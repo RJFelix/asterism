@@ -1,0 +1,11 @@
+{
+  "name": "asterism",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Spatial canvas and malleable HTML workspace for agentic workflows and speculative collaboration",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
