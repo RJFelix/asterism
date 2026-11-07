@@ -1,0 +1,24 @@
+{
+  "name": "@asterism/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./outbox": "./src/outbox.ts",
+    "./peer": "./src/peer.ts",
+    "./connection": "./src/connection.ts",
+    "./harness-bridge": "./src/harness-bridge.ts"
+  },
+  "dependencies": {
+    "@t3tools/contracts": "*",
+    "@t3tools/provider-acp": "*",
+    "@t3tools/provider-core": "*",
+    "@t3tools/shared": "*",
+    "@t3tools/ssh": "*",
+    "@t3tools/tailscale": "*",
+    "effect": "4.1.2",
+    "effect-acp": "*",
+    "effect-codex-app-server": "*"
+  }
+}

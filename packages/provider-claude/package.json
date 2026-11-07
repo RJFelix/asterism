@@ -1,0 +1,17 @@
+{
+  "name": "@t3tools/provider-claude",
+  "version": "0.1.7",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server/adapter": "./src/server/adapter.ts",
+    "./server/driver": "./src/server/ClaudeDriver.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.84",
+    "@t3tools/contracts": "*",
+    "@t3tools/provider-core": "*",
+    "@t3tools/shared": "*",
+    "effect": "4.1.2"
+  }
+}

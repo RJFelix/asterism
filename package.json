@@ -1,11 +1,28 @@
 {
   "name": "asterism",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Spatial canvas and malleable HTML workspace for agentic workflows and speculative collaboration",
+  "description": "Spatial canvas, Innovation Train, and Effect-TS multi-provider harness orchestrator",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@asterism/core": "*",
+    "@t3tools/contracts": "*",
+    "@t3tools/provider-acp": "*",
+    "@t3tools/provider-core": "*",
+    "@t3tools/shared": "*",
+    "@t3tools/ssh": "*",
+    "@t3tools/tailscale": "*",
+    "effect": "4.1.2",
+    "effect-acp": "*",
+    "effect-codex-app-server": "*",
+    "@effect/platform-node": "4.1.2",
+    "@effect/platform-node-shared": "4.1.2"
   }
 }
