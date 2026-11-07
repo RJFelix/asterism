@@ -1,15 +1,23 @@
+export const INNOVATION_STAGES = [
+  { id: "note", label: "1. Note", icon: "✎", color: "#94a3b8", next: "brainstorm", nextLabel: "Advance → Brainstorm (3x)" },
+  { id: "brainstorm", label: "2. Brainstorm", icon: "⚡", color: "#c084fc", next: "refine", nextLabel: "Advance → Refine Spec" },
+  { id: "refine", label: "3. Refine", icon: "◈", color: "#38bdf8", next: "design", nextLabel: "Advance → Interactive Design" },
+  { id: "design", label: "4. Design", icon: "❖", color: "#fbbf24", next: "implement", nextLabel: "Advance → Implementation" },
+  { id: "implement", label: "5. Implement", icon: "⚙", color: "#34d399", next: "refine", nextLabel: "Spawn Next Iteration" }
+];
+
 export function getDefaultCanvasState() {
   return {
-    version: 1,
+    version: 2,
     updatedAt: new Date().toISOString(),
-    viewport: { x: 80, y: 60, scale: 0.88 },
+    viewport: { x: 70, y: 55, scale: 0.85 },
     strokes: [],
     edges: [
       {
         id: "edge-1",
         from: "node-brief",
         to: "node-hydro",
-        label: "Workflow DSL -> Fork"
+        label: "Advance → Refine DSL"
       },
       {
         id: "edge-2",
@@ -21,7 +29,7 @@ export function getDefaultCanvasState() {
         id: "edge-3",
         from: "node-hydro",
         to: "node-spec-b",
-        label: "Fork B: Tactical Console"
+        label: "Fork B: State Scrubber"
       },
       {
         id: "edge-4",
@@ -39,77 +47,89 @@ export function getDefaultCanvasState() {
     nodes: [
       {
         id: "node-brief",
-        title: "Design Brief: Collaborative UI/UX & Speculative Studio",
+        title: "Seed Note: The Innovation Train",
         kind: "brief",
-        x: 40,
-        y: 60,
+        stage: "note",
+        x: 30,
+        y: 50,
         width: 390,
-        height: 360,
+        height: 375,
         model: "openai/gpt-6-luna",
         status: "ready",
-        branchTag: "root",
+        branchTag: "seed-note",
         html: `<div class="surface-root">
   <style>
     .surface-root {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       color: #e2e8f0;
-      padding: 16px;
+      padding: 15px;
       line-height: 1.45;
-      font-size: 13px;
+      font-size: 12.5px;
     }
-    .badge-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-    .badge {
-      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
-      padding: 3px 8px; border-radius: 999px; background: rgba(56, 189, 248, 0.14);
-      color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);
+    .train-track {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; font-size: 10.5px;
     }
-    h3 { margin: 0 0 8px; font-size: 15px; color: #f8fafc; }
+    .station { display: flex; flex-direction: column; align-items: center; gap: 3px; color: #94a3b8; }
+    .station.active { color: #38bdf8; font-weight: 700; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    h3 { margin: 0 0 6px; font-size: 14.5px; color: #f8fafc; }
     p { margin: 0 0 10px; color: #94a3b8; }
-    .goal-list {
-      display: grid; gap: 8px; margin: 12px 0;
-    }
+    .goal-list { display: grid; gap: 7px; margin: 10px 0; }
     .goal-item {
       background: rgba(15, 23, 42, 0.65);
       border: 1px solid rgba(148, 163, 184, 0.16);
-      border-radius: 8px; padding: 9px 11px;
+      border-radius: 8px; padding: 8px 10px;
     }
-    .goal-item strong { color: #e2e8f0; display: block; margin-bottom: 2px; font-size: 12px; }
-    .goal-item span { color: #94a3b8; font-size: 11.5px; }
+    .goal-item strong { color: #e2e8f0; display: block; margin-bottom: 2px; font-size: 11.5px; }
+    .goal-item span { color: #94a3b8; font-size: 11px; }
+    .cta-row { display: flex; gap: 6px; margin-top: 8px; }
     .cta-btn {
-      width: 100%; margin-top: 6px; padding: 8px 12px; border-radius: 7px;
+      flex: 1; padding: 7px 10px; border-radius: 7px;
       border: 1px solid rgba(168, 85, 247, 0.45);
       background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(59, 130, 246, 0.25));
-      color: #f3e8ff; font-weight: 600; font-size: 12px; cursor: pointer;
+      color: #f3e8ff; font-weight: 600; font-size: 11.5px; cursor: pointer;
     }
     .cta-btn:hover { background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(59, 130, 246, 0.4)); }
   </style>
-  <div class="badge-row">
-    <span class="badge">Malleable HTML Session</span>
-    <span class="badge">Root Context</span>
+  <div class="train-track">
+    <div class="station active"><span class="dot"></span>Note</div>
+    <span>→</span>
+    <div class="station"><span class="dot"></span>Brainstorm</div>
+    <span>→</span>
+    <div class="station"><span class="dot"></span>Refine</div>
+    <span>→</span>
+    <div class="station"><span class="dot"></span>Design</div>
+    <span>→</span>
+    <div class="station"><span class="dot"></span>Implement</div>
   </div>
-  <h3>Rethinking Agent + Human UI/UX</h3>
-  <p>Instead of a linear text scrollback, every node on this canvas is a live, malleable HTML application that both you and agents can mutate in place or fork speculatively.</p>
+  <h3>Continuous Innovation Train</h3>
+  <p>Every node sits on a continuous pipeline from raw thought to running code. Keep <strong>as many speculative forks as you want</strong>—each kept fork becomes its own parallel train car that can advance to the next stage.</p>
   <div class="goal-list">
     <div class="goal-item">
-      <strong>1. Mutate Any Surface Live</strong>
-      <span>Use the prompt bar at the bottom of any card (or click Inspect) to ask an agent to redesign or add interactive tools to that card's DOM.</span>
+      <strong>Keep Multiple Forks &amp; Synthesize</strong>
+      <span>Click <em>✓ Keep Fork</em> on any number of branches without destroying siblings, or <em>⊕ Synthesize Kept</em> to merge two kept designs into a hybrid child.</span>
     </div>
     <div class="goal-item">
-      <strong>2. Speculative Forking (Hydro DSL)</strong>
-      <span>Click <em>Speculate (3x)</em> on any node to anticipate 3 distinct design/action directions in parallel and compare them side-by-side.</span>
+      <strong>Advance Stage (→)</strong>
+      <span>Click the stage button on any card header to spawn a downstream node for the next phase (Brainstorm → Refine → Design → Implement).</span>
     </div>
   </div>
-  <button class="cta-btn" onclick="window.parent.postMessage({type:'asterism:trigger-speculate', nodeId:'node-brief', prompt:'Explore 3 radically different UI/UX design tools for co-designing interfaces with an agent'}, '*')">
-    ⚡ Fork 3 Speculative Co-Design Surfaces
-  </button>
+  <div class="cta-row">
+    <button class="cta-btn" onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'node-brief'}, '*')">
+      🚂 Advance Note → Next Stage
+    </button>
+  </div>
 </div>`
       },
       {
         id: "node-hydro",
         title: "Hydro Workflow & Jev Evaluator",
         kind: "workflow",
-        x: 500,
-        y: 60,
+        stage: "refine",
+        x: 495,
+        y: 50,
         width: 430,
         height: 390,
         model: "openai/gpt-6-luna",
@@ -148,15 +168,15 @@ export function getDefaultCanvasState() {
     .btn:hover { border-color: #38bdf8; color: #38bdf8; }
   </style>
   <div class="hdr">
-    <span class="hdr-title">do-notation :: Workflow UIVariant</span>
-    <span class="pill" id="hydro-state">Forked 3 Branches</span>
+    <span class="hdr-title">do-notation :: Workflow [UIVariant]</span>
+    <span class="pill" id="hydro-state">Multi-Fork Active</span>
   </div>
   <div class="step">
     <div class="step-top">
-      <span><span class="kw">Intent</span> "Anticipate operator UI preference"</span>
+      <span><span class="kw">Intent</span> "Fan out speculative UI branches"</span>
       <span class="cost-free">0 tokens</span>
     </div>
-    <div class="desc">Instead of blocking on <code>Ask</code>, fork the canvas into 3 concrete interactive surfaces.</div>
+    <div class="desc">Keep 1, 2, or all 3 branches alive simultaneously as independent innovation tracks.</div>
   </div>
   <div class="step">
     <div class="step-top">
@@ -168,10 +188,10 @@ export function getDefaultCanvasState() {
   <div class="step">
     <div class="step-top">
       <span><span class="kw">PJudge</span> (LastN 3) QChoice</span>
-      <span class="cost-jev" id="jev-label">Jev • p = 0.84</span>
+      <span class="cost-jev" id="jev-label">Jev • p = 0.86</span>
     </div>
     <div class="desc">Fast small model scores layout density, interaction ergonomics, and accessibility.</div>
-    <div class="prob-bar"><div class="prob-fill" id="jev-bar" style="width: 84%"></div></div>
+    <div class="prob-bar"><div class="prob-fill" id="jev-bar" style="width: 86%"></div></div>
   </div>
   <div class="controls">
     <button class="btn" onclick="
@@ -180,6 +200,9 @@ export function getDefaultCanvasState() {
       document.getElementById('jev-bar').style.width = (p*100) + '%';
       document.getElementById('hydro-state').textContent = p >= 0.75 ? 'Pass >= 0.75' : 'Abstain / Ask User';
     ">Re-run Jev Calibration</button>
+    <button class="btn" onclick="window.parent.postMessage({type:'asterism:prune-unkept', parentId:'node-hydro'}, '*')">
+      ✂ Prune Unkept Forks
+    </button>
   </div>
 </div>`
       },
@@ -187,8 +210,9 @@ export function getDefaultCanvasState() {
         id: "node-robotics",
         title: "Physical World: Desk Arm & Depth Sensor",
         kind: "robotics",
-        x: 40,
-        y: 460,
+        stage: "implement",
+        x: 30,
+        y: 465,
         width: 390,
         height: 330,
         model: "openai/gpt-6-luna",
@@ -263,14 +287,16 @@ export function getDefaultCanvasState() {
         id: "node-spec-a",
         title: "Branch A: Spatial Direct-Manipulation HUD",
         kind: "speculative",
+        stage: "design",
         x: 1010,
-        y: 30,
-        width: 360,
-        height: 255,
+        y: 25,
+        width: 370,
+        height: 265,
         model: "openai/gpt-6-luna",
         status: "speculative",
         branchTag: "fork-A",
         parentId: "node-hydro",
+        jevScore: 0.89,
         html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
     <span style="background:rgba(56,189,248,0.18);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;">SPECULATIVE FORK A</span>
@@ -278,12 +304,15 @@ export function getDefaultCanvasState() {
   </div>
   <h4 style="margin:0 0 6px;font-size:14px;">Zero-Chat Spatial Inspector</h4>
   <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">Overlays bounding-box handles and inline CSS/token sliders directly onto live components.</p>
-  <div style="background:rgba(15,23,42,0.8);border:1px dashed rgba(56,189,248,0.45);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
+  <div style="background:rgba(15,23,42,0.8);border:1px dashed rgba(56,189,248,0.45);border-radius:8px;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
     <div>
       <div style="font-size:11px;color:#38bdf8;font-family:monospace;">&lt;Card radius="12px" /&gt;</div>
-      <div style="font-size:10px;color:#64748b;">Drag handles to resize &amp; restyle</div>
+      <div style="font-size:10px;color:#64748b;">Keep multiple forks &amp; advance</div>
     </div>
-    <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-a'}, '*')" style="background:#0284c7;color:white;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork A</button>
+    <div style="display:flex;gap:5px;">
+      <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-a'}, '*')" style="background:#0284c7;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
+      <button onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'node-spec-a'}, '*')" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
+    </div>
   </div>
 </div>`
       },
@@ -291,14 +320,16 @@ export function getDefaultCanvasState() {
         id: "node-spec-b",
         title: "Branch B: Keyframe & Constraint Timeline",
         kind: "speculative",
+        stage: "design",
         x: 1010,
         y: 310,
-        width: 360,
-        height: 255,
+        width: 370,
+        height: 265,
         model: "openai/gpt-6-luna",
         status: "speculative",
         branchTag: "fork-B",
         parentId: "node-hydro",
+        jevScore: 0.82,
         html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
     <span style="background:rgba(168,85,247,0.18);color:#c084fc;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;">SPECULATIVE FORK B</span>
@@ -306,15 +337,16 @@ export function getDefaultCanvasState() {
   </div>
   <h4 style="margin:0 0 6px;font-size:14px;">State-Graph &amp; Motion Scrubbing</h4>
   <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">Treats UI/UX as a state machine with scrubbable transitions between empty, loading, error, and populated states.</p>
-  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(168,85,247,0.35);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
-    <div style="display:flex;gap:4px;">
-      <span style="padding:3px 6px;background:#3b0764;color:#e9d5ff;border-radius:4px;font-size:10px;">Idle</span>
+  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(168,85,247,0.35);border-radius:8px;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+    <div style="display:flex;gap:4px;align-items:center;">
+      <span style="padding:3px 5px;background:#3b0764;color:#e9d5ff;border-radius:4px;font-size:10px;">Idle</span>
       <span style="color:#64748b;">→</span>
-      <span style="padding:3px 6px;background:#581c87;color:#f3e8ff;border-radius:4px;font-size:10px;">Streaming</span>
-      <span style="color:#64748b;">→</span>
-      <span style="padding:3px 6px;background:#1e293b;color:#94a3b8;border-radius:4px;font-size:10px;">Done</span>
+      <span style="padding:3px 5px;background:#581c87;color:#f3e8ff;border-radius:4px;font-size:10px;">Live</span>
     </div>
-    <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-b'}, '*')" style="background:#7e22ce;color:white;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork B</button>
+    <div style="display:flex;gap:5px;">
+      <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-b'}, '*')" style="background:#7e22ce;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
+      <button onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'node-spec-b'}, '*')" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
+    </div>
   </div>
 </div>`
       },
@@ -322,14 +354,16 @@ export function getDefaultCanvasState() {
         id: "node-spec-c",
         title: "Branch C: Embodied Sketch + Voice Table",
         kind: "speculative",
+        stage: "design",
         x: 1010,
-        y: 590,
-        width: 360,
-        height: 255,
+        y: 595,
+        width: 370,
+        height: 265,
         model: "openai/gpt-6-luna",
         status: "speculative",
         branchTag: "fork-C",
         parentId: "node-hydro",
+        jevScore: 0.77,
         html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
     <span style="background:rgba(16,185,129,0.18);color:#34d399;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;">SPECULATIVE FORK C</span>
@@ -337,9 +371,12 @@ export function getDefaultCanvasState() {
   </div>
   <h4 style="margin:0 0 6px;font-size:14px;">Physical Camera + Paper Sketch Sync</h4>
   <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">Uses overhead desk camera + Whisper voice stream to turn pen-and-paper wireframes into live DOM surfaces.</p>
-  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(16,185,129,0.35);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
-    <div style="font-size:10.5px;color:#6ee7b7;">📷 Overhead Cam + Whisper Ready</div>
-    <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-c'}, '*')" style="background:#059669;color:white;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork C</button>
+  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(16,185,129,0.35);border-radius:8px;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+    <div style="font-size:10.5px;color:#6ee7b7;">📷 Overhead Cam</div>
+    <div style="display:flex;gap:5px;">
+      <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-c'}, '*')" style="background:#059669;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
+      <button onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'node-spec-c'}, '*')" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
+    </div>
   </div>
 </div>`
       }

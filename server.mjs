@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDefaultCanvasState } from "./src/default-state.mjs";
-import { mutateHtmlSurface, generateSpeculativeBranches } from "./src/llm.mjs";
+import { mutateHtmlSurface, generateSpeculativeBranches, advanceNodeStage } from "./src/llm.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "data");
@@ -175,29 +175,106 @@ export function createAsterismServer() {
       }
     }
 
+    // Keep one or more speculative branches! By default pruneSiblings=false so multiple forks can be kept in parallel.
     if (req.method === "POST" && url.pathname === "/api/nodes/commit-branch") {
       try {
-        const { nodeId } = await readJsonBody(req);
+        const { nodeId, pruneSiblings = false } = await readJsonBody(req);
         const winner = canvasState.nodes.find((n) => n.id === nodeId);
         if (!winner) return sendJson(res, 404, { error: "Branch node not found" });
 
-        const parentId = winner.parentId;
-        const siblingIds = new Set(
-          canvasState.nodes
-            .filter((n) => n.parentId && n.parentId === parentId && n.id !== winner.id)
-            .map((n) => n.id)
-        );
-
         winner.status = "committed";
         winner.kind = "surface";
-        canvasState.nodes = canvasState.nodes.filter((n) => !siblingIds.has(n.id));
-        canvasState.edges = canvasState.edges.filter(
-          (e) => !siblingIds.has(e.from) && !siblingIds.has(e.to)
-        );
+
+        let discarded = [];
+        if (pruneSiblings && winner.parentId) {
+          const siblingIds = new Set(
+            canvasState.nodes
+              .filter(
+                (n) =>
+                  n.parentId === winner.parentId &&
+                  n.id !== winner.id &&
+                  n.status !== "committed"
+              )
+              .map((n) => n.id)
+          );
+          discarded = [...siblingIds];
+          canvasState.nodes = canvasState.nodes.filter((n) => !siblingIds.has(n.id));
+          canvasState.edges = canvasState.edges.filter(
+            (e) => !siblingIds.has(e.from) && !siblingIds.has(e.to)
+          );
+        }
 
         saveState(canvasState);
         broadcastState();
-        return sendJson(res, 200, { winner, discarded: [...siblingIds], state: canvasState });
+        return sendJson(res, 200, { winner, discarded, state: canvasState });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Explicitly prune only unkept (still speculative) sibling forks of a parent node
+    if (req.method === "POST" && url.pathname === "/api/nodes/prune-unkept") {
+      try {
+        const { parentId } = await readJsonBody(req);
+        const unkeptIds = new Set(
+          canvasState.nodes
+            .filter(
+              (n) =>
+                (!parentId || n.parentId === parentId) &&
+                n.kind === "speculative" &&
+                n.status !== "committed"
+            )
+            .map((n) => n.id)
+        );
+        canvasState.nodes = canvasState.nodes.filter((n) => !unkeptIds.has(n.id));
+        canvasState.edges = canvasState.edges.filter(
+          (e) => !unkeptIds.has(e.from) && !unkeptIds.has(e.to)
+        );
+        saveState(canvasState);
+        broadcastState();
+        return sendJson(res, 200, { discarded: [...unkeptIds], state: canvasState });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Advance any node (or kept fork) to the next stage of the Innovation Train
+    if (req.method === "POST" && url.pathname === "/api/nodes/advance") {
+      try {
+        const { nodeId, targetStage, instruction } = await readJsonBody(req);
+        const sourceNode = canvasState.nodes.find((n) => n.id === nodeId);
+        if (!sourceNode) return sendJson(res, 404, { error: "Source node not found" });
+
+        // Marking a speculative branch as committed when you advance it
+        if (sourceNode.kind === "speculative") {
+          sourceNode.status = "committed";
+          sourceNode.kind = "surface";
+        }
+        sourceNode.status = "mutating";
+        broadcastState();
+
+        const childNode = await advanceNodeStage({
+          sourceNode,
+          targetStage,
+          instruction
+        });
+
+        // Offset vertically if siblings already exist at the target X
+        const existingDownstream = canvasState.edges.filter((e) => e.from === sourceNode.id).length;
+        childNode.y = sourceNode.y + existingDownstream * 140;
+
+        sourceNode.status = "committed";
+        canvasState.nodes.push(childNode);
+        canvasState.edges.push({
+          id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          from: sourceNode.id,
+          to: childNode.id,
+          label: `→ ${childNode.stage}`
+        });
+
+        saveState(canvasState);
+        broadcastState();
+        return sendJson(res, 200, { childNode, state: canvasState });
       } catch (err) {
         return sendJson(res, 500, { error: err.message });
       }

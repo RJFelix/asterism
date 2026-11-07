@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asterism — Spatial Canvas & Malleable HTML Studio</title>
+  <title>Asterism — Spatial Canvas & Innovation Train</title>
   <style>
     :root {
       --bg-deep: #070a12;
@@ -39,20 +39,20 @@
 
     #canvas-world {
       position: absolute; top: 0; left: 0;
-      width: 4000px; height: 3000px;
+      width: 5000px; height: 3600px;
       transform-origin: 0 0;
     }
 
     #svg-layer {
       position: absolute; top: 0; left: 0;
-      width: 4000px; height: 3000px;
+      width: 5000px; height: 3600px;
       pointer-events: none; overflow: visible;
     }
 
     /* Top Floating HUD Toolbar */
     .hud-topbar {
       position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
-      z-index: 100; display: flex; align-items: center; gap: 8px;
+      z-index: 100; display: flex; align-items: center; gap: 7px;
       padding: 7px 12px; border-radius: 12px;
       background: rgba(15, 23, 42, 0.88);
       backdrop-filter: blur(14px);
@@ -73,8 +73,8 @@
       background: rgba(30, 41, 59, 0.75);
       color: var(--text-muted);
       border: 1px solid rgba(148, 163, 184, 0.16);
-      padding: 6px 11px; border-radius: 8px;
-      font-size: 12px; font-weight: 500; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px;
+      font-size: 11.5px; font-weight: 500; cursor: pointer;
       display: flex; align-items: center; gap: 5px;
       transition: all 0.15s ease;
     }
@@ -86,7 +86,7 @@
     }
     .zoom-readout {
       font-family: ui-monospace, monospace; font-size: 11px;
-      color: var(--text-muted); min-width: 46px; text-align: center;
+      color: var(--text-muted); min-width: 44px; text-align: center;
     }
 
     /* Spatial Node Cards */
@@ -102,8 +102,12 @@
       transition: box-shadow 0.2s, border-color 0.2s;
     }
     .canvas-node.kind-speculative {
-      border-color: rgba(168, 85, 247, 0.45);
+      border-color: rgba(168, 85, 247, 0.48);
       box-shadow: 0 16px 38px rgba(88, 28, 135, 0.25);
+    }
+    .canvas-node.status-committed {
+      border-color: rgba(16, 185, 129, 0.55);
+      box-shadow: 0 16px 38px rgba(16, 185, 129, 0.16);
     }
     .canvas-node.status-mutating, .canvas-node.status-speculating {
       border-color: var(--accent-cyan);
@@ -111,35 +115,37 @@
     }
     .node-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 8px 11px;
+      padding: 7px 10px;
       background: rgba(30, 41, 59, 0.85);
       border-bottom: 1px solid rgba(148, 163, 184, 0.16);
       cursor: grab;
-      gap: 8px;
+      gap: 6px;
     }
     .node-header:active { cursor: grabbing; }
     .node-title-wrap {
-      display: flex; align-items: center; gap: 7px; overflow: hidden;
+      display: flex; align-items: center; gap: 6px; overflow: hidden;
     }
-    .node-tag {
-      font-family: ui-monospace, monospace; font-size: 10px;
+    .node-stage-pill {
+      font-family: ui-monospace, monospace; font-size: 9.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
       padding: 2px 6px; border-radius: 5px;
-      background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.16); color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
       white-space: nowrap;
     }
     .node-title {
-      font-size: 12px; font-weight: 600; color: #f8fafc;
+      font-size: 11.5px; font-weight: 600; color: #f8fafc;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .node-actions {
-      display: flex; align-items: center; gap: 4px;
+      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
     }
     .mini-btn {
       background: rgba(15, 23, 42, 0.7);
       color: var(--text-muted);
       border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 6px; padding: 3px 7px;
-      font-size: 10.5px; cursor: pointer;
+      border-radius: 6px; padding: 3px 6px;
+      font-size: 10px; cursor: pointer;
     }
     .mini-btn:hover { color: #f8fafc; border-color: var(--accent-cyan); }
     .mini-btn.spec-btn {
@@ -147,6 +153,12 @@
       background: rgba(168, 85, 247, 0.16);
     }
     .mini-btn.spec-btn:hover { background: rgba(168, 85, 247, 0.32); }
+    .mini-btn.advance-btn {
+      color: #6ee7b7; border-color: rgba(16, 185, 129, 0.45);
+      background: rgba(16, 185, 129, 0.16);
+      font-weight: 600;
+    }
+    .mini-btn.advance-btn:hover { background: rgba(16, 185, 129, 0.32); }
 
     .node-body {
       flex: 1; position: relative; overflow: auto;
@@ -170,7 +182,7 @@
     /* Prompt / Co-Design Footer inside each Node */
     .node-footer {
       display: flex; align-items: center; gap: 6px;
-      padding: 7px 9px;
+      padding: 6px 9px;
       background: rgba(15, 23, 42, 0.95);
       border-top: 1px solid rgba(148, 163, 184, 0.15);
     }
@@ -199,7 +211,7 @@
     #status-toast {
       position: fixed; bottom: 16px; left: 16px; z-index: 100;
       padding: 8px 14px; border-radius: 9px;
-      background: rgba(15, 23, 42, 0.9);
+      background: rgba(15, 23, 42, 0.92);
       border: 1px solid rgba(56, 189, 248, 0.35);
       font-size: 12px; color: #bae6fd;
       display: none;
@@ -213,12 +225,13 @@
       <span>ASTERISM</span>
     </div>
     <button class="tool-btn active" id="mode-select" onclick="setMode('select')">↖ Pan / Interact</button>
-    <button class="tool-btn" id="mode-draw" onclick="setMode('draw')">✎ Freehand Sketch</button>
+    <button class="tool-btn" id="mode-draw" onclick="setMode('draw')">✎ Sketch</button>
     <button class="tool-btn" id="mode-connect" onclick="setMode('connect')">⤳ Wire Nodes</button>
-    <button class="tool-btn" onclick="createNewSurface()">＋ New HTML Surface</button>
+    <button class="tool-btn" onclick="createNewSurface()">＋ New Note / Surface</button>
+    <button class="tool-btn" onclick="pruneUnkeptForks()" title="Remove only speculative branches you haven't marked Keep">✂ Prune Unkept Forks</button>
     <button class="tool-btn" onclick="clearSketches()">⌫ Clear Ink</button>
-    <button class="tool-btn" onclick="resetCanvas()">↺ Reset Demo</button>
-    <span class="zoom-readout" id="zoom-label">88%</span>
+    <button class="tool-btn" onclick="resetCanvas()">↺ Reset</button>
+    <span class="zoom-readout" id="zoom-label">85%</span>
   </div>
 
   <div id="canvas-viewport">
@@ -240,7 +253,7 @@
 
   <script>
     let state = {
-      viewport: { x: 60, y: 60, scale: 0.88 },
+      viewport: { x: 70, y: 55, scale: 0.85 },
       nodes: [],
       edges: [],
       strokes: []
@@ -260,7 +273,7 @@
     const zoomLabel = document.getElementById('zoom-label');
     const toastEl = document.getElementById('status-toast');
 
-    function showToast(msg, ms = 3200) {
+    function showToast(msg, ms = 3500) {
       toastEl.textContent = msg;
       toastEl.style.display = 'block';
       clearTimeout(toastEl._timer);
@@ -306,12 +319,13 @@
         const y2 = to.y + to.height / 2;
         const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
 
+        const isSpeculative = to.kind === 'speculative' && to.status !== 'committed';
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', 'rgba(56, 189, 248, 0.55)');
-        path.setAttribute('stroke-width', '2');
-        path.setAttribute('stroke-dasharray', to.kind === 'speculative' ? '6 4' : '');
+        path.setAttribute('stroke', isSpeculative ? 'rgba(168, 85, 247, 0.55)' : 'rgba(56, 189, 248, 0.65)');
+        path.setAttribute('stroke-width', isSpeculative ? '2' : '2.4');
+        path.setAttribute('stroke-dasharray', isSpeculative ? '6 4' : '');
         path.setAttribute('marker-end', 'url(#arrow)');
         edgesGroup.appendChild(path);
 
@@ -336,7 +350,7 @@
         const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
         poly.setAttribute('points', stroke.points.map(p => `${p.x},${p.y}`).join(' '));
         poly.setAttribute('fill', 'none');
-        poly.setAttribute('stroke', stroke.color || '#f43f5e');
+        poly.setAttribute('stroke', stroke.color || '#38bdf8');
         poly.setAttribute('stroke-width', '3');
         poly.setAttribute('stroke-linecap', 'round');
         poly.setAttribute('stroke-linejoin', 'round');
@@ -366,12 +380,13 @@
           card.innerHTML = `
             <div class="node-header">
               <div class="node-title-wrap">
-                <span class="node-tag"></span>
+                <span class="node-stage-pill"></span>
                 <span class="node-title"></span>
               </div>
               <div class="node-actions">
-                <button class="mini-btn code-toggle-btn" title="Edit Live HTML">‹/› HTML</button>
-                <button class="mini-btn spec-btn" title="Fork 3 Speculative Variants in Parallel">⚡ Speculate (3x)</button>
+                <button class="mini-btn code-toggle-btn" title="Edit Live HTML">‹/›</button>
+                <button class="mini-btn spec-btn" title="Fork 3 Speculative Variants in Parallel">⚡ Fork 3x</button>
+                <button class="mini-btn advance-btn" title="Advance to Next Innovation Train Stage">🚂 Advance →</button>
                 <button class="mini-btn del-btn" title="Delete Surface">✕</button>
               </div>
             </div>
@@ -380,7 +395,7 @@
               <textarea class="node-code-editor" spellcheck="false"></textarea>
             </div>
             <div class="node-footer">
-              <input class="node-prompt-input" type="text" placeholder="Mutate this HTML surface (e.g. 'Add an interactive color token picker')..." />
+              <input class="node-prompt-input" type="text" placeholder="Mutate surface or specify focus before Fork / Advance..." />
               <button class="node-send-btn">Mutate</button>
             </div>
             <div class="resize-handle"></div>
@@ -395,7 +410,9 @@
         card.style.width = `${node.width}px`;
         card.style.height = `${node.height}px`;
 
-        card.querySelector('.node-tag').textContent = node.branchTag || node.kind || 'surface';
+        const stageLabel = (node.stage || node.branchTag || 'surface').toUpperCase();
+        card.querySelector('.node-stage-pill').textContent =
+          node.status === 'committed' ? `✓ ${stageLabel}` : stageLabel;
         card.querySelector('.node-title').textContent = node.title;
 
         const iframe = card.querySelector('.node-iframe');
@@ -415,6 +432,7 @@
       const resizeHandle = card.querySelector('.resize-handle');
       const codeBtn = card.querySelector('.code-toggle-btn');
       const specBtn = card.querySelector('.spec-btn');
+      const advanceBtn = card.querySelector('.advance-btn');
       const delBtn = card.querySelector('.del-btn');
       const editor = card.querySelector('.node-code-editor');
       const promptInput = card.querySelector('.node-prompt-input');
@@ -505,7 +523,14 @@
 
       specBtn.addEventListener('click', () => {
         const customPrompt = promptInput.value.trim();
+        promptInput.value = '';
         triggerSpeculate(nodeId, customPrompt || 'Explore 3 divergent interactive UI designs for this surface');
+      });
+
+      advanceBtn.addEventListener('click', () => {
+        const customPrompt = promptInput.value.trim();
+        promptInput.value = '';
+        advanceStage(nodeId, customPrompt);
       });
 
       delBtn.addEventListener('click', () => {
@@ -541,17 +566,36 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId, prompt, count: 3 })
       });
-      showToast('3 speculative branches ready! Compare side-by-side and click "Keep" on the winner.');
+      showToast('3 speculative branches ready! Keep as many as you like or click "🚂 Advance →" on any branch.');
     }
 
-    async function commitBranch(nodeId) {
-      showToast('Committing winning branch & pruning discarded siblings...');
+    async function commitBranch(nodeId, pruneSiblings = false) {
+      showToast('✓ Marked fork as Kept! (Siblings stay alive so you can keep multiple tracks.)');
       await fetch('/api/nodes/commit-branch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId })
+        body: JSON.stringify({ nodeId, pruneSiblings })
       });
-      showToast('Branch committed to canvas!');
+    }
+
+    async function pruneUnkeptForks(parentId) {
+      const res = await fetch('/api/nodes/prune-unkept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId })
+      });
+      const data = await res.json();
+      showToast(`Pruned ${data.discarded?.length || 0} unkept speculative fork(s). Kept forks remain intact.`);
+    }
+
+    async function advanceStage(nodeId, instruction) {
+      showToast('🚂 Advancing node to next Innovation Train stage...', 20000);
+      await fetch('/api/nodes/advance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId, instruction })
+      });
+      showToast('Next stage spawned on the Innovation Train!');
     }
 
     window.addEventListener('message', (e) => {
@@ -559,7 +603,11 @@
       if (e.data.type === 'asterism:trigger-speculate') {
         triggerSpeculate(e.data.nodeId, e.data.prompt);
       } else if (e.data.type === 'asterism:commit-branch') {
-        commitBranch(e.data.nodeId);
+        commitBranch(e.data.nodeId, Boolean(e.data.pruneSiblings));
+      } else if (e.data.type === 'asterism:prune-unkept') {
+        pruneUnkeptForks(e.data.parentId);
+      } else if (e.data.type === 'asterism:advance-stage') {
+        advanceStage(e.data.nodeId, e.data.instruction);
       }
     });
 
@@ -607,7 +655,7 @@
       if (e.target.closest('.node-body')) return;
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      const nextScale = Math.min(2.0, Math.max(0.35, state.viewport.scale * zoomFactor));
+      const nextScale = Math.min(2.0, Math.max(0.3, state.viewport.scale * zoomFactor));
       const wx = (e.clientX - state.viewport.x) / state.viewport.scale;
       const wy = (e.clientY - state.viewport.y) / state.viewport.scale;
       state.viewport.scale = nextScale;
@@ -618,20 +666,22 @@
 
     function createNewSurface() {
       const center = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
-      const id = 'node-custom-' + Date.now();
+      const id = 'node-note-' + Date.now();
       state.nodes.push({
         id,
-        title: 'Interactive Prototype Surface',
+        title: 'Seed Note / Idea',
         kind: 'surface',
+        stage: 'note',
         x: Math.round(center.x - 180),
         y: Math.round(center.y - 140),
         width: 370,
         height: 290,
         status: 'ready',
-        branchTag: 'live-dom',
+        branchTag: 'note',
         html: `<div style="font-family:system-ui,sans-serif;padding:16px;color:#e2e8f0;">
-  <h4 style="margin:0 0 8px;color:#38bdf8;">New Malleable Surface</h4>
-  <p style="font-size:12px;color:#94a3b8;">Type an instruction below to have the agent transform this card into any custom tool, visualization, or interactive UI prototype.</p>
+  <h4 style="margin:0 0 8px;color:#38bdf8;">New Innovation Train Seed</h4>
+  <p style="font-size:12px;color:#94a3b8;margin-bottom:12px;">Jot down a raw note here, click <strong>⚡ Fork 3x</strong> to brainstorm parallel directions, or click <strong>🚂 Advance →</strong> to refine and implement.</p>
+  <button onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'${id}'}, '*')" style="width:100%;background:#0284c7;color:white;border:none;padding:7px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;">🚂 Advance Note → Brainstorm</button>
 </div>`
       });
       renderAll();
@@ -646,7 +696,7 @@
 
     async function resetCanvas() {
       await fetch('/api/reset', { method: 'POST' });
-      showToast('Canvas reset to default demo state.');
+      showToast('Canvas reset to default Innovation Train state.');
     }
 
     async function persistState() {
