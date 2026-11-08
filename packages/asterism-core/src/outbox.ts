@@ -32,6 +32,13 @@ export const AsterismEffectRequest = Schema.Union([
     count: Schema.Number,
   }),
   Schema.Struct({
+    type: Schema.Literal("surface.synthesize"),
+    nodeId: Schema.String,
+    parentIds: Schema.Array(Schema.String),
+    targetStage: CanvasNodeStage,
+    instruction: Schema.optional(Schema.String),
+  }),
+  Schema.Struct({
     type: Schema.Literal("train.advance"),
     nodeId: Schema.String,
     targetStage: CanvasNodeStage,
@@ -44,6 +51,12 @@ export const AsterismEffectRequest = Schema.Union([
     model: Schema.String,
     prompt: Schema.String,
     cwd: Schema.String,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("worktree.commit"),
+    nodeId: Schema.String,
+    worktreePath: Schema.String,
+    message: Schema.String,
   }),
   Schema.Struct({
     type: Schema.Literal("peer.delegate"),

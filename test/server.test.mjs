@@ -1,15 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import * as Effect from "effect/Effect";
+import { removeIsolatedWorktree } from "@asterism/core";
 import { createAsterismServer } from "../server.mjs";
 
 test("Asterism server supports keeping multiple speculative branches in parallel and pruning only unkept forks", async () => {
-  const server = createAsterismServer();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "asterism-srv1-"));
+  const server = createAsterismServer({
+    dbPath: path.join(tmpDir, "test1.sqlite"),
+    worktreesDir: path.join(tmpDir, "worktrees"),
+  });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
 
   try {
-    // Reset to clean state
     const resetRes = await fetch(`${baseUrl}/api/reset`, { method: "POST" });
     assert.equal(resetRes.status, 200);
     const state = await resetRes.json();
@@ -20,7 +28,7 @@ test("Asterism server supports keeping multiple speculative branches in parallel
     const keepARes = await fetch(`${baseUrl}/api/nodes/commit-branch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeId: "node-spec-a" })
+      body: JSON.stringify({ nodeId: "node-spec-a" }),
     });
     assert.equal(keepARes.status, 200);
     const keepAData = await keepARes.json();
@@ -32,7 +40,7 @@ test("Asterism server supports keeping multiple speculative branches in parallel
     const keepBRes = await fetch(`${baseUrl}/api/nodes/commit-branch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeId: "node-spec-b" })
+      body: JSON.stringify({ nodeId: "node-spec-b" }),
     });
     assert.equal(keepBRes.status, 200);
     const keepBData = await keepBRes.json();
@@ -44,16 +52,134 @@ test("Asterism server supports keeping multiple speculative branches in parallel
     const pruneRes = await fetch(`${baseUrl}/api/nodes/prune-unkept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ parentId: "node-hydro" })
+      body: JSON.stringify({ parentId: "node-hydro" }),
     });
     assert.equal(pruneRes.status, 200);
     const pruneData = await pruneRes.json();
     assert.deepEqual(pruneData.discarded, ["node-spec-c"]);
     assert.equal(pruneData.state.nodes.length, 5);
 
-    // Reset back so default demo state has all 3 speculative branches ready
     await fetch(`${baseUrl}/api/reset`, { method: "POST" });
   } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synthesis, and Live Worktree Outbox Implementation + Git Diff/Commit", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "asterism-srv2-"));
+  const worktreesDir = path.join(tmpDir, "worktrees");
+  const server = createAsterismServer({
+    dbPath: path.join(tmpDir, "test2.sqlite"),
+    worktreesDir,
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  let createdWorktree = null;
+
+  try {
+    await fetch(`${baseUrl}/api/reset`, { method: "POST" });
+
+    // Feature 4: Check /api/providers exposes Arena models and CLI binary probing
+    const provRes = await fetch(`${baseUrl}/api/providers`);
+    assert.equal(provRes.status, 200);
+    const provData = await provRes.json();
+    assert.ok(Array.isArray(provData.arenaModels));
+    assert.ok(provData.arenaModels.length >= 5);
+    assert.ok(provData.providers.some((p) => p.id === "codex" && typeof p.cliInstalled === "boolean"));
+
+    // Feature 3: Bidirectional window.asterism state update & model switch
+    const stateRes = await fetch(`${baseUrl}/api/nodes/state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nodeId: "node-spec-a",
+        patch: { cornerRadiusPx: 22, customInteractiveToggle: "enabled" },
+        model: "openai/gpt-6-luna",
+      }),
+    });
+    assert.equal(stateRes.status, 200);
+    const stateData = await stateRes.json();
+    assert.equal(stateData.node.state.cornerRadiusPx, 22);
+    assert.equal(stateData.node.state.customInteractiveToggle, "enabled");
+
+    // Feature 2: Multi-Parent Convergence (Synthesize node-spec-a + node-spec-b)
+    // Use an unavailable model name to exercise fast deterministic synthesis fallback without waiting on external LLM latency
+    const synthRes = await fetch(`${baseUrl}/api/nodes/synthesize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        parentIds: ["node-spec-a", "node-spec-b"],
+        instruction: "Combine spatial inspector handles with state timeline scrubbing",
+        targetStage: "design",
+        model: "offline-fast-synth",
+      }),
+    });
+    assert.equal(synthRes.status, 200);
+    const synthData = await synthRes.json();
+    const synthNode = synthData.synthNode;
+    assert.ok(synthNode.id.startsWith("node-synth-"));
+    assert.deepEqual(synthNode.parentIds, ["node-spec-a", "node-spec-b"]);
+    // Merged state from both parents!
+    assert.equal(synthNode.state.cornerRadiusPx, 22);
+    assert.equal(synthNode.state.timelineFps, 60);
+    const synthEdges = synthData.state.edges.filter((e) => e.to === synthNode.id);
+    assert.equal(synthEdges.length, 2);
+    assert.equal(synthEdges[0].kind, "synthesis");
+
+    // Feature 1: Run Outbox Implementation Agent inside isolated Git worktree on the synthesized node
+    const implRes = await fetch(`${baseUrl}/api/nodes/implement/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nodeId: synthNode.id,
+        instruction: "Generate verified controller for synthesized spatial timeline",
+      }),
+    });
+    assert.equal(implRes.status, 200);
+    const implData = await implRes.json();
+    createdWorktree = implData.node.worktree;
+    assert.ok(createdWorktree?.worktreePath, "Isolated worktree path must be provisioned");
+    assert.equal(implData.implementation.testPassed, true, "Generated worktree test suite must pass node --test");
+    assert.ok(implData.implementation.diff.insertions > 40, "Git diff must report inserted lines");
+    assert.ok(implData.implementation.diff.changedFiles.length >= 4, "Git diff must list generated implementation files");
+    assert.ok(implData.implementation.lineageCount >= 3, "Lineage must include synthesized parent chain");
+
+    // Inspect live diff via GET /api/nodes/implement/diff
+    const diffRes = await fetch(
+      `${baseUrl}/api/nodes/implement/diff?nodeId=${encodeURIComponent(synthNode.id)}`,
+    );
+    assert.equal(diffRes.status, 200);
+    const diffData = await diffRes.json();
+    assert.equal(diffData.hasWorktree, true);
+    assert.match(diffData.diff.patch, /createSurfaceController/);
+
+    // Commit changes inside the isolated Git worktree branch
+    const commitRes = await fetch(`${baseUrl}/api/nodes/implement/commit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nodeId: synthNode.id,
+        message: "Commit synthesized implementation from test",
+      }),
+    });
+    assert.equal(commitRes.status, 200);
+    const commitData = await commitRes.json();
+    assert.equal(commitData.commit.committed, true);
+    assert.ok(commitData.commit.commitSha.length >= 6);
+
+    // Reset back to clean default state
+    await fetch(`${baseUrl}/api/reset`, { method: "POST" });
+  } finally {
+    if (createdWorktree?.worktreePath) {
+      await Effect.runPromise(
+        removeIsolatedWorktree({
+          repoRoot: path.resolve(path.dirname(new URL(import.meta.url).pathname), ".."),
+          worktreePath: createdWorktree.worktreePath,
+          branchName: createdWorktree.branchName,
+        }),
+      );
+    }
     await new Promise((resolve) => server.close(resolve));
   }
 });

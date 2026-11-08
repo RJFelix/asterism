@@ -165,3 +165,300 @@ export const removeIsolatedWorktree = (input: {
     },
     catch: () => undefined,
   }).pipe(Effect.ignore);
+
+export interface WorktreeDiffFile {
+  readonly path: string;
+  readonly status: string;
+  readonly insertions: number;
+  readonly deletions: number;
+}
+
+export interface WorktreeDiffSummary {
+  readonly branchName: string;
+  readonly headCommit: string;
+  readonly changedFiles: ReadonlyArray<WorktreeDiffFile>;
+  readonly insertions: number;
+  readonly deletions: number;
+  readonly statSummary: string;
+  readonly patch: string;
+}
+
+/**
+ * Inspects live Git status and unified diff inside an isolated worktree.
+ * Marks untracked files with `git add -N` so newly created implementation files
+ * appear in `git diff HEAD` and numstat counts prior to commit.
+ */
+export const inspectWorktreeDiff = (
+  worktreePath: string,
+): Effect.Effect<WorktreeDiffSummary, Error> =>
+  Effect.tryPromise({
+    try: async () => {
+      if (!fs.existsSync(worktreePath)) {
+        throw new Error(`Worktree path does not exist: ${worktreePath}`);
+      }
+
+      await execFileAsync("git", ["-C", worktreePath, "add", "-N", "."]).catch(
+        () => {},
+      );
+
+      const [{ stdout: branchOut }, { stdout: headOut }, { stdout: statusOut }, { stdout: numstatOut }, { stdout: statOut }, { stdout: patchOut }] =
+        await Promise.all([
+          execFileAsync("git", [
+            "-C",
+            worktreePath,
+            "rev-parse",
+            "--abbrev-ref",
+            "HEAD",
+          ]),
+          execFileAsync("git", [
+            "-C",
+            worktreePath,
+            "rev-parse",
+            "--short",
+            "HEAD",
+          ]),
+          execFileAsync("git", ["-C", worktreePath, "status", "--porcelain"]),
+          execFileAsync("git", ["-C", worktreePath, "diff", "--numstat", "HEAD"]),
+          execFileAsync("git", ["-C", worktreePath, "diff", "--stat", "HEAD"]),
+          execFileAsync("git", ["-C", worktreePath, "diff", "HEAD"]),
+        ]);
+
+      const statusByFile = new Map<string, string>();
+      for (const line of statusOut.split("\n")) {
+        if (line.length < 4) continue;
+        const code = line.slice(0, 2).trim() || "M";
+        const filePath = line.slice(3).trim();
+        if (filePath) statusByFile.set(filePath, code);
+      }
+
+      const changedFiles: Array<WorktreeDiffFile> = [];
+      let totalInsertions = 0;
+      let totalDeletions = 0;
+
+      for (const line of numstatOut.split("\n")) {
+        if (!line.trim()) continue;
+        const parts = line.split("\t");
+        if (parts.length < 3) continue;
+        const ins = Number.parseInt(parts[0], 10) || 0;
+        const del = Number.parseInt(parts[1], 10) || 0;
+        const filePath = parts[2].trim();
+        totalInsertions += ins;
+        totalDeletions += del;
+        changedFiles.push({
+          path: filePath,
+          status: statusByFile.get(filePath) ?? "M",
+          insertions: ins,
+          deletions: del,
+        });
+      }
+
+      return {
+        branchName: branchOut.trim(),
+        headCommit: headOut.trim(),
+        changedFiles,
+        insertions: totalInsertions,
+        deletions: totalDeletions,
+        statSummary: statOut.trim(),
+        patch: patchOut.slice(0, 24_000),
+      };
+    },
+    catch: (cause) =>
+      cause instanceof Error ? cause : new Error(String(cause)),
+  });
+
+export interface WorktreeCommitResult {
+  readonly committed: boolean;
+  readonly commitSha: string;
+  readonly branchName: string;
+  readonly message: string;
+}
+
+export const commitWorktreeChanges = (input: {
+  readonly worktreePath: string;
+  readonly message: string;
+}): Effect.Effect<WorktreeCommitResult, Error> =>
+  Effect.tryPromise({
+    try: async () => {
+      await execFileAsync("git", ["-C", input.worktreePath, "add", "-A"]);
+      const { stdout: statusOut } = await execFileAsync("git", [
+        "-C",
+        input.worktreePath,
+        "status",
+        "--porcelain",
+      ]);
+
+      let committed = false;
+      if (statusOut.trim().length > 0) {
+        await execFileAsync("git", [
+          "-C",
+          input.worktreePath,
+          "-c",
+          "user.name=Asterism Agent",
+          "-c",
+          "user.email=asterism@exe.xyz",
+          "commit",
+          "-m",
+          input.message,
+        ]);
+        committed = true;
+      }
+
+      const [{ stdout: shaOut }, { stdout: branchOut }] = await Promise.all([
+        execFileAsync("git", [
+          "-C",
+          input.worktreePath,
+          "rev-parse",
+          "--short",
+          "HEAD",
+        ]),
+        execFileAsync("git", [
+          "-C",
+          input.worktreePath,
+          "rev-parse",
+          "--abbrev-ref",
+          "HEAD",
+        ]),
+      ]);
+
+      return {
+        committed,
+        commitSha: shaOut.trim(),
+        branchName: branchOut.trim(),
+        message: input.message,
+      };
+    },
+    catch: (cause) =>
+      cause instanceof Error ? cause : new Error(String(cause)),
+  });
+
+export interface WorktreeImplementationBundle {
+  readonly moduleCode: string;
+  readonly testCode: string;
+  readonly surfaceHtml: string;
+  readonly lineage: unknown;
+}
+
+export interface WorktreeImplementationResult {
+  readonly moduleRelPath: string;
+  readonly testRelPath: string;
+  readonly surfaceRelPath: string;
+  readonly testPassed: boolean;
+  readonly testOutput: string;
+  readonly diff: WorktreeDiffSummary;
+}
+
+/**
+ * Materializes an `IMPLEMENT`-stage node's code, surface, and deterministic test suite
+ * inside its isolated Git worktree, runs `node --test`, and returns the live diff + verification output.
+ */
+export const runWorktreeAgentImplementation = (input: {
+  readonly worktreePath: string;
+  readonly nodeId: string;
+  readonly bundle: WorktreeImplementationBundle;
+}): Effect.Effect<WorktreeImplementationResult, Error> =>
+  Effect.tryPromise({
+    try: async () => {
+      const safeSlug = input.nodeId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 48);
+      const implDir = path.join(input.worktreePath, "implementations", safeSlug);
+      fs.mkdirSync(implDir, { recursive: true });
+
+      const moduleRelPath = path.join("implementations", safeSlug, "index.mjs");
+      const testRelPath = path.join("implementations", safeSlug, "verify.test.mjs");
+      const surfaceRelPath = path.join("implementations", safeSlug, "surface.html");
+      const lineageRelPath = path.join("implementations", safeSlug, "lineage.json");
+
+      fs.writeFileSync(
+        path.join(input.worktreePath, moduleRelPath),
+        input.bundle.moduleCode,
+        "utf8",
+      );
+      fs.writeFileSync(
+        path.join(input.worktreePath, testRelPath),
+        input.bundle.testCode,
+        "utf8",
+      );
+      fs.writeFileSync(
+        path.join(input.worktreePath, surfaceRelPath),
+        input.bundle.surfaceHtml,
+        "utf8",
+      );
+      fs.writeFileSync(
+        path.join(input.worktreePath, lineageRelPath),
+        JSON.stringify(input.bundle.lineage, null, 2),
+        "utf8",
+      );
+
+      let testPassed = false;
+      let testOutput = "";
+      try {
+        const { stdout, stderr } = await execFileAsync(
+          process.execPath,
+          ["--test", testRelPath],
+          { cwd: input.worktreePath, timeout: 15_000 },
+        );
+        testPassed = true;
+        testOutput = [stdout, stderr].filter(Boolean).join("\n").trim();
+      } catch (err: any) {
+        testPassed = false;
+        testOutput = [err?.stdout, err?.stderr, err?.message]
+          .filter(Boolean)
+          .join("\n")
+          .trim();
+      }
+
+      const diff = await Effect.runPromise(
+        inspectWorktreeDiff(input.worktreePath),
+      );
+
+      return {
+        moduleRelPath,
+        testRelPath,
+        surfaceRelPath,
+        testPassed,
+        testOutput: testOutput.slice(0, 8000),
+        diff,
+      };
+    },
+    catch: (cause) =>
+      cause instanceof Error ? cause : new Error(String(cause)),
+  });
+
+export interface CliBinaryProbe {
+  readonly id: string;
+  readonly binary: string;
+  readonly installed: boolean;
+  readonly binaryPath: string | null;
+}
+
+export const probeAvailableHarnesses = (
+  binaries: ReadonlyArray<{ readonly id: string; readonly binary: string }>,
+): Effect.Effect<ReadonlyArray<CliBinaryProbe>, never> =>
+  Effect.tryPromise({
+    try: async () => {
+      const extraPaths = [
+        "/usr/local/bin",
+        "/usr/bin",
+        path.join(process.env.HOME || "/home/exedev", ".local", "bin"),
+      ];
+      const searchDirs = [
+        ...(process.env.PATH || "").split(path.delimiter).filter(Boolean),
+        ...extraPaths,
+      ];
+
+      return binaries.map(({ id, binary }) => {
+        for (const dir of searchDirs) {
+          const candidate = path.join(dir, binary);
+          try {
+            if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+              return { id, binary, installed: true, binaryPath: candidate };
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return { id, binary, installed: false, binaryPath: null };
+      });
+    },
+    catch: () => [],
+  }).pipe(Effect.orElseSucceed(() => []));
+

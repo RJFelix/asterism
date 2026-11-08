@@ -266,7 +266,7 @@ export function getDefaultCanvasState() {
   <div class="sliders">
     <div class="slider-row">
       <span class="lbl">Shoulder</span>
-      <input type="range" min="-70" max="45" value="-25" oninput="
+      <input type="range" min="-70" max="45" value="-25" data-state-key="shoulderDeg" oninput="
         document.getElementById('j1').setAttribute('transform', 'translate(63, 103) rotate(' + this.value + ')');
         document.getElementById('s1-val').textContent = this.value + '°';
       ">
@@ -274,108 +274,134 @@ export function getDefaultCanvasState() {
     </div>
     <div class="slider-row">
       <span class="lbl">Elbow</span>
-      <input type="range" min="-20" max="110" value="55" oninput="
+      <input type="range" min="-20" max="110" value="55" data-state-key="elbowDeg" oninput="
         document.getElementById('j2').setAttribute('transform', 'translate(0, -52) rotate(' + this.value + ')');
         document.getElementById('s2-val').textContent = this.value + '°';
       ">
       <code id="s2-val">55°</code>
     </div>
   </div>
-</div>`
+</div>`,
+        state: { shoulderDeg: -25, elbowDeg: 55 }
       },
       {
         id: "node-spec-a",
-        title: "Branch A: Spatial Direct-Manipulation HUD",
+        title: "fork-A [gpt-6-luna]: Spatial Direct-Manipulation HUD",
         kind: "speculative",
         stage: "design",
         x: 1010,
         y: 25,
-        width: 370,
-        height: 265,
+        width: 385,
+        height: 270,
         model: "openai/gpt-6-luna",
+        provider: "chatgpt-gateway",
+        harness: "@t3tools/provider-codex",
+        arenaMode: true,
         status: "speculative",
-        branchTag: "fork-A",
+        branchTag: "fork-A:gpt-6-luna",
         parentId: "node-hydro",
+        parentIds: ["node-hydro"],
         jevScore: 0.89,
+        state: { cornerRadiusPx: 12, inspectorOverlay: true },
         html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:rgba(56,189,248,0.18);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;">SPECULATIVE FORK A</span>
-    <span style="color:#94a3b8;font-size:11px;">Jev Score: 0.89</span>
+    <span style="background:rgba(56,189,248,0.18);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⚔ FORK A • gpt-6-luna</span>
+    <span style="color:#94a3b8;font-size:11px;">Jev: 0.89</span>
   </div>
   <h4 style="margin:0 0 6px;font-size:14px;">Zero-Chat Spatial Inspector</h4>
-  <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">Overlays bounding-box handles and inline CSS/token sliders directly onto live components.</p>
-  <div style="background:rgba(15,23,42,0.8);border:1px dashed rgba(56,189,248,0.45);border-radius:8px;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Overlays bounding-box handles and inline CSS/token sliders directly onto live components via <code>window.asterism.state</code>.</p>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;color:#cbd5e1;">
+    <span>Radius:</span>
+    <input type="range" min="0" max="24" value="12" data-state-key="cornerRadiusPx" style="flex:1;accent-color:#38bdf8;" oninput="document.getElementById('rad-lbl').textContent=this.value+'px'" />
+    <code id="rad-lbl" style="color:#38bdf8;">12px</code>
+  </div>
+  <div style="background:rgba(15,23,42,0.8);border:1px dashed rgba(56,189,248,0.45);border-radius:8px;padding:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
     <div>
-      <div style="font-size:11px;color:#38bdf8;font-family:monospace;">&lt;Card radius="12px" /&gt;</div>
-      <div style="font-size:10px;color:#64748b;">Keep multiple forks &amp; advance</div>
+      <div style="font-size:10.5px;color:#38bdf8;font-family:monospace;">@t3tools/provider-codex</div>
+      <div style="font-size:10px;color:#64748b;">Keep multiple &amp; ⊕ Synthesize</div>
     </div>
     <div style="display:flex;gap:5px;">
-      <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-a'}, '*')" style="background:#0284c7;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
-      <button onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'node-spec-a'}, '*')" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
+      <button onclick="window.asterism.keepFork()" style="background:#0284c7;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
+      <button onclick="window.asterism.advanceStage()" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
     </div>
   </div>
 </div>`
       },
       {
         id: "node-spec-b",
-        title: "Branch B: Keyframe & Constraint Timeline",
+        title: "fork-B [gpt-6.1-terra]: Keyframe & Constraint Timeline",
         kind: "speculative",
         stage: "design",
         x: 1010,
-        y: 310,
-        width: 370,
-        height: 265,
-        model: "openai/gpt-6-luna",
+        y: 315,
+        width: 385,
+        height: 270,
+        model: "openai/gpt-6.1-terra",
+        provider: "chatgpt-gateway",
+        harness: "@t3tools/provider-claude",
+        arenaMode: true,
         status: "speculative",
-        branchTag: "fork-B",
+        branchTag: "fork-B:gpt-6.1-terra",
         parentId: "node-hydro",
-        jevScore: 0.82,
+        parentIds: ["node-hydro"],
+        jevScore: 0.84,
+        state: { timelineFps: 60, deterministicGuard: true },
         html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:rgba(168,85,247,0.18);color:#c084fc;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;">SPECULATIVE FORK B</span>
-    <span style="color:#94a3b8;font-size:11px;">Jev Score: 0.82</span>
+    <span style="background:rgba(168,85,247,0.18);color:#c084fc;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⚔ FORK B • gpt-6.1-terra</span>
+    <span style="color:#94a3b8;font-size:11px;">Jev: 0.84</span>
   </div>
   <h4 style="margin:0 0 6px;font-size:14px;">State-Graph &amp; Motion Scrubbing</h4>
-  <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">Treats UI/UX as a state machine with scrubbable transitions between empty, loading, error, and populated states.</p>
-  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(168,85,247,0.35);border-radius:8px;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Treats UI/UX as a state machine with scrubbable transitions between empty, loading, error, and populated states.</p>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;color:#cbd5e1;">
+    <span>FPS Target:</span>
+    <input type="range" min="24" max="120" value="60" data-state-key="timelineFps" style="flex:1;accent-color:#c084fc;" oninput="document.getElementById('fps-lbl').textContent=this.value+'fps'" />
+    <code id="fps-lbl" style="color:#c084fc;">60fps</code>
+  </div>
+  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(168,85,247,0.35);border-radius:8px;padding:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
     <div style="display:flex;gap:4px;align-items:center;">
       <span style="padding:3px 5px;background:#3b0764;color:#e9d5ff;border-radius:4px;font-size:10px;">Idle</span>
       <span style="color:#64748b;">→</span>
       <span style="padding:3px 5px;background:#581c87;color:#f3e8ff;border-radius:4px;font-size:10px;">Live</span>
     </div>
     <div style="display:flex;gap:5px;">
-      <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-b'}, '*')" style="background:#7e22ce;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
-      <button onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'node-spec-b'}, '*')" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
+      <button onclick="window.asterism.keepFork()" style="background:#7e22ce;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
+      <button onclick="window.asterism.advanceStage()" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
     </div>
   </div>
 </div>`
       },
       {
         id: "node-spec-c",
-        title: "Branch C: Embodied Sketch + Voice Table",
+        title: "fork-C [gpt-6.1-sol]: Embodied Sketch + Telemetry",
         kind: "speculative",
         stage: "design",
         x: 1010,
-        y: 595,
-        width: 370,
-        height: 265,
-        model: "openai/gpt-6-luna",
+        y: 605,
+        width: 385,
+        height: 270,
+        model: "openai/gpt-6.1-sol",
+        provider: "chatgpt-gateway",
+        harness: "@t3tools/provider-antigravity",
+        arenaMode: true,
         status: "speculative",
-        branchTag: "fork-C",
+        branchTag: "fork-C:gpt-6.1-sol",
         parentId: "node-hydro",
-        jevScore: 0.77,
+        parentIds: ["node-hydro"],
+        jevScore: 0.79,
+        state: { confidenceThreshold: 0.85 },
         html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:rgba(16,185,129,0.18);color:#34d399;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;">SPECULATIVE FORK C</span>
-    <span style="color:#94a3b8;font-size:11px;">Jev Score: 0.77</span>
+    <span style="background:rgba(16,185,129,0.18);color:#34d399;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⚔ FORK C • gpt-6.1-sol</span>
+    <span style="color:#94a3b8;font-size:11px;">Jev: 0.79</span>
   </div>
   <h4 style="margin:0 0 6px;font-size:14px;">Physical Camera + Paper Sketch Sync</h4>
-  <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">Uses overhead desk camera + Whisper voice stream to turn pen-and-paper wireframes into live DOM surfaces.</p>
-  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(16,185,129,0.35);border-radius:8px;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
-    <div style="font-size:10.5px;color:#6ee7b7;">📷 Overhead Cam</div>
+  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Uses overhead desk camera + Whisper voice stream to turn pen-and-paper wireframes into live DOM surfaces.</p>
+  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(16,185,129,0.35);border-radius:8px;padding:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+    <div style="font-size:10.5px;color:#6ee7b7;">📷 @t3tools/provider-antigravity</div>
     <div style="display:flex;gap:5px;">
-      <button onclick="window.parent.postMessage({type:'asterism:commit-branch', nodeId:'node-spec-c'}, '*')" style="background:#059669;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
-      <button onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'node-spec-c'}, '*')" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
+      <button onclick="window.asterism.keepFork()" style="background:#059669;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
+      <button onclick="window.asterism.advanceStage()" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
     </div>
   </div>
 </div>`

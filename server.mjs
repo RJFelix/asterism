@@ -4,12 +4,25 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import { getDefaultCanvasState } from "./src/default-state.mjs";
-import { mutateHtmlSurface, generateSpeculativeBranches, advanceNodeStage } from "./src/llm.mjs";
+import {
+  ARENA_MODELS,
+  DEFAULT_MODEL,
+  mutateHtmlSurface,
+  generateSpeculativeBranches,
+  synthesizeNodes,
+  advanceNodeStage,
+  generateWorktreeImplementationBundle,
+} from "./src/llm.mjs";
 import {
   makeSqliteEventSink,
   makePeerFederation,
   createIsolatedWorktree,
+  inspectWorktreeDiff,
+  commitWorktreeChanges,
+  runWorktreeAgentImplementation,
+  probeAvailableHarnesses,
   MCP_PROTOCOL_VERSION,
   MODE_LIMIT_HEADER,
 } from "@asterism/core";
@@ -28,20 +41,87 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-export const ENVIRONMENT_ID = process.env.ASTERISM_ENV_ID || "env-asterism-agentbox-101";
+export const ENVIRONMENT_ID =
+  process.env.ASTERISM_ENV_ID || "env-asterism-agentbox-101";
 
 export const EXTRACTED_PROVIDER_CATALOG = [
-  { id: "codex", package: "@t3tools/provider-codex", protocol: "effect-codex-app-server", capabilities: CodexProviderCapabilitiesV2 },
-  { id: "claudeAgent", package: "@t3tools/provider-claude", protocol: "claude-agent-sdk", capabilities: ClaudeProviderCapabilitiesV2 },
-  { id: "antigravity", package: "@t3tools/provider-antigravity", protocol: "effect-acp", capabilities: AcpProviderCapabilitiesV2 },
-  { id: "pi", package: "@t3tools/provider-pi", protocol: "pi-rpc", capabilities: AcpProviderCapabilitiesV2 },
-  { id: "opencode", package: "@t3tools/provider-opencode", protocol: "opencode-v1-v2", capabilities: AcpProviderCapabilitiesV2 },
-  { id: "cursor", package: "@t3tools/provider-cursor", protocol: "cursor-sdk", capabilities: AcpProviderCapabilitiesV2 },
-  { id: "muse", package: "@t3tools/provider-muse", protocol: "muse-msp", capabilities: AcpProviderCapabilitiesV2 },
-  { id: "grok", package: "@t3tools/provider-grok", protocol: "effect-acp", capabilities: AcpProviderCapabilitiesV2 },
-  { id: "fx", package: "@t3tools/provider-fx", protocol: "effect-acp", capabilities: AcpProviderCapabilitiesV2 },
-  { id: "kiro", package: "@t3tools/provider-kiro", protocol: "effect-acp", capabilities: AcpProviderCapabilitiesV2 },
-  { id: "acp-registry", package: "@t3tools/provider-acp-registry", protocol: "effect-acp", capabilities: AcpProviderCapabilitiesV2 },
+  {
+    id: "codex",
+    package: "@t3tools/provider-codex",
+    binary: "codex",
+    protocol: "effect-codex-app-server",
+    capabilities: CodexProviderCapabilitiesV2,
+  },
+  {
+    id: "claudeAgent",
+    package: "@t3tools/provider-claude",
+    binary: "claude",
+    protocol: "claude-agent-sdk",
+    capabilities: ClaudeProviderCapabilitiesV2,
+  },
+  {
+    id: "antigravity",
+    package: "@t3tools/provider-antigravity",
+    binary: "antigravity",
+    protocol: "effect-acp",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
+  {
+    id: "pi",
+    package: "@t3tools/provider-pi",
+    binary: "pi",
+    protocol: "pi-rpc",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
+  {
+    id: "opencode",
+    package: "@t3tools/provider-opencode",
+    binary: "opencode",
+    protocol: "opencode-v1-v2",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
+  {
+    id: "cursor",
+    package: "@t3tools/provider-cursor",
+    binary: "cursor",
+    protocol: "cursor-sdk",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
+  {
+    id: "muse",
+    package: "@t3tools/provider-muse",
+    binary: "muse",
+    protocol: "muse-msp",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
+  {
+    id: "grok",
+    package: "@t3tools/provider-grok",
+    binary: "grok",
+    protocol: "effect-acp",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
+  {
+    id: "fx",
+    package: "@t3tools/provider-fx",
+    binary: "fx",
+    protocol: "effect-acp",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
+  {
+    id: "kiro",
+    package: "@t3tools/provider-kiro",
+    binary: "kiro",
+    protocol: "effect-acp",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
+  {
+    id: "acp-registry",
+    package: "@t3tools/provider-acp-registry",
+    binary: "acp",
+    protocol: "effect-acp",
+    capabilities: AcpProviderCapabilitiesV2,
+  },
 ];
 
 export function loadState() {
@@ -60,6 +140,39 @@ export function loadState() {
 export function saveState(state) {
   state.updatedAt = new Date().toISOString();
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), "utf8");
+}
+
+/**
+ * Walks upstream DAG edges & parentIds to collect the full ordered lineage leading into `targetNodeId`.
+ */
+export function collectLineageNodes(canvasState, targetNodeId) {
+  const byId = new Map((canvasState.nodes || []).map((n) => [n.id, n]));
+  const visited = new Set();
+  const ordered = [];
+
+  function visit(nodeId) {
+    if (!nodeId || visited.has(nodeId)) return;
+    visited.add(nodeId);
+    const node = byId.get(nodeId);
+    if (!node) return;
+
+    const parentIds = new Set();
+    if (node.parentId) parentIds.add(node.parentId);
+    if (Array.isArray(node.parentIds)) {
+      for (const pid of node.parentIds) parentIds.add(pid);
+    }
+    for (const edge of canvasState.edges || []) {
+      if (edge.to === nodeId && edge.from) parentIds.add(edge.from);
+    }
+
+    for (const pid of parentIds) {
+      visit(pid);
+    }
+    ordered.push(node);
+  }
+
+  visit(targetNodeId);
+  return ordered;
 }
 
 function readJsonBody(req) {
@@ -91,6 +204,7 @@ function sendJson(res, status, data, extraHeaders = {}) {
 
 export function createAsterismServer(options = {}) {
   const dbPath = options.dbPath || SQLITE_FILE;
+  const worktreesDir = options.worktreesDir || WORKTREES_DIR;
   const eventSink = Effect.runSync(makeSqliteEventSink(dbPath));
   const peerFederation = Effect.runSync(makePeerFederation());
   Effect.runSync(eventSink.reconcileAfterProcessLoss);
@@ -98,6 +212,8 @@ export function createAsterismServer(options = {}) {
   let canvasState = loadState();
   const sseClients = new Set();
   const mcpSessions = new Map();
+  const workerId = `asterism-outbox-worker-${crypto.randomUUID().slice(0, 8)}`;
+  let drainingOutbox = false;
 
   function broadcastState(eventType = "state") {
     const payload = `event: ${eventType}\ndata: ${JSON.stringify(canvasState)}\n\n`;
@@ -110,7 +226,14 @@ export function createAsterismServer(options = {}) {
     }
   }
 
-  async function recordDomainCommand(commandType, streamId, eventType, payload, effects = [], commandId) {
+  async function recordDomainCommand(
+    commandType,
+    streamId,
+    eventType,
+    payload,
+    effects = [],
+    commandId,
+  ) {
     const cid = commandId || `cmd-${crypto.randomUUID()}`;
     return Effect.runPromise(
       eventSink.commitCommand({
@@ -123,23 +246,124 @@ export function createAsterismServer(options = {}) {
     );
   }
 
+  /**
+   * Feature 1: Outbox Worker Loop that claims pending `harness.run-turn` and `worktree.commit`
+   * effects and executes them inside the node's isolated Git worktree.
+   */
+  async function drainOutbox() {
+    if (drainingOutbox) return;
+    drainingOutbox = true;
+    try {
+      while (true) {
+        const claimedOpt = await Effect.runPromise(
+          eventSink.claimNextEffect(workerId),
+        );
+        if (Option.isNone(claimedOpt)) break;
+        const effect = Option.getOrThrow(claimedOpt);
+
+        try {
+          if (effect.request.type === "harness.run-turn") {
+            const node = canvasState.nodes.find(
+              (n) => n.id === effect.request.nodeId,
+            );
+            if (node) {
+              node.implementStatus = "running";
+              broadcastState();
+
+              if (!node.worktree || !node.worktree.worktreePath) {
+                node.worktree = await Effect.runPromise(
+                  createIsolatedWorktree({
+                    repoRoot: __dirname,
+                    worktreesDir,
+                    nodeId: node.id,
+                  }),
+                );
+              }
+
+              const lineageNodes = collectLineageNodes(canvasState, node.id);
+              const bundle = await generateWorktreeImplementationBundle({
+                node,
+                lineageNodes,
+                instruction: effect.request.prompt,
+              });
+
+              const implResult = await Effect.runPromise(
+                runWorktreeAgentImplementation({
+                  worktreePath: node.worktree.worktreePath,
+                  nodeId: node.id,
+                  bundle,
+                }),
+              );
+
+              node.implementStatus = implResult.testPassed ? "verified" : "failed";
+              node.implementation = {
+                status: implResult.testPassed ? "verified" : "failed",
+                provider: effect.request.provider,
+                model: effect.request.model,
+                prompt: effect.request.prompt,
+                moduleRelPath: implResult.moduleRelPath,
+                testRelPath: implResult.testRelPath,
+                surfaceRelPath: implResult.surfaceRelPath,
+                testPassed: implResult.testPassed,
+                testOutput: implResult.testOutput,
+                diff: implResult.diff,
+                lineageCount: lineageNodes.length,
+                updatedAt: new Date().toISOString(),
+              };
+              saveState(canvasState);
+              broadcastState();
+            }
+          }
+          await Effect.runPromise(
+            eventSink.completeEffect({ effectId: effect.id, workerId }),
+          );
+        } catch (err) {
+          await Effect.runPromise(
+            eventSink.failEffect({
+              effectId: effect.id,
+              workerId,
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          );
+        }
+      }
+    } finally {
+      drainingOutbox = false;
+    }
+  }
+
   return http.createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
-    // 1. Environment Descriptor (for T3-style Multi-Route Connection Probing & Peer Verification)
+    // 1. Environment Descriptor
     if (req.method === "GET" && url.pathname === "/api/environment/descriptor") {
       return sendJson(res, 200, {
         environmentId: ENVIRONMENT_ID,
         name: "asterism-agentbox-101",
         protocolVersion: MCP_PROTOCOL_VERSION,
         providers: EXTRACTED_PROVIDER_CATALOG.map((p) => p.id),
+        arenaModels: ARENA_MODELS.map((m) => m.id),
       });
     }
 
-    // 2. Extracted Provider Harness Catalog
+    // 2. Extracted Provider Harness Catalog + Arena Models + Live CLI Binary Probing
     if (req.method === "GET" && url.pathname === "/api/providers") {
+      const cliProbes = await Effect.runPromise(
+        probeAvailableHarnesses(
+          EXTRACTED_PROVIDER_CATALOG.map((p) => ({
+            id: p.id,
+            binary: p.binary,
+          })),
+        ),
+      );
+      const probeById = new Map(cliProbes.map((p) => [p.id, p]));
       return sendJson(res, 200, {
-        providers: EXTRACTED_PROVIDER_CATALOG,
+        providers: EXTRACTED_PROVIDER_CATALOG.map((p) => ({
+          ...p,
+          cliInstalled: probeById.get(p.id)?.installed ?? false,
+          binaryPath: probeById.get(p.id)?.binaryPath ?? null,
+        })),
+        arenaModels: ARENA_MODELS,
       });
     }
 
@@ -150,11 +374,12 @@ export function createAsterismServer(options = {}) {
       return sendJson(res, 200, { events });
     }
 
-    // 4. Peer Federation `/mcp` Endpoint (JSON-RPC 2.0 + T3-Mode-Limit header support)
+    // 4. Peer Federation `/mcp` Endpoint
     if (req.method === "POST" && url.pathname === "/mcp") {
       try {
         const rpc = await readJsonBody(req);
-        const modeLimit = req.headers[MODE_LIMIT_HEADER.toLowerCase()] || "full-access/default";
+        const modeLimit =
+          req.headers[MODE_LIMIT_HEADER.toLowerCase()] || "full-access/default";
 
         if (rpc.method === "initialize") {
           const sid = `mcp-sess-${crypto.randomUUID()}`;
@@ -167,7 +392,7 @@ export function createAsterismServer(options = {}) {
               id: rpc.id ?? 0,
               result: {
                 protocolVersion: MCP_PROTOCOL_VERSION,
-                serverInfo: { name: "asterism-mcp", version: "0.2.0" },
+                serverInfo: { name: "asterism-mcp", version: "0.3.0" },
                 capabilities: { tools: {} },
               },
             },
@@ -186,7 +411,6 @@ export function createAsterismServer(options = {}) {
 
         if (rpc.method === "tools/call") {
           const toolName = rpc.params?.name;
-          const args = rpc.params?.arguments || {};
 
           if (toolName === "asterism_canvas_summary") {
             const summary = {
@@ -199,6 +423,7 @@ export function createAsterismServer(options = {}) {
                 title: n.title,
                 stage: n.stage,
                 status: n.status,
+                model: n.model || DEFAULT_MODEL,
               })),
             };
             return sendJson(res, 200, {
@@ -275,12 +500,52 @@ export function createAsterismServer(options = {}) {
       }
     }
 
-    if (req.method === "POST" && url.pathname === "/api/nodes/mutate") {
+    // Feature 3: Bidirectional Surface <-> Agent Bridge (`window.asterism.setState` & Model Selection)
+    if (req.method === "POST" && url.pathname === "/api/nodes/state") {
       try {
-        const { nodeId, instruction, selectedSelector, commandId } = await readJsonBody(req);
+        const { nodeId, patch, model, provider, commandId } = await readJsonBody(req);
         const node = canvasState.nodes.find((n) => n.id === nodeId);
         if (!node) return sendJson(res, 404, { error: "Node not found" });
 
+        if (patch && typeof patch === "object") {
+          node.state = { ...(node.state || {}), ...patch };
+        }
+        if (typeof model === "string" && model.trim()) {
+          node.model = model.trim();
+        }
+        if (typeof provider === "string" && provider.trim()) {
+          node.provider = provider.trim();
+        }
+
+        saveState(canvasState);
+        await recordDomainCommand(
+          "node.state.patch",
+          node.id,
+          "surface.state.updated",
+          {
+            nodeId: node.id,
+            patch: patch || {},
+            model: node.model,
+            state: node.state || {},
+          },
+          [],
+          commandId,
+        );
+        broadcastState();
+        return sendJson(res, 200, { node, state: canvasState });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/nodes/mutate") {
+      try {
+        const { nodeId, instruction, selectedSelector, model, commandId } =
+          await readJsonBody(req);
+        const node = canvasState.nodes.find((n) => n.id === nodeId);
+        if (!node) return sendJson(res, 404, { error: "Node not found" });
+
+        if (model) node.model = model;
         node.status = "mutating";
         broadcastState();
 
@@ -289,7 +554,8 @@ export function createAsterismServer(options = {}) {
           title: node.title,
           instruction,
           selectedSelector,
-          model: node.model,
+          model: node.model || DEFAULT_MODEL,
+          nodeState: node.state,
         });
 
         node.html = updatedHtml;
@@ -300,7 +566,7 @@ export function createAsterismServer(options = {}) {
           "node.mutate",
           node.id,
           "surface.mutated",
-          { nodeId: node.id, instruction },
+          { nodeId: node.id, instruction, model: node.model },
           [{ request: { type: "surface.mutate", nodeId: node.id, instruction } }],
           commandId,
         );
@@ -312,11 +578,20 @@ export function createAsterismServer(options = {}) {
       }
     }
 
+    // Feature 4: Multi-Provider / Multi-Model Arena Forking
     if (req.method === "POST" && url.pathname === "/api/nodes/speculate") {
       try {
-        const { nodeId, prompt, count = 3, commandId } = await readJsonBody(req);
+        const {
+          nodeId,
+          prompt,
+          count = 3,
+          arenaMode = true,
+          models,
+          commandId,
+        } = await readJsonBody(req);
         const sourceNode = canvasState.nodes.find((n) => n.id === nodeId);
-        if (!sourceNode) return sendJson(res, 404, { error: "Source node not found" });
+        if (!sourceNode)
+          return sendJson(res, 404, { error: "Source node not found" });
 
         sourceNode.status = "speculating";
         broadcastState();
@@ -325,16 +600,22 @@ export function createAsterismServer(options = {}) {
           sourceNode,
           prompt,
           count,
+          arenaMode,
+          models,
         });
 
         sourceNode.status = "ready";
         for (const b of branches) {
           canvasState.nodes.push(b);
+          const shortModel = (b.model || "").replace(/^openai\//, "");
           canvasState.edges.push({
             id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             from: sourceNode.id,
             to: b.id,
-            label: `${b.branchTag} (p=${b.jevScore})`,
+            kind: arenaMode ? "arena" : "speculative",
+            label: arenaMode
+              ? `⚔ ${shortModel} (p=${b.jevScore})`
+              : `${b.branchTag} (p=${b.jevScore})`,
           });
         }
 
@@ -345,14 +626,16 @@ export function createAsterismServer(options = {}) {
           "branches.forked",
           {
             sourceNodeId: sourceNode.id,
+            arenaMode,
             branchIds: branches.map((b) => b.id),
+            models: branches.map((b) => b.model),
           },
           [
             {
               request: {
                 type: "surface.speculate",
                 nodeId: sourceNode.id,
-                prompt: prompt || "Speculate",
+                prompt: prompt || "Arena Speculate",
                 count,
               },
             },
@@ -366,11 +649,91 @@ export function createAsterismServer(options = {}) {
       }
     }
 
+    // Feature 2: Multi-Parent Convergence ("Synthesize / Merge Forks" DAG Node)
+    if (req.method === "POST" && url.pathname === "/api/nodes/synthesize") {
+      try {
+        const {
+          parentIds = [],
+          instruction,
+          targetStage,
+          model,
+          commandId,
+        } = await readJsonBody(req);
+
+        const uniqueParentIds = [...new Set(parentIds)];
+        const parentNodes = uniqueParentIds
+          .map((id) => canvasState.nodes.find((n) => n.id === id))
+          .filter(Boolean);
+
+        if (parentNodes.length < 2) {
+          return sendJson(res, 400, {
+            error: "At least 2 parent nodes are required to synthesize a merged branch",
+          });
+        }
+
+        for (const p of parentNodes) {
+          if (p.kind === "speculative") {
+            p.status = "committed";
+            p.kind = "surface";
+          }
+        }
+        broadcastState();
+
+        const synthNode = await synthesizeNodes({
+          parentNodes,
+          instruction,
+          targetStage,
+          model: model || parentNodes[0]?.model || DEFAULT_MODEL,
+        });
+
+        canvasState.nodes.push(synthNode);
+        for (const p of parentNodes) {
+          canvasState.edges.push({
+            id: `edge-synth-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            from: p.id,
+            to: synthNode.id,
+            kind: "synthesis",
+            label: `⊕ merge (${p.branchTag || p.stage})`,
+          });
+        }
+
+        saveState(canvasState);
+        await recordDomainCommand(
+          "node.synthesize",
+          synthNode.id,
+          "branches.synthesized",
+          {
+            synthNodeId: synthNode.id,
+            parentIds: parentNodes.map((p) => p.id),
+            stage: synthNode.stage,
+          },
+          [
+            {
+              request: {
+                type: "surface.synthesize",
+                nodeId: synthNode.id,
+                parentIds: parentNodes.map((p) => p.id),
+                targetStage: synthNode.stage,
+                ...(instruction ? { instruction } : {}),
+              },
+            },
+          ],
+          commandId,
+        );
+        broadcastState();
+        return sendJson(res, 200, { synthNode, state: canvasState });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
     if (req.method === "POST" && url.pathname === "/api/nodes/commit-branch") {
       try {
-        const { nodeId, pruneSiblings = false, commandId } = await readJsonBody(req);
+        const { nodeId, pruneSiblings = false, commandId } =
+          await readJsonBody(req);
         const winner = canvasState.nodes.find((n) => n.id === nodeId);
-        if (!winner) return sendJson(res, 404, { error: "Branch node not found" });
+        if (!winner)
+          return sendJson(res, 404, { error: "Branch node not found" });
 
         winner.status = "committed";
         winner.kind = "surface";
@@ -388,7 +751,9 @@ export function createAsterismServer(options = {}) {
               .map((n) => n.id),
           );
           discarded = [...siblingIds];
-          canvasState.nodes = canvasState.nodes.filter((n) => !siblingIds.has(n.id));
+          canvasState.nodes = canvasState.nodes.filter(
+            (n) => !siblingIds.has(n.id),
+          );
           canvasState.edges = canvasState.edges.filter(
             (e) => !siblingIds.has(e.from) && !siblingIds.has(e.to),
           );
@@ -423,7 +788,9 @@ export function createAsterismServer(options = {}) {
             )
             .map((n) => n.id),
         );
-        canvasState.nodes = canvasState.nodes.filter((n) => !unkeptIds.has(n.id));
+        canvasState.nodes = canvasState.nodes.filter(
+          (n) => !unkeptIds.has(n.id),
+        );
         canvasState.edges = canvasState.edges.filter(
           (e) => !unkeptIds.has(e.from) && !unkeptIds.has(e.to),
         );
@@ -437,7 +804,10 @@ export function createAsterismServer(options = {}) {
           commandId,
         );
         broadcastState();
-        return sendJson(res, 200, { discarded: [...unkeptIds], state: canvasState });
+        return sendJson(res, 200, {
+          discarded: [...unkeptIds],
+          state: canvasState,
+        });
       } catch (err) {
         return sendJson(res, 500, { error: err.message });
       }
@@ -445,9 +815,11 @@ export function createAsterismServer(options = {}) {
 
     if (req.method === "POST" && url.pathname === "/api/nodes/advance") {
       try {
-        const { nodeId, targetStage, instruction, commandId } = await readJsonBody(req);
+        const { nodeId, targetStage, instruction, commandId } =
+          await readJsonBody(req);
         const sourceNode = canvasState.nodes.find((n) => n.id === nodeId);
-        if (!sourceNode) return sendJson(res, 404, { error: "Source node not found" });
+        if (!sourceNode)
+          return sendJson(res, 404, { error: "Source node not found" });
 
         if (sourceNode.kind === "speculative") {
           sourceNode.status = "committed";
@@ -462,27 +834,9 @@ export function createAsterismServer(options = {}) {
           instruction,
         });
 
-        // If advancing into the IMPLEMENT stage, provision a real isolated Git worktree via @asterism/core!
-        if (childNode.stage === "implement") {
-          try {
-            const wt = await Effect.runPromise(
-              createIsolatedWorktree({
-                repoRoot: __dirname,
-                worktreesDir: WORKTREES_DIR,
-                nodeId: childNode.id,
-              }),
-            );
-            childNode.worktree = wt;
-            childNode.html = `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;background:rgba(16,185,129,0.12);border-bottom:1px solid rgba(16,185,129,0.3);padding:6px 10px;color:#34d399;display:flex;justify-content:space-between;">
-              <span>⚙ worktree: ${wt.branchName}</span>
-              <span>base: ${wt.baseCommit}</span>
-            </div>` + childNode.html;
-          } catch {
-            // Ignore worktree error if git is unavailable
-          }
-        }
-
-        const existingDownstream = canvasState.edges.filter((e) => e.from === sourceNode.id).length;
+        const existingDownstream = canvasState.edges.filter(
+          (e) => e.from === sourceNode.id,
+        ).length;
         childNode.y = sourceNode.y + existingDownstream * 140;
 
         sourceNode.status = "committed";
@@ -493,6 +847,45 @@ export function createAsterismServer(options = {}) {
           to: childNode.id,
           label: `→ ${childNode.stage}`,
         });
+
+        const outboxEffects = [
+          {
+            request: {
+              type: "train.advance",
+              nodeId: sourceNode.id,
+              targetStage: childNode.stage,
+              ...(instruction ? { instruction } : {}),
+            },
+          },
+        ];
+
+        // Feature 1: If advancing into IMPLEMENT, provision an isolated Git worktree and enqueue an outbox agent turn!
+        if (childNode.stage === "implement") {
+          try {
+            const wt = await Effect.runPromise(
+              createIsolatedWorktree({
+                repoRoot: __dirname,
+                worktreesDir,
+                nodeId: childNode.id,
+              }),
+            );
+            childNode.worktree = wt;
+            outboxEffects.push({
+              request: {
+                type: "harness.run-turn",
+                nodeId: childNode.id,
+                provider: childNode.provider || "codex",
+                model: childNode.model || DEFAULT_MODEL,
+                prompt:
+                  instruction ||
+                  `Implement and verify ${childNode.title} inside isolated worktree`,
+                cwd: wt.worktreePath,
+              },
+            });
+          } catch {
+            // Ignore worktree error if git is unavailable
+          }
+        }
 
         saveState(canvasState);
         await recordDomainCommand(
@@ -505,29 +898,188 @@ export function createAsterismServer(options = {}) {
             stage: childNode.stage,
             worktree: childNode.worktree ?? null,
           },
+          outboxEffects,
+          commandId,
+        );
+
+        // Drain the outbox so any `harness.run-turn` effect materializes code, runs `node --test`, and computes `git diff`
+        await drainOutbox();
+
+        broadcastState();
+        return sendJson(res, 200, {
+          childNode,
+          state: canvasState,
+          peerFederationReady: Boolean(peerFederation),
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Feature 1: Inspect live Git diff & verification status for an IMPLEMENT node
+    if (req.method === "GET" && url.pathname === "/api/nodes/implement/diff") {
+      try {
+        const nodeId = url.searchParams.get("nodeId");
+        const node = canvasState.nodes.find((n) => n.id === nodeId);
+        if (!node) return sendJson(res, 404, { error: "Node not found" });
+
+        if (!node.worktree?.worktreePath) {
+          return sendJson(res, 200, {
+            nodeId: node.id,
+            hasWorktree: false,
+            implementation: node.implementation || null,
+          });
+        }
+
+        const diff = await Effect.runPromise(
+          inspectWorktreeDiff(node.worktree.worktreePath),
+        );
+        if (node.implementation) {
+          node.implementation.diff = diff;
+        }
+        return sendJson(res, 200, {
+          nodeId: node.id,
+          hasWorktree: true,
+          worktree: node.worktree,
+          diff,
+          implementation: node.implementation || null,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Feature 1: Trigger or re-run the Outbox Agent inside an IMPLEMENT node's Git worktree
+    if (req.method === "POST" && url.pathname === "/api/nodes/implement/run") {
+      try {
+        const { nodeId, instruction, provider, model, commandId } =
+          await readJsonBody(req);
+        const node = canvasState.nodes.find((n) => n.id === nodeId);
+        if (!node) return sendJson(res, 404, { error: "Node not found" });
+
+        node.stage = "implement";
+        if (model) node.model = model;
+        if (provider) node.provider = provider;
+
+        if (!node.worktree?.worktreePath) {
+          node.worktree = await Effect.runPromise(
+            createIsolatedWorktree({
+              repoRoot: __dirname,
+              worktreesDir,
+              nodeId: node.id,
+            }),
+          );
+        }
+
+        await recordDomainCommand(
+          "implement.run",
+          node.id,
+          "implement.turn.enqueued",
+          {
+            nodeId: node.id,
+            worktreePath: node.worktree.worktreePath,
+            instruction: instruction || "Run worktree implementation & verification",
+          },
           [
             {
               request: {
-                type: "train.advance",
-                nodeId: sourceNode.id,
-                targetStage: childNode.stage,
-                ...(instruction ? { instruction } : {}),
+                type: "harness.run-turn",
+                nodeId: node.id,
+                provider: node.provider || "codex",
+                model: node.model || DEFAULT_MODEL,
+                prompt:
+                  instruction ||
+                  `Implement and verify ${node.title} inside isolated worktree`,
+                cwd: node.worktree.worktreePath,
               },
             },
           ],
           commandId,
         );
+
+        await drainOutbox();
+        return sendJson(res, 200, {
+          node,
+          implementation: node.implementation,
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Feature 1: Commit generated implementation inside the node's isolated Git worktree branch
+    if (req.method === "POST" && url.pathname === "/api/nodes/implement/commit") {
+      try {
+        const { nodeId, message, commandId } = await readJsonBody(req);
+        const node = canvasState.nodes.find((n) => n.id === nodeId);
+        if (!node) return sendJson(res, 404, { error: "Node not found" });
+        if (!node.worktree?.worktreePath) {
+          return sendJson(res, 400, { error: "Node has no provisioned Git worktree" });
+        }
+
+        const commitMessage =
+          message || `Implement ${node.title} (${node.id}) via Asterism Innovation Train`;
+
+        const commitResult = await Effect.runPromise(
+          commitWorktreeChanges({
+            worktreePath: node.worktree.worktreePath,
+            message: commitMessage,
+          }),
+        );
+
+        node.worktree.headCommit = commitResult.commitSha;
+        node.worktree.lastCommitMessage = commitResult.message;
+        if (node.implementation) {
+          node.implementation.lastCommit = commitResult;
+          node.implementation.diff = await Effect.runPromise(
+            inspectWorktreeDiff(node.worktree.worktreePath),
+          );
+        }
+
+        saveState(canvasState);
+        await recordDomainCommand(
+          "implement.commit",
+          node.id,
+          "worktree.committed",
+          {
+            nodeId: node.id,
+            ...commitResult,
+          },
+          [
+            {
+              request: {
+                type: "worktree.commit",
+                nodeId: node.id,
+                worktreePath: node.worktree.worktreePath,
+                message: commitMessage,
+              },
+            },
+          ],
+          commandId,
+        );
+        await drainOutbox();
         broadcastState();
-        return sendJson(res, 200, { childNode, state: canvasState, peerFederationReady: Boolean(peerFederation) });
+
+        return sendJson(res, 200, {
+          commit: commitResult,
+          node,
+          state: canvasState,
+        });
       } catch (err) {
         return sendJson(res, 500, { error: err.message });
       }
     }
 
     // Serve static files from public/
-    const relPath = url.pathname === "/" ? "index.html" : url.pathname.replace(/^\/+/, "");
+    const relPath =
+      url.pathname === "/" ? "index.html" : url.pathname.replace(/^\/+/, "");
     const filePath = path.join(PUBLIC_DIR, relPath);
-    if (filePath.startsWith(PUBLIC_DIR) && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    if (
+      filePath.startsWith(PUBLIC_DIR) &&
+      fs.existsSync(filePath) &&
+      fs.statSync(filePath).isFile()
+    ) {
       const ext = path.extname(filePath);
       const mime =
         ext === ".html"
@@ -550,6 +1102,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT || 3456);
   const server = createAsterismServer();
   server.listen(port, "0.0.0.0", () => {
-    console.log(`Asterism Spatial Canvas & Effect-TS Orchestrator running at http://localhost:${port} (and https://agentbox-101.exe.xyz:${port}/)`);
+    console.log(
+      `Asterism Spatial Canvas & Effect-TS Orchestrator running at http://localhost:${port} (and https://agentbox-101.exe.xyz:${port}/)`,
+    );
   });
 }

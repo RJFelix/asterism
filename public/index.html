@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asterism — Spatial Canvas & Innovation Train</title>
+  <title>Asterism — Spatial Canvas &amp; Innovation Train</title>
   <style>
     :root {
       --bg-deep: #070a12;
@@ -12,6 +12,7 @@
       --accent-cyan: #38bdf8;
       --accent-purple: #a855f7;
       --accent-emerald: #10b981;
+      --accent-amber: #fbbf24;
       --text-main: #f1f5f9;
       --text-muted: #94a3b8;
     }
@@ -39,13 +40,13 @@
 
     #canvas-world {
       position: absolute; top: 0; left: 0;
-      width: 5000px; height: 3600px;
+      width: 6000px; height: 4000px;
       transform-origin: 0 0;
     }
 
     #svg-layer {
       position: absolute; top: 0; left: 0;
-      width: 5000px; height: 3600px;
+      width: 6000px; height: 4000px;
       pointer-events: none; overflow: visible;
     }
 
@@ -54,10 +55,12 @@
       position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
       z-index: 100; display: flex; align-items: center; gap: 7px;
       padding: 7px 12px; border-radius: 12px;
-      background: rgba(15, 23, 42, 0.88);
+      background: rgba(15, 23, 42, 0.9);
       backdrop-filter: blur(14px);
       border: 1px solid rgba(148, 163, 184, 0.22);
       box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+      max-width: 96vw;
+      flex-wrap: wrap;
     }
     .brand {
       display: flex; align-items: center; gap: 7px;
@@ -77,12 +80,23 @@
       font-size: 11.5px; font-weight: 500; cursor: pointer;
       display: flex; align-items: center; gap: 5px;
       transition: all 0.15s ease;
+      white-space: nowrap;
     }
     .tool-btn:hover { color: var(--text-main); border-color: rgba(148, 163, 184, 0.38); }
     .tool-btn.active {
       background: rgba(56, 189, 248, 0.18);
       color: var(--accent-cyan);
       border-color: rgba(56, 189, 248, 0.5);
+    }
+    .tool-btn.synth-btn {
+      background: rgba(251, 191, 36, 0.15);
+      color: #fcd34d;
+      border-color: rgba(251, 191, 36, 0.42);
+      font-weight: 600;
+    }
+    .tool-btn.synth-btn:hover {
+      background: rgba(251, 191, 36, 0.28);
+      border-color: #fbbf24;
     }
     .zoom-readout {
       font-family: ui-monospace, monospace; font-size: 11px;
@@ -94,7 +108,7 @@
       position: absolute;
       display: flex; flex-direction: column;
       border-radius: 12px;
-      background: rgba(15, 23, 42, 0.92);
+      background: rgba(15, 23, 42, 0.94);
       border: 1px solid rgba(148, 163, 184, 0.24);
       box-shadow: 0 18px 40px rgba(0, 0, 0, 0.52);
       backdrop-filter: blur(10px);
@@ -109,48 +123,82 @@
       border-color: rgba(16, 185, 129, 0.55);
       box-shadow: 0 16px 38px rgba(16, 185, 129, 0.16);
     }
+    .canvas-node.selected-for-synth {
+      border-color: #fbbf24 !important;
+      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45), 0 18px 40px rgba(0, 0, 0, 0.6) !important;
+    }
     .canvas-node.status-mutating, .canvas-node.status-speculating {
       border-color: var(--accent-cyan);
       box-shadow: 0 0 25px rgba(56, 189, 248, 0.35);
     }
     .node-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 7px 10px;
-      background: rgba(30, 41, 59, 0.85);
+      padding: 6px 8px;
+      background: rgba(30, 41, 59, 0.9);
       border-bottom: 1px solid rgba(148, 163, 184, 0.16);
       cursor: grab;
-      gap: 6px;
+      gap: 5px;
     }
     .node-header:active { cursor: grabbing; }
     .node-title-wrap {
-      display: flex; align-items: center; gap: 6px; overflow: hidden;
+      display: flex; align-items: center; gap: 5px; overflow: hidden; flex: 1;
+    }
+    .synth-check-btn {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: #94a3b8;
+      border-radius: 4px;
+      width: 18px; height: 18px;
+      font-size: 10px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0; padding: 0;
+    }
+    .synth-check-btn.checked {
+      background: rgba(251, 191, 36, 0.25);
+      border-color: #fbbf24;
+      color: #fde68a;
     }
     .node-stage-pill {
-      font-family: ui-monospace, monospace; font-size: 9.5px; font-weight: 700;
+      font-family: ui-monospace, monospace; font-size: 9px; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.04em;
-      padding: 2px 6px; border-radius: 5px;
+      padding: 2px 5px; border-radius: 5px;
       background: rgba(56, 189, 248, 0.16); color: var(--accent-cyan);
       border: 1px solid rgba(56, 189, 248, 0.3);
-      white-space: nowrap;
+      white-space: nowrap; flex-shrink: 0;
     }
     .node-title {
-      font-size: 11.5px; font-weight: 600; color: #f8fafc;
+      font-size: 11px; font-weight: 600; color: #f8fafc;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .node-actions {
-      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+      display: flex; align-items: center; gap: 3px; flex-shrink: 0;
     }
+    .model-select {
+      background: rgba(15, 23, 42, 0.85);
+      color: #cbd5e1;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 5px;
+      font-size: 9.5px;
+      font-family: ui-monospace, monospace;
+      padding: 2px 4px;
+      cursor: pointer;
+      outline: none;
+      max-width: 92px;
+    }
+    .model-select:hover { border-color: var(--accent-cyan); color: #f8fafc; }
     .mini-btn {
       background: rgba(15, 23, 42, 0.7);
       color: var(--text-muted);
       border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 6px; padding: 3px 6px;
-      font-size: 10px; cursor: pointer;
+      border-radius: 6px; padding: 3px 5px;
+      font-size: 9.5px; cursor: pointer;
+      white-space: nowrap;
     }
     .mini-btn:hover { color: #f8fafc; border-color: var(--accent-cyan); }
     .mini-btn.spec-btn {
       color: #e9d5ff; border-color: rgba(168, 85, 247, 0.45);
       background: rgba(168, 85, 247, 0.16);
+      font-weight: 600;
     }
     .mini-btn.spec-btn:hover { background: rgba(168, 85, 247, 0.32); }
     .mini-btn.advance-btn {
@@ -159,6 +207,48 @@
       font-weight: 600;
     }
     .mini-btn.advance-btn:hover { background: rgba(16, 185, 129, 0.32); }
+
+    /* Feature 1: Worktree & Diff Inspector Sub-Bar for IMPLEMENT nodes */
+    .worktree-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 4px 8px;
+      background: rgba(6, 78, 59, 0.35);
+      border-bottom: 1px solid rgba(16, 185, 129, 0.3);
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 10px;
+      color: #6ee7b7;
+    }
+    .canvas-node.stage-implement .worktree-bar {
+      display: flex;
+    }
+    .wt-meta {
+      display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap;
+    }
+    .wt-diff-stat {
+      padding: 1px 5px; border-radius: 4px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      font-size: 9.5px;
+    }
+    .wt-diff-stat .ins { color: #34d399; }
+    .wt-diff-stat .del { color: #f87171; }
+    .wt-actions {
+      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    }
+    .wt-btn {
+      background: rgba(15, 23, 42, 0.8);
+      color: #a7f3d0;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 9.5px;
+      font-family: ui-monospace, monospace;
+      cursor: pointer;
+    }
+    .wt-btn:hover { background: rgba(16, 185, 129, 0.25); color: #ffffff; }
 
     .node-body {
       flex: 1; position: relative; overflow: auto;
@@ -176,21 +266,40 @@
       font-size: 11.5px; padding: 10px; border: none; outline: none;
       resize: none;
     }
+    .node-diff-inspector {
+      display: none; width: 100%; height: 100%;
+      background: #060913; color: #e2e8f0;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 11px; padding: 10px; overflow: auto;
+    }
     .canvas-node.editing-html .node-iframe { display: none; }
     .canvas-node.editing-html .node-code-editor { display: block; }
+    .canvas-node.viewing-diff .node-iframe { display: none; }
+    .canvas-node.viewing-diff .node-diff-inspector { display: block; }
 
     /* Prompt / Co-Design Footer inside each Node */
     .node-footer {
-      display: flex; align-items: center; gap: 6px;
-      padding: 6px 9px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 8px;
       background: rgba(15, 23, 42, 0.95);
       border-top: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .state-pill {
+      font-family: ui-monospace, monospace;
+      font-size: 9.5px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.12);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      white-space: nowrap;
+      cursor: help;
     }
     .node-prompt-input {
       flex: 1; background: rgba(30, 41, 59, 0.75);
       border: 1px solid rgba(148, 163, 184, 0.22);
       color: #f8fafc; border-radius: 6px;
-      padding: 5px 8px; font-size: 11.5px; outline: none;
+      padding: 5px 8px; font-size: 11px; outline: none;
     }
     .node-prompt-input:focus { border-color: var(--accent-cyan); }
     .node-send-btn {
@@ -211,10 +320,11 @@
     #status-toast {
       position: fixed; bottom: 16px; left: 16px; z-index: 100;
       padding: 8px 14px; border-radius: 9px;
-      background: rgba(15, 23, 42, 0.92);
+      background: rgba(15, 23, 42, 0.94);
       border: 1px solid rgba(56, 189, 248, 0.35);
       font-size: 12px; color: #bae6fd;
       display: none;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     }
   </style>
 </head>
@@ -227,8 +337,9 @@
     <button class="tool-btn active" id="mode-select" onclick="setMode('select')">↖ Pan / Interact</button>
     <button class="tool-btn" id="mode-draw" onclick="setMode('draw')">✎ Sketch</button>
     <button class="tool-btn" id="mode-connect" onclick="setMode('connect')">⤳ Wire Nodes</button>
-    <button class="tool-btn" onclick="createNewSurface()">＋ New Note / Surface</button>
-    <button class="tool-btn" onclick="pruneUnkeptForks()" title="Remove only speculative branches you haven't marked Keep">✂ Prune Unkept Forks</button>
+    <button class="tool-btn" onclick="createNewSurface()">＋ New Note</button>
+    <button class="tool-btn synth-btn" id="btn-synthesize" onclick="synthesizeSelectedOrKept()" title="Select 2+ nodes (or Keep 2+ forks) to converge them into a unified hybrid surface">⊕ Synthesize Forks</button>
+    <button class="tool-btn" onclick="pruneUnkeptForks()" title="Remove only speculative branches you haven't marked Keep">✂ Prune Unkept</button>
     <button class="tool-btn" onclick="clearSketches()">⌫ Clear Ink</button>
     <button class="tool-btn" onclick="resetCanvas()">↺ Reset</button>
     <span class="zoom-readout" id="zoom-label">85%</span>
@@ -241,6 +352,9 @@
           <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 0 1 L 8 5 L 0 9 z" fill="rgba(56, 189, 248, 0.65)" />
           </marker>
+          <marker id="arrow-synth" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="rgba(251, 191, 36, 0.85)" />
+          </marker>
         </defs>
         <g id="edges-group"></g>
         <g id="strokes-group"></g>
@@ -252,6 +366,14 @@
   <div id="status-toast"></div>
 
   <script>
+    const AVAILABLE_MODELS = [
+      { id: 'openai/gpt-6-luna', label: 'gpt-6-luna' },
+      { id: 'openai/gpt-6.1-terra', label: 'gpt-6.1-terra' },
+      { id: 'openai/gpt-6.1-sol', label: 'gpt-6.1-sol' },
+      { id: 'openai/gpt-6-astra', label: 'gpt-6-astra' },
+      { id: 'openai/gpt-5.3-codex', label: 'gpt-5.3-codex' },
+    ];
+
     let state = {
       viewport: { x: 70, y: 55, scale: 0.85 },
       nodes: [],
@@ -264,6 +386,7 @@
     let panStart = { x: 0, y: 0 };
     let activeStroke = null;
     let connectSourceId = null;
+    const selectedForSynth = new Set();
 
     const viewportEl = document.getElementById('canvas-viewport');
     const worldEl = document.getElementById('canvas-world');
@@ -272,6 +395,7 @@
     const strokesGroup = document.getElementById('strokes-group');
     const zoomLabel = document.getElementById('zoom-label');
     const toastEl = document.getElementById('status-toast');
+    const synthBtnEl = document.getElementById('btn-synthesize');
 
     function showToast(msg, ms = 3500) {
       toastEl.textContent = msg;
@@ -280,6 +404,25 @@
       if (ms > 0) {
         toastEl._timer = setTimeout(() => { toastEl.style.display = 'none'; }, ms);
       }
+    }
+
+    function updateSynthButtonLabel() {
+      const count = selectedForSynth.size;
+      if (count >= 2) {
+        synthBtnEl.textContent = `⊕ Synthesize Selected (${count})`;
+      } else {
+        synthBtnEl.textContent = '⊕ Synthesize Forks';
+      }
+    }
+
+    function toggleNodeSynthSelection(nodeId) {
+      if (selectedForSynth.has(nodeId)) {
+        selectedForSynth.delete(nodeId);
+      } else {
+        selectedForSynth.add(nodeId);
+      }
+      updateSynthButtonLabel();
+      renderNodes();
     }
 
     function setMode(nextMode) {
@@ -319,14 +462,22 @@
         const y2 = to.y + to.height / 2;
         const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
 
-        const isSpeculative = to.kind === 'speculative' && to.status !== 'committed';
+        const isSynth = edge.kind === 'synthesis';
+        const isSpeculative = !isSynth && to.kind === 'speculative' && to.status !== 'committed';
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', isSpeculative ? 'rgba(168, 85, 247, 0.55)' : 'rgba(56, 189, 248, 0.65)');
-        path.setAttribute('stroke-width', isSpeculative ? '2' : '2.4');
+        path.setAttribute(
+          'stroke',
+          isSynth
+            ? 'rgba(251, 191, 36, 0.85)'
+            : isSpeculative
+              ? 'rgba(168, 85, 247, 0.58)'
+              : 'rgba(56, 189, 248, 0.65)'
+        );
+        path.setAttribute('stroke-width', isSynth ? '2.6' : isSpeculative ? '2' : '2.4');
         path.setAttribute('stroke-dasharray', isSpeculative ? '6 4' : '');
-        path.setAttribute('marker-end', 'url(#arrow)');
+        path.setAttribute('marker-end', isSynth ? 'url(#arrow-synth)' : 'url(#arrow)');
         edgesGroup.appendChild(path);
 
         if (edge.label) {
@@ -334,7 +485,7 @@
           text.setAttribute('x', String((x1 + x2) / 2));
           text.setAttribute('y', String((y1 + y2) / 2 - 7));
           text.setAttribute('text-anchor', 'middle');
-          text.setAttribute('fill', '#94a3b8');
+          text.setAttribute('fill', isSynth ? '#fde68a' : '#94a3b8');
           text.setAttribute('font-size', '11');
           text.setAttribute('font-family', 'ui-monospace, monospace');
           text.textContent = edge.label;
@@ -358,12 +509,159 @@
       }
     }
 
-    function buildSrcDoc(htmlFragment) {
+    /**
+     * Feature 3: Injects the bidirectional `window.asterism` bridge into every surface iframe!
+     */
+    function buildSrcDoc(node) {
+      const initialStateJson = JSON.stringify(node.state || {}).replace(/</g, '\\u003c');
+      const nodeIdJson = JSON.stringify(node.id);
+      const stageJson = JSON.stringify(node.stage || 'note');
+      const modelJson = JSON.stringify(node.model || 'openai/gpt-6-luna');
+
       return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
         html, body { margin: 0; padding: 0; background: transparent; color: #e2e8f0; overflow-x: hidden; }
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 4px; }
-      </style></head><body>${htmlFragment}</body></html>`;
+      </style>
+      <script>
+        (function() {
+          const _state = ${initialStateJson};
+          window.asterism = {
+            nodeId: ${nodeIdJson},
+            stage: ${stageJson},
+            model: ${modelJson},
+            state: _state,
+            getState() {
+              return Object.assign({}, _state);
+            },
+            setState(patch) {
+              if (!patch || typeof patch !== 'object') return _state;
+              Object.assign(_state, patch);
+              window.parent.postMessage({
+                type: 'asterism:set-state',
+                nodeId: this.nodeId,
+                patch: patch
+              }, '*');
+              window.dispatchEvent(new CustomEvent('asterism:statechange', { detail: this.getState() }));
+              return this.getState();
+            },
+            mutate(instruction) {
+              window.parent.postMessage({
+                type: 'asterism:mutate-node',
+                nodeId: this.nodeId,
+                instruction: instruction
+              }, '*');
+            },
+            spawnFork(prompt, options) {
+              window.parent.postMessage(Object.assign({
+                type: 'asterism:trigger-speculate',
+                nodeId: this.nodeId,
+                prompt: prompt
+              }, options || {}), '*');
+            },
+            keepFork(pruneSiblings) {
+              window.parent.postMessage({
+                type: 'asterism:commit-branch',
+                nodeId: this.nodeId,
+                pruneSiblings: Boolean(pruneSiblings)
+              }, '*');
+            },
+            advanceStage(instruction, targetStage) {
+              window.parent.postMessage({
+                type: 'asterism:advance-stage',
+                nodeId: this.nodeId,
+                instruction: instruction,
+                targetStage: targetStage
+              }, '*');
+            },
+            synthesizeWith(otherNodeIds, instruction, targetStage) {
+              const ids = [this.nodeId].concat(Array.isArray(otherNodeIds) ? otherNodeIds : [otherNodeIds]);
+              window.parent.postMessage({
+                type: 'asterism:synthesize-nodes',
+                parentIds: ids,
+                instruction: instruction,
+                targetStage: targetStage
+              }, '*');
+            },
+            runImplementAgent(instruction) {
+              window.parent.postMessage({
+                type: 'asterism:run-implement',
+                nodeId: this.nodeId,
+                instruction: instruction
+              }, '*');
+            },
+            bindInputs(root) {
+              const container = root || document;
+              const els = container.querySelectorAll('input[data-state-key], select[data-state-key], textarea[data-state-key], input[name], select[name], textarea[name]');
+              els.forEach((el) => {
+                const key = el.getAttribute('data-state-key') || el.getAttribute('name');
+                if (!key || el._asterismBound) return;
+                el._asterismBound = true;
+                if (Object.prototype.hasOwnProperty.call(_state, key)) {
+                  if (el.type === 'checkbox') {
+                    el.checked = Boolean(_state[key]);
+                  } else if (String(el.value) !== String(_state[key])) {
+                    el.value = _state[key];
+                    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
+                  }
+                }
+                const sync = () => {
+                  let val = el.type === 'checkbox' ? el.checked : el.value;
+                  if (el.type === 'range' || el.type === 'number') {
+                    const num = Number(val);
+                    if (!Number.isNaN(num)) val = num;
+                  }
+                  window.asterism.setState({ [key]: val });
+                };
+                el.addEventListener('input', sync);
+                el.addEventListener('change', sync);
+              });
+            }
+          };
+          window.addEventListener('DOMContentLoaded', () => {
+            window.asterism.bindInputs(document);
+          });
+        })();
+      <\/script></head><body>${node.html || ''}</body></html>`;
+    }
+
+    function formatDiffPatchHtml(node) {
+      const impl = node.implementation;
+      const wt = node.worktree;
+      if (!wt && !impl) {
+        return `<div style="color:#94a3b8;padding:8px;">No isolated Git worktree provisioned yet. Click <strong>▶ Run Agent</strong> above to provision a worktree, generate code &amp; tests, and inspect the live Git diff.</div>`;
+      }
+      const diff = impl?.diff;
+      const patchLines = (diff?.patch || '').split('\n');
+      const coloredPatch = patchLines.map((line) => {
+        const esc = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          return `<div style="background:rgba(16,185,129,0.14);color:#6ee7b7;">${esc}</div>`;
+        }
+        if (line.startsWith('-') && !line.startsWith('---')) {
+          return `<div style="background:rgba(239,68,68,0.14);color:#fca5a5;">${esc}</div>`;
+        }
+        if (line.startsWith('@@')) {
+          return `<div style="color:#38bdf8;margin-top:4px;">${esc}</div>`;
+        }
+        return `<div style="color:#94a3b8;">${esc}</div>`;
+      }).join('');
+
+      const filesHtml = (diff?.changedFiles || []).map(f =>
+        `<span style="background:rgba(30,41,59,0.9);border:1px solid rgba(148,163,184,0.25);padding:2px 6px;border-radius:4px;font-size:10px;">${f.status} ${f.path} (<span style="color:#34d399">+${f.insertions}</span>/<span style="color:#f87171">-${f.deletions}</span>)</span>`
+      ).join(' ');
+
+      return `
+        <div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(148,163,184,0.2);">
+          <div style="display:flex;justify-content:space-between;color:#f8fafc;font-weight:700;margin-bottom:4px;">
+            <span>Branch: ${wt?.branchName || diff?.branchName || 'asterism/implement'}</span>
+            <span>HEAD: ${wt?.headCommit || diff?.headCommit || wt?.baseCommit || 'HEAD'}</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">${filesHtml || '<span style="color:#64748b;">Working tree clean (all changes committed)</span>'}</div>
+          ${impl?.testOutput ? `<details style="margin-top:4px;"><summary style="cursor:pointer;color:${impl.testPassed ? '#34d399' : '#f87171'};font-weight:600;">${impl.testPassed ? '✓ node --test Passed' : '✕ node --test Failed'} (${impl.lineageCount || 1} stage lineage)</summary><pre style="margin:4px 0 0;padding:6px;background:#020617;border-radius:4px;color:#cbd5e1;white-space:pre-wrap;font-size:10px;">${impl.testOutput.replace(/</g, '&lt;')}</pre></details>` : ''}
+        </div>
+        <div style="font-size:10px;line-height:1.4;white-space:pre-wrap;">${coloredPatch || '<span style="color:#64748b;">No uncommitted diff lines.</span>'}</div>
+      `;
     }
 
     function renderNodes() {
@@ -377,25 +675,45 @@
         if (!card) {
           card = document.createElement('div');
           card.dataset.id = node.id;
+          const modelOptionsHtml = AVAILABLE_MODELS.map(
+            m => `<option value="${m.id}">${m.label}</option>`
+          ).join('');
+
           card.innerHTML = `
             <div class="node-header">
               <div class="node-title-wrap">
+                <button class="synth-check-btn" title="Select node for multi-parent ⊕ Synthesis">☐</button>
                 <span class="node-stage-pill"></span>
                 <span class="node-title"></span>
               </div>
               <div class="node-actions">
+                <select class="model-select" title="Active Model / Provider Harness for this Node">${modelOptionsHtml}</select>
                 <button class="mini-btn code-toggle-btn" title="Edit Live HTML">‹/›</button>
-                <button class="mini-btn spec-btn" title="Fork 3 Speculative Variants in Parallel">⚡ Fork 3x</button>
+                <button class="mini-btn spec-btn" title="Arena Fork: Pit 3 Models & Harnesses in Parallel">⚔ Arena 3x</button>
                 <button class="mini-btn advance-btn" title="Advance to Next Innovation Train Stage">🚂 Advance →</button>
                 <button class="mini-btn del-btn" title="Delete Surface">✕</button>
+              </div>
+            </div>
+            <div class="worktree-bar">
+              <div class="wt-meta">
+                <span class="wt-branch-label">⚙ worktree</span>
+                <span class="wt-diff-stat"><span class="ins">+0</span> / <span class="del">-0</span></span>
+                <span class="wt-test-badge"></span>
+              </div>
+              <div class="wt-actions">
+                <button class="wt-btn wt-diff-btn" title="Inspect Live Git Worktree Diff & Test Output">🔍 Diff</button>
+                <button class="wt-btn wt-run-btn" title="Run / Re-run Outbox Agent inside Isolated Worktree">▶ Run Agent</button>
+                <button class="wt-btn wt-commit-btn" title="Commit Implementation in Isolated Worktree Branch">✓ Commit</button>
               </div>
             </div>
             <div class="node-body">
               <iframe class="node-iframe" sandbox="allow-scripts allow-same-origin"></iframe>
               <textarea class="node-code-editor" spellcheck="false"></textarea>
+              <div class="node-diff-inspector"></div>
             </div>
             <div class="node-footer">
-              <input class="node-prompt-input" type="text" placeholder="Mutate surface or specify focus before Fork / Advance..." />
+              <span class="state-pill" title="Persisted Interactive Widget State (window.asterism.state)">⚡ 0</span>
+              <input class="node-prompt-input" type="text" placeholder="Mutate surface, or type directive for ⚔ Arena / 🚂 Advance / ▶ Run Agent..." />
               <button class="node-send-btn">Mutate</button>
             </div>
             <div class="resize-handle"></div>
@@ -404,22 +722,83 @@
           nodesLayer.appendChild(card);
         }
 
-        card.className = `canvas-node kind-${node.kind || 'surface'} status-${node.status || 'ready'}`;
+        const isSelected = selectedForSynth.has(node.id);
+        const keepEditing = card.classList.contains('editing-html');
+        const keepViewingDiff = card.classList.contains('viewing-diff');
+
+        card.className = [
+          'canvas-node',
+          `kind-${node.kind || 'surface'}`,
+          `status-${node.status || 'ready'}`,
+          `stage-${node.stage || 'note'}`,
+          isSelected ? 'selected-for-synth' : '',
+          keepEditing ? 'editing-html' : '',
+          keepViewingDiff ? 'viewing-diff' : ''
+        ].filter(Boolean).join(' ');
+
         card.style.left = `${node.x}px`;
         card.style.top = `${node.y}px`;
         card.style.width = `${node.width}px`;
         card.style.height = `${node.height}px`;
+
+        const checkBtn = card.querySelector('.synth-check-btn');
+        checkBtn.textContent = isSelected ? '☑' : '☐';
+        checkBtn.classList.toggle('checked', isSelected);
 
         const stageLabel = (node.stage || node.branchTag || 'surface').toUpperCase();
         card.querySelector('.node-stage-pill').textContent =
           node.status === 'committed' ? `✓ ${stageLabel}` : stageLabel;
         card.querySelector('.node-title').textContent = node.title;
 
+        const modelSelect = card.querySelector('.model-select');
+        const activeModel = node.model || 'openai/gpt-6-luna';
+        if (modelSelect.value !== activeModel) {
+          modelSelect.value = activeModel;
+        }
+
+        // Update state-pill count
+        const stateKeys = Object.keys(node.state || {});
+        const statePill = card.querySelector('.state-pill');
+        statePill.textContent = `⚡ ${stateKeys.length}`;
+        statePill.title = stateKeys.length > 0
+          ? `window.asterism.state: ${JSON.stringify(node.state)}`
+          : 'window.asterism.state (interactive widget state)';
+
+        // Update Worktree Bar if stage === 'implement'
+        if (node.stage === 'implement' || node.worktree || node.implementation) {
+          card.classList.add('stage-implement');
+          const branchLbl = card.querySelector('.wt-branch-label');
+          const shortBranch = (node.worktree?.branchName || 'unprovisioned').replace(/^asterism\//, '');
+          branchLbl.textContent = `⚙ ${shortBranch.slice(0, 20)}`;
+
+          const ins = node.implementation?.diff?.insertions ?? 0;
+          const del = node.implementation?.diff?.deletions ?? 0;
+          card.querySelector('.wt-diff-stat').innerHTML = `<span class="ins">+${ins}</span>/<span class="del">-${del}</span>`;
+
+          const testBadge = card.querySelector('.wt-test-badge');
+          if (node.implementStatus === 'running') {
+            testBadge.textContent = '⟳ Running...';
+            testBadge.style.color = '#38bdf8';
+          } else if (node.implementation?.testPassed) {
+            testBadge.textContent = '✓ Verified';
+            testBadge.style.color = '#34d399';
+          } else if (node.implementation) {
+            testBadge.textContent = '⚠ Check Failed';
+            testBadge.style.color = '#f87171';
+          } else {
+            testBadge.textContent = 'Ready';
+            testBadge.style.color = '#94a3b8';
+          }
+
+          const diffInspector = card.querySelector('.node-diff-inspector');
+          diffInspector.innerHTML = formatDiffPatchHtml(node);
+        }
+
         const iframe = card.querySelector('.node-iframe');
         const editor = card.querySelector('.node-code-editor');
         if (card.dataset.lastHtml !== node.html) {
           card.dataset.lastHtml = node.html;
-          iframe.srcdoc = buildSrcDoc(node.html);
+          iframe.srcdoc = buildSrcDoc(node);
           if (document.activeElement !== editor) {
             editor.value = node.html;
           }
@@ -429,18 +808,46 @@
 
     function setupNodeInteractions(card, nodeId) {
       const header = card.querySelector('.node-header');
+      const checkBtn = card.querySelector('.synth-check-btn');
+      const modelSelect = card.querySelector('.model-select');
       const resizeHandle = card.querySelector('.resize-handle');
       const codeBtn = card.querySelector('.code-toggle-btn');
       const specBtn = card.querySelector('.spec-btn');
       const advanceBtn = card.querySelector('.advance-btn');
       const delBtn = card.querySelector('.del-btn');
+      const wtDiffBtn = card.querySelector('.wt-diff-btn');
+      const wtRunBtn = card.querySelector('.wt-run-btn');
+      const wtCommitBtn = card.querySelector('.wt-commit-btn');
       const editor = card.querySelector('.node-code-editor');
       const promptInput = card.querySelector('.node-prompt-input');
       const sendBtn = card.querySelector('.node-send-btn');
 
-      header.addEventListener('pointerdown', (e) => {
-        if (e.target.closest('button')) return;
+      checkBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        toggleNodeSynthSelection(nodeId);
+      });
+
+      modelSelect.addEventListener('change', async (e) => {
+        e.stopPropagation();
+        const model = modelSelect.value;
+        const node = state.nodes.find(n => n.id === nodeId);
+        if (node) node.model = model;
+        showToast(`Switched node model to ${model.replace('openai/', '')}`);
+        await fetch('/api/nodes/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId, model })
+        });
+      });
+
+      header.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button') || e.target.closest('select')) return;
+        e.stopPropagation();
+
+        if (e.shiftKey) {
+          toggleNodeSynthSelection(nodeId);
+          return;
+        }
 
         if (mode === 'connect') {
           if (!connectSourceId) {
@@ -494,8 +901,8 @@
         const origH = node.height;
 
         function onMove(ev) {
-          node.width = Math.max(260, Math.round(origW + (ev.clientX - startX) / state.viewport.scale));
-          node.height = Math.max(200, Math.round(origH + (ev.clientY - startY) / state.viewport.scale));
+          node.width = Math.max(280, Math.round(origW + (ev.clientX - startX) / state.viewport.scale));
+          node.height = Math.max(210, Math.round(origH + (ev.clientY - startY) / state.viewport.scale));
           card.style.width = `${node.width}px`;
           card.style.height = `${node.height}px`;
           renderEdges();
@@ -510,6 +917,7 @@
       });
 
       codeBtn.addEventListener('click', () => {
+        card.classList.remove('viewing-diff');
         const isEditing = card.classList.toggle('editing-html');
         if (!isEditing) {
           const node = state.nodes.find(n => n.id === nodeId);
@@ -521,10 +929,50 @@
         }
       });
 
+      wtDiffBtn.addEventListener('click', async () => {
+        card.classList.remove('editing-html');
+        const isViewing = card.classList.toggle('viewing-diff');
+        if (isViewing) {
+          const res = await fetch(`/api/nodes/implement/diff?nodeId=${encodeURIComponent(nodeId)}`);
+          const data = await res.json();
+          const node = state.nodes.find(n => n.id === nodeId);
+          if (node && data.diff) {
+            node.implementation = node.implementation || {};
+            node.implementation.diff = data.diff;
+            renderNodes();
+          }
+        }
+      });
+
+      wtRunBtn.addEventListener('click', async () => {
+        const customPrompt = promptInput.value.trim();
+        promptInput.value = '';
+        await runImplementAgent(nodeId, customPrompt);
+      });
+
+      wtCommitBtn.addEventListener('click', async () => {
+        const customMsg = promptInput.value.trim();
+        promptInput.value = '';
+        showToast('Committing implementation inside isolated Git worktree...', 10000);
+        const res = await fetch('/api/nodes/implement/commit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId, message: customMsg || undefined })
+        });
+        const data = await res.json();
+        if (data.commit) {
+          showToast(`✓ Committed ${data.commit.commitSha} on branch ${data.commit.branchName}!`);
+        }
+      });
+
       specBtn.addEventListener('click', () => {
         const customPrompt = promptInput.value.trim();
         promptInput.value = '';
-        triggerSpeculate(nodeId, customPrompt || 'Explore 3 divergent interactive UI designs for this surface');
+        triggerSpeculate(
+          nodeId,
+          customPrompt || 'Explore 3 divergent interactive UI designs across Arena models',
+          { arenaMode: true }
+        );
       });
 
       advanceBtn.addEventListener('click', () => {
@@ -534,6 +982,8 @@
       });
 
       delBtn.addEventListener('click', () => {
+        selectedForSynth.delete(nodeId);
+        updateSynthButtonLabel();
         state.nodes = state.nodes.filter(n => n.id !== nodeId);
         state.edges = state.edges.filter(e => e.from !== nodeId && e.to !== nodeId);
         renderAll();
@@ -544,13 +994,7 @@
         const instruction = promptInput.value.trim();
         if (!instruction) return;
         promptInput.value = '';
-        showToast(`Mutating surface "${nodeId}" via LLM...`, 15000);
-        await fetch('/api/nodes/mutate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodeId, instruction })
-        });
-        showToast('Surface updated!');
+        await mutateNode(nodeId, instruction);
       }
 
       sendBtn.addEventListener('click', runMutate);
@@ -559,18 +1003,81 @@
       });
     }
 
-    async function triggerSpeculate(nodeId, prompt) {
-      showToast('⚡ Forking 3 speculative UI branches in parallel...', 20000);
+    async function mutateNode(nodeId, instruction) {
+      showToast(`Mutating surface "${nodeId}" via LLM...`, 15000);
+      await fetch('/api/nodes/mutate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId, instruction })
+      });
+      showToast('Surface updated!');
+    }
+
+    async function triggerSpeculate(nodeId, prompt, options = {}) {
+      showToast('⚔ Arena Forking: Pitting gpt-6-luna, gpt-6.1-terra, and gpt-6.1-sol in parallel...', 20000);
       await fetch('/api/nodes/speculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, prompt, count: 3 })
+        body: JSON.stringify({
+          nodeId,
+          prompt,
+          count: options.count || 3,
+          arenaMode: options.arenaMode ?? true,
+          models: options.models
+        })
       });
-      showToast('3 speculative branches ready! Keep as many as you like or click "🚂 Advance →" on any branch.');
+      showToast('3 Arena branches ready! Keep multiple forks or click "⊕ Synthesize Forks" to merge them.');
+    }
+
+    async function synthesizeSelectedOrKept(customParentIds, instruction, targetStage) {
+      let parentIds = Array.isArray(customParentIds) ? customParentIds : [...selectedForSynth];
+      if (parentIds.length < 2) {
+        // Look for committed/kept speculative branches first
+        const committedForks = state.nodes.filter(n => n.status === 'committed' && n.parentId);
+        if (committedForks.length >= 2) {
+          parentIds = committedForks.slice(-2).map(n => n.id);
+        } else {
+          const specForks = state.nodes.filter(n => n.kind === 'speculative' || n.branchTag?.startsWith('fork-'));
+          parentIds = specForks.slice(0, 2).map(n => n.id);
+        }
+      }
+
+      if (parentIds.length < 2) {
+        showToast('Select at least 2 nodes using their ☐ header checkboxes to synthesize!');
+        return;
+      }
+
+      showToast(`⊕ Synthesizing ${parentIds.length} parent branches into a unified hybrid surface...`, 20000);
+      const res = await fetch('/api/nodes/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentIds, instruction, targetStage })
+      });
+      const data = await res.json();
+      selectedForSynth.clear();
+      updateSynthButtonLabel();
+      if (data.synthNode) {
+        showToast(`⊕ Created "${data.synthNode.title}" with convergence edges from ${parentIds.length} parents!`);
+      }
+    }
+
+    async function runImplementAgent(nodeId, instruction) {
+      showToast('⚙ Running Outbox Agent inside isolated Git worktree (generating module + running node --test)...', 15000);
+      const res = await fetch('/api/nodes/implement/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId, instruction })
+      });
+      const data = await res.json();
+      if (data.implementation) {
+        const ins = data.implementation.diff?.insertions ?? 0;
+        const passed = data.implementation.testPassed;
+        showToast(`⚙ Worktree implementation ${passed ? 'verified ✓' : 'completed'} (+${ins} lines). Click "🔍 Diff" on the card to inspect!`);
+      }
     }
 
     async function commitBranch(nodeId, pruneSiblings = false) {
-      showToast('✓ Marked fork as Kept! (Siblings stay alive so you can keep multiple tracks.)');
+      showToast('✓ Marked fork as Kept! (Select 2+ forks and click "⊕ Synthesize Forks" to merge them.)');
       await fetch('/api/nodes/commit-branch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -588,26 +1095,53 @@
       showToast(`Pruned ${data.discarded?.length || 0} unkept speculative fork(s). Kept forks remain intact.`);
     }
 
-    async function advanceStage(nodeId, instruction) {
+    async function advanceStage(nodeId, instruction, targetStage) {
       showToast('🚂 Advancing node to next Innovation Train stage...', 20000);
       await fetch('/api/nodes/advance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, instruction })
+        body: JSON.stringify({ nodeId, instruction, targetStage })
       });
       showToast('Next stage spawned on the Innovation Train!');
     }
 
-    window.addEventListener('message', (e) => {
+    // Listen to messages from surface iframes (both `window.asterism.*` and legacy `postMessage`)
+    window.addEventListener('message', async (e) => {
       if (!e.data || typeof e.data !== 'object') return;
-      if (e.data.type === 'asterism:trigger-speculate') {
-        triggerSpeculate(e.data.nodeId, e.data.prompt);
-      } else if (e.data.type === 'asterism:commit-branch') {
-        commitBranch(e.data.nodeId, Boolean(e.data.pruneSiblings));
-      } else if (e.data.type === 'asterism:prune-unkept') {
-        pruneUnkeptForks(e.data.parentId);
-      } else if (e.data.type === 'asterism:advance-stage') {
-        advanceStage(e.data.nodeId, e.data.instruction);
+      const msg = e.data;
+      if (msg.type === 'asterism:set-state' && msg.nodeId && msg.patch) {
+        const node = state.nodes.find(n => n.id === msg.nodeId);
+        if (node) {
+          node.state = Object.assign({}, node.state || {}, msg.patch);
+          const card = nodesLayer.querySelector(`[data-id="${node.id}"]`);
+          if (card) {
+            const keys = Object.keys(node.state);
+            const pill = card.querySelector('.state-pill');
+            if (pill) {
+              pill.textContent = `⚡ ${keys.length}`;
+              pill.title = `window.asterism.state: ${JSON.stringify(node.state)}`;
+            }
+          }
+        }
+        await fetch('/api/nodes/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId: msg.nodeId, patch: msg.patch })
+        });
+      } else if (msg.type === 'asterism:mutate-node') {
+        mutateNode(msg.nodeId, msg.instruction);
+      } else if (msg.type === 'asterism:trigger-speculate') {
+        triggerSpeculate(msg.nodeId, msg.prompt, msg);
+      } else if (msg.type === 'asterism:commit-branch') {
+        commitBranch(msg.nodeId, Boolean(msg.pruneSiblings));
+      } else if (msg.type === 'asterism:prune-unkept') {
+        pruneUnkeptForks(msg.parentId);
+      } else if (msg.type === 'asterism:advance-stage') {
+        advanceStage(msg.nodeId, msg.instruction, msg.targetStage);
+      } else if (msg.type === 'asterism:synthesize-nodes') {
+        synthesizeSelectedOrKept(msg.parentIds, msg.instruction, msg.targetStage);
+      } else if (msg.type === 'asterism:run-implement') {
+        runImplementAgent(msg.nodeId, msg.instruction);
       }
     });
 
@@ -672,16 +1206,25 @@
         title: 'Seed Note / Idea',
         kind: 'surface',
         stage: 'note',
-        x: Math.round(center.x - 180),
+        x: Math.round(center.x - 190),
         y: Math.round(center.y - 140),
-        width: 370,
-        height: 290,
+        width: 380,
+        height: 300,
+        model: 'openai/gpt-6-luna',
         status: 'ready',
         branchTag: 'note',
+        state: { priority: 80 },
         html: `<div style="font-family:system-ui,sans-serif;padding:16px;color:#e2e8f0;">
   <h4 style="margin:0 0 8px;color:#38bdf8;">New Innovation Train Seed</h4>
-  <p style="font-size:12px;color:#94a3b8;margin-bottom:12px;">Jot down a raw note here, click <strong>⚡ Fork 3x</strong> to brainstorm parallel directions, or click <strong>🚂 Advance →</strong> to refine and implement.</p>
-  <button onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'${id}'}, '*')" style="width:100%;background:#0284c7;color:white;border:none;padding:7px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;">🚂 Advance Note → Brainstorm</button>
+  <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">Jot down a raw note, adjust interactive state via <code>window.asterism</code>, click <strong>⚔ Arena 3x</strong> to pit models in parallel, or click <strong>🚂 Advance →</strong>.</p>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:11px;color:#cbd5e1;">
+    <span>Priority:</span>
+    <input type="range" min="1" max="100" value="80" data-state-key="priority" style="flex:1;accent-color:#38bdf8;" />
+  </div>
+  <div style="display:flex;gap:6px;">
+    <button onclick="window.asterism.spawnFork('Explore 3 divergent directions')" style="flex:1;background:#7e22ce;color:white;border:none;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">⚔ Arena 3x</button>
+    <button onclick="window.asterism.advanceStage()" style="flex:1;background:#0284c7;color:white;border:none;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Advance →</button>
+  </div>
 </div>`
       });
       renderAll();
@@ -695,6 +1238,8 @@
     }
 
     async function resetCanvas() {
+      selectedForSynth.clear();
+      updateSynthButtonLabel();
       await fetch('/api/reset', { method: 'POST' });
       showToast('Canvas reset to default Innovation Train state.');
     }
