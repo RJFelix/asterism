@@ -30,6 +30,12 @@ import {
   probeAvailableHarnesses,
   MCP_PROTOCOL_VERSION,
   MODE_LIMIT_HEADER,
+  createDefaultEnergyEnvelope,
+  attenuateEnergyForBranches,
+  normalizeWarrant,
+  computeAttentionBid,
+  allocateBasalFreeEnergy,
+  shouldBranchForRegretMinimization,
 } from "@asterism/core";
 import { CodexProviderCapabilitiesV2 } from "@t3tools/provider-codex/server/adapter";
 import { ClaudeProviderCapabilitiesV2 } from "@t3tools/provider-claude/server/adapter";
@@ -645,7 +651,12 @@ export function createAsterismServer(options = {}) {
       }
     }
 
-    // Multi-Panel Aware Mutation: can update the focused panel AND spawn related companion panels
+    // Multi-Panel Aware Mutation:
+    // - By default ("minimization of regret"), if the node already has downstream children in the graph,
+    //   acting on it branches into an additional future (`revisions-from`) rather than destructively
+    //   overwriting or invalidating the existing downstream Innovation Train!
+    // - Can also update in-place (`editIntent: "in-place"`) while snapshotting `revisions[]` and
+    //   storing per-role `facets[surfaceRole]`.
     if (req.method === "POST" && url.pathname === "/api/nodes/mutate") {
       try {
         const {
@@ -654,15 +665,24 @@ export function createAsterismServer(options = {}) {
           selectedSelector,
           model,
           surfaceRole,
+          editIntent = "auto-branch",
           commandId,
         } = await readJsonBody(req);
         const node = canvasState.nodes.find((n) => n.id === nodeId);
         if (!node) return sendJson(res, 404, { error: "Node not found" });
 
-        if (model) node.model = model;
-        if (surfaceRole && SURFACE_ROLES[surfaceRole]) {
-          node.surfaceRole = surfaceRole;
-        }
+        const targetRole =
+          surfaceRole && SURFACE_ROLES[surfaceRole]
+            ? surfaceRole
+            : node.surfaceRole || defaultRoleForStage(node.stage);
+        const targetModel = model || node.model || DEFAULT_MODEL;
+
+        const branchNewFuture = shouldBranchForRegretMinimization({
+          nodeId: node.id,
+          edges: canvasState.edges || [],
+          editIntent,
+        });
+
         node.status = "mutating";
         broadcastState();
 
@@ -672,28 +692,100 @@ export function createAsterismServer(options = {}) {
         let spawnedPanels = [];
         if (selectedSelector) {
           updatedHtml = await mutateHtmlSurface({
-            currentHtml: node.html,
+            currentHtml: node.facets?.[targetRole] || node.html,
             title: node.title,
-            surfaceRole: node.surfaceRole || defaultRoleForStage(node.stage),
+            surfaceRole: targetRole,
             instruction,
             selectedSelector,
-            model: node.model || DEFAULT_MODEL,
+            model: targetModel,
             nodeState: node.state,
             neighborhood,
           });
         } else {
           const collab = await collaborateAcrossPanels({
-            sourceNode: node,
+            sourceNode: {
+              ...node,
+              surfaceRole: targetRole,
+              html: node.facets?.[targetRole] || node.html,
+            },
             instruction,
             neighborhood,
-            model: node.model || DEFAULT_MODEL,
+            model: targetModel,
           });
           updatedHtml = collab.updatedHtml;
           spawnedPanels = collab.spawnedPanels || [];
         }
 
-        node.html = updatedHtml;
         node.status = "ready";
+        let targetNode = node;
+        let branchedRevisionNode = null;
+
+        if (branchNewFuture) {
+          // Minimization of Regret: Fork a new revision timeline node so existing downstream futures stay 100% intact!
+          const siblingRevs = canvasState.edges.filter(
+            (e) => e.from === node.id && e.relation === "revisions-from",
+          ).length;
+          const revNum = (node.revision || 1) + siblingRevs + 1;
+          branchedRevisionNode = {
+            ...JSON.parse(JSON.stringify(node)),
+            id: `${node.id}-rev${revNum}-${Date.now().toString(36).slice(-4)}`,
+            title: `${node.title} (v${revNum})`,
+            parentId: node.id,
+            revision: revNum,
+            surfaceRole: targetRole,
+            model: targetModel,
+            x: node.x + 40,
+            y: node.y + node.height + 55 + siblingRevs * 110,
+            status: "ready",
+            commitment: "speculative",
+            html: updatedHtml,
+            facets: {
+              ...(node.facets || { [node.surfaceRole || defaultRoleForStage(node.stage)]: node.html }),
+              [targetRole]: updatedHtml,
+            },
+            energy: createDefaultEnergyEnvelope(node.energy),
+          };
+          canvasState.nodes.push(branchedRevisionNode);
+          canvasState.edges.push({
+            id: `edge-rev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            from: node.id,
+            to: branchedRevisionNode.id,
+            relation: "revisions-from",
+            kind: "revisions-from",
+            label: `🌱 branches v${revNum} (existing future preserved)`,
+          });
+          targetNode = branchedRevisionNode;
+        } else {
+          // In-place update: preserve prior snapshot in `revisions[]` and never cancel downstream nodes
+          const prevRev = node.revision || 1;
+          node.revisions = Array.isArray(node.revisions) ? node.revisions : [];
+          node.revisions.push({
+            revision: prevRev,
+            timestamp: new Date().toISOString(),
+            title: node.title,
+            html: node.html,
+            state: { ...(node.state || {}) },
+            instruction,
+          });
+          node.revision = prevRev + 1;
+          node.model = targetModel;
+          node.surfaceRole = targetRole;
+          node.facets = {
+            ...(node.facets || {}),
+            [targetRole]: updatedHtml,
+          };
+          node.html = updatedHtml;
+
+          // Non-destructively notify direct downstream nodes that an upstream revision exists (no cancellation!)
+          for (const edge of canvasState.edges || []) {
+            if (edge.from === node.id) {
+              const child = canvasState.nodes.find((n) => n.id === edge.to);
+              if (child) {
+                child.upstreamRevisionAvailable = node.revision;
+              }
+            }
+          }
+        }
 
         for (const sp of spawnedPanels) {
           const relMeta =
@@ -702,7 +794,7 @@ export function createAsterismServer(options = {}) {
           canvasState.nodes.push(sp);
           canvasState.edges.push({
             id: `edge-rel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            from: node.id,
+            from: targetNode.id,
             to: sp.id,
             relation: sp.relationFromParent,
             kind: sp.relationFromParent,
@@ -714,23 +806,209 @@ export function createAsterismServer(options = {}) {
 
         await recordDomainCommand(
           "node.mutate",
-          node.id,
-          "surface.mutated",
+          targetNode.id,
+          branchNewFuture ? "surface.branched.regret_free" : "surface.mutated",
           {
-            nodeId: node.id,
+            sourceNodeId: node.id,
+            targetNodeId: targetNode.id,
+            branchedNewFuture: branchNewFuture,
             instruction,
-            model: node.model,
-            surfaceRole: node.surfaceRole,
+            model: targetNode.model,
+            surfaceRole: targetNode.surfaceRole,
             spawnedPanelIds: spawnedPanels.map((p) => p.id),
           },
-          [{ request: { type: "surface.mutate", nodeId: node.id, instruction } }],
+          [{ request: { type: "surface.mutate", nodeId: targetNode.id, instruction } }],
           commandId,
         );
 
         broadcastState();
         return sendJson(res, 200, {
-          node,
+          node: targetNode,
+          branchedNewFuture: branchNewFuture,
+          branchedRevisionNode,
           spawnedPanels,
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Crystallization Optic / Facet Tab Switch & Tear-Off Lens (`/api/nodes/facet`)
+    // Lets a single Active Thought render any Facet (`dialogue` | `spec-diagram` | `ui-prototype` | `artifact-harness`)
+    // either in-place via Facet Tabs OR torn off as a linked side-by-side Lens Panel!
+    if (req.method === "POST" && url.pathname === "/api/nodes/facet") {
+      try {
+        const {
+          nodeId,
+          facetRole = "spec-diagram",
+          tearOff = false,
+          prompt,
+          commandId,
+        } = await readJsonBody(req);
+        const node = canvasState.nodes.find((n) => n.id === nodeId);
+        if (!node) return sendJson(res, 404, { error: "Node not found" });
+
+        const currentRole = node.surfaceRole || defaultRoleForStage(node.stage);
+        node.facets = node.facets || { [currentRole]: node.html };
+
+        const relationMap = {
+          "ui-prototype": "visualizes-ui",
+          "spec-diagram": "specifies",
+          "artifact-harness": "implements",
+          dialogue: "annotates",
+        };
+        const relation = relationMap[facetRole] || "specifies";
+
+        // Generate facet HTML on demand if not cached yet (or if a custom prompt was supplied)
+        if (!node.facets[facetRole] || prompt) {
+          node.status = "mutating";
+          broadcastState();
+          const neighborhood = collectNeighborhoodNodes(canvasState, node.id);
+          const generated = await spawnRelatedPanel({
+            sourceNode: node,
+            relation,
+            surfaceRole: facetRole,
+            title: node.title,
+            prompt:
+              prompt ||
+              `Crystallize the "${facetRole}" facet lens for thought "${node.title}"`,
+            neighborhood,
+            existingRelatedCount: 0,
+            model: node.model || DEFAULT_MODEL,
+          });
+          node.facets[facetRole] = generated.html;
+          node.status = "ready";
+        }
+
+        if (tearOff) {
+          const existingOut = canvasState.edges.filter(
+            (e) => e.from === node.id,
+          ).length;
+          const tornOffLens = {
+            id: `lens-${facetRole}-${Date.now().toString(36)}`,
+            title: `${node.title} [${SURFACE_ROLES[facetRole]?.shortBadge || facetRole}]`,
+            kind: "lens",
+            lensOfNodeId: node.id,
+            stage: node.stage,
+            surfaceRole: facetRole,
+            x: node.x + node.width + 65,
+            y: node.y + existingOut * 120,
+            width: 410,
+            height: 350,
+            model: node.model || DEFAULT_MODEL,
+            status: "ready",
+            state: node.state || {},
+            facets: { ...node.facets },
+            html: node.facets[facetRole],
+            energy: createDefaultEnergyEnvelope(node.energy),
+          };
+          canvasState.nodes.push(tornOffLens);
+          canvasState.edges.push({
+            id: `edge-lens-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            from: node.id,
+            to: tornOffLens.id,
+            relation,
+            kind: "lens",
+            label: `🔭 lens (${facetRole})`,
+          });
+          saveState(canvasState);
+          await recordDomainCommand(
+            "node.facet.tearoff",
+            node.id,
+            "facet.torn_off",
+            { nodeId: node.id, lensNodeId: tornOffLens.id, facetRole },
+            [],
+            commandId,
+          );
+          broadcastState();
+          return sendJson(res, 200, {
+            node,
+            tornOffLens,
+            facetRole,
+            state: canvasState,
+          });
+        }
+
+        node.surfaceRole = facetRole;
+        node.html = node.facets[facetRole];
+        saveState(canvasState);
+        await recordDomainCommand(
+          "node.facet.switch",
+          node.id,
+          "facet.switched",
+          { nodeId: node.id, facetRole },
+          [],
+          commandId,
+        );
+        broadcastState();
+        return sendJson(res, 200, { node, facetRole, state: canvasState });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Basal Free-Energy Floor & EVOI Attention Queue (`/api/energy/basal-tick`)
+    // Allocates excess "effective free" compute energy to exhausted or high-EVOI directions so the
+    // system never deadlocks waiting for a human Steer when free compute can buy positive information value.
+    if (
+      (req.method === "POST" || req.method === "GET") &&
+      url.pathname === "/api/energy/basal-tick"
+    ) {
+      try {
+        for (const n of canvasState.nodes) {
+          if (!n.energy) {
+            n.energy = createDefaultEnergyEnvelope();
+          }
+          const w = normalizeWarrant(n);
+          n.warrant = w.warrant;
+          const downstreamCount = (canvasState.edges || []).filter(
+            (e) => e.from === n.id,
+          ).length;
+          n.attentionBid = computeAttentionBid({
+            warrant: n.warrant,
+            jevScore: n.jevScore,
+            downstreamCount,
+            opticMode:
+              n.surfaceRole === "ui-prototype"
+                ? "exhibit"
+                : n.surfaceRole === "dialogue"
+                  ? "steer"
+                  : "observe",
+          });
+        }
+
+        const result = allocateBasalFreeEnergy(canvasState.nodes);
+        const byId = new Map(canvasState.nodes.map((n) => [n.id, n]));
+        for (const alloc of result.allocations) {
+          const target = byId.get(alloc.nodeId);
+          if (target) {
+            target.energy = alloc.updatedEnvelope;
+          }
+        }
+
+        const attentionQueue = [...canvasState.nodes]
+          .sort(
+            (a, b) =>
+              (b.attentionBid?.evoiScore || 0) -
+              (a.attentionBid?.evoiScore || 0),
+          )
+          .map((n) => ({
+            nodeId: n.id,
+            title: n.title,
+            surfaceRole: n.surfaceRole || defaultRoleForStage(n.stage),
+            evoiScore: n.attentionBid?.evoiScore ?? 0,
+            epistemicEntropy: n.attentionBid?.epistemicEntropy ?? 0,
+            remainingTokens: n.energy?.remainingTokens ?? 0,
+            basalRechargedTokens: n.energy?.basalRechargedTokens ?? 0,
+          }));
+
+        saveState(canvasState);
+        broadcastState();
+        return sendJson(res, 200, {
+          totalGrantedTokens: result.totalGrantedTokens,
+          allocations: result.allocations,
+          attentionQueue,
           state: canvasState,
         });
       } catch (err) {
@@ -884,8 +1162,26 @@ export function createAsterismServer(options = {}) {
           neighborhood,
         });
 
+        const parentEnergy =
+          sourceNode.energy || createDefaultEnergyEnvelope();
+        const childEnergy = attenuateEnergyForBranches(
+          parentEnergy,
+          branches.length || count,
+        );
+        sourceNode.energy = {
+          ...parentEnergy,
+          remainingTokens: Math.max(
+            400,
+            parentEnergy.remainingTokens - 300 * branches.length,
+          ),
+        };
+
         sourceNode.status = "ready";
         for (const b of branches) {
+          b.commitment = "speculative";
+          b.warrant = normalizeWarrant(b).warrant;
+          b.energy = childEnergy;
+          b.facets = { [b.surfaceRole || defaultRoleForStage(b.stage)]: b.html };
           canvasState.nodes.push(b);
           const shortModel = (b.model || "").replace(/^openai\//, "");
           canvasState.edges.push({
@@ -953,12 +1249,8 @@ export function createAsterismServer(options = {}) {
           });
         }
 
-        for (const p of parentNodes) {
-          if (p.kind === "speculative") {
-            p.status = "committed";
-            p.kind = "surface";
-          }
-        }
+        // Preserve Epistemic Honesty: Do NOT silently launder speculative parents into "committed"
+        // merely because they were coupled (`⋈`); only explicit Keep (`Steer`) or verified checks commit!
         broadcastState();
 
         const synthNode = await synthesizeNodes({
@@ -968,6 +1260,13 @@ export function createAsterismServer(options = {}) {
           surfaceRole,
           model: model || parentNodes[0]?.model || DEFAULT_MODEL,
         });
+        synthNode.commitment = "speculative";
+        synthNode.warrant = normalizeWarrant(synthNode).warrant;
+        synthNode.energy = createDefaultEnergyEnvelope();
+        synthNode.facets = {
+          [synthNode.surfaceRole || defaultRoleForStage(synthNode.stage)]:
+            synthNode.html,
+        };
 
         canvasState.nodes.push(synthNode);
         for (const p of parentNodes) {

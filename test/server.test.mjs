@@ -190,7 +190,8 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.ok(relEdge);
     assert.equal(relEdge.relation, "visualizes-ui");
 
-    // Multi-Panel Agent Collaboration via /api/nodes/mutate: asking a Dialogue panel to "spawn a spec panel" updates the source panel AND spawns a linked `spec-diagram` panel!
+    // Multi-Panel Agent Collaboration via /api/nodes/mutate: asking a Dialogue panel (`node-brief`, which already has downstream children!)
+    // defaults to Regret-Minimizing Branching (`branchedNewFuture: true`) so existing downstream futures stay intact, AND spawns the requested companion `spec-diagram` panel!
     const multiCollabRes = await fetch(`${baseUrl}/api/nodes/mutate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -202,9 +203,38 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     });
     assert.equal(multiCollabRes.status, 200);
     const multiCollabData = await multiCollabRes.json();
+    assert.equal(multiCollabData.branchedNewFuture, true, "Acting on an upstream node with downstream edges must branch a new future by default to minimize regret");
+    assert.ok(multiCollabData.branchedRevisionNode.id.startsWith("node-brief-rev"));
     assert.equal(multiCollabData.spawnedPanels.length, 1);
     assert.equal(multiCollabData.spawnedPanels[0].surfaceRole, "spec-diagram");
     assert.equal(multiCollabData.spawnedPanels[0].relationFromParent, "specifies");
+
+    // Crystallization Facet Tab Switch & Tear-Off Lens (`/api/nodes/facet`)
+    const facetRes = await fetch(`${baseUrl}/api/nodes/facet`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nodeId: "node-brief",
+        facetRole: "spec-diagram",
+        tearOff: true,
+        prompt: "Crystallize architecture contract lens",
+      }),
+    });
+    assert.equal(facetRes.status, 200);
+    const facetData = await facetRes.json();
+    assert.ok(facetData.tornOffLens.id.startsWith("lens-spec-diagram-"));
+    assert.equal(facetData.tornOffLens.lensOfNodeId, "node-brief");
+    assert.ok(facetData.node.facets["spec-diagram"]);
+
+    // Basal Free-Energy Floor Allocator (`/api/energy/basal-tick`)
+    const energyRes = await fetch(`${baseUrl}/api/energy/basal-tick`, {
+      method: "POST",
+    });
+    assert.equal(energyRes.status, 200);
+    const energyData = await energyRes.json();
+    assert.ok(energyData.totalGrantedTokens >= 2000, "Basal Free-Energy Floor must allocate excess free energy across nodes");
+    assert.ok(energyData.attentionQueue.length >= 6);
+    assert.ok(typeof energyData.attentionQueue[0].evoiScore === "number");
 
     // Reset back to clean default state
     await fetch(`${baseUrl}/api/reset`, { method: "POST" });
@@ -221,3 +251,4 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     await new Promise((resolve) => server.close(resolve));
   }
 });
+

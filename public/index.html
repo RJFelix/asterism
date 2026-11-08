@@ -279,6 +279,105 @@
     .canvas-node.role-artifact-harness .worktree-bar {
       display: flex;
     }
+    /* Crystallization Facet Tab Bar (`[💬 Steer | 📐 Spec | 🎨 UI | ⚙ Code]`) */
+    .facet-tab-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px 8px;
+      background: rgba(15, 23, 42, 0.88);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+      gap: 4px;
+    }
+    .facet-tabs {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .facet-tab {
+      background: rgba(30, 41, 59, 0.65);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 5px;
+      padding: 2px 6px;
+      font-size: 9.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .facet-tab:hover { color: #f8fafc; border-color: rgba(56, 189, 248, 0.4); }
+    .facet-tab.active {
+      background: rgba(56, 189, 248, 0.18);
+      color: #38bdf8;
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+    .facet-tab.cached::after {
+      content: "•";
+      color: #34d399;
+      margin-left: 2px;
+    }
+    .facet-meta-right {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: ui-monospace, monospace;
+      font-size: 9px;
+      color: #94a3b8;
+    }
+    .energy-pill {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #6ee7b7;
+      cursor: pointer;
+    }
+    .tearoff-btn {
+      background: rgba(30, 41, 59, 0.8);
+      color: #cbd5e1;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 9px;
+      cursor: pointer;
+    }
+    .tearoff-btn:hover {
+      border-color: var(--accent-cyan);
+      color: #38bdf8;
+    }
+    /* Comparison Matrix Modal */
+    #compare-modal {
+      display: none;
+      position: fixed;
+      inset: 58px 24px 24px 24px;
+      z-index: 250;
+      background: rgba(9, 13, 24, 0.96);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 14px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(16px);
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #compare-modal.open { display: flex; }
+    .compare-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 12px;
+      padding: 12px;
+      overflow: auto;
+    }
+    .compare-col {
+      display: flex;
+      flex-direction: column;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 10px;
+      overflow: hidden;
+    }
     .wt-meta {
       display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap;
     }
@@ -394,10 +493,26 @@
     <button class="tool-btn" id="mode-connect" onclick="setMode('connect')">⤳ Wire Panels</button>
     <button class="tool-btn" onclick="createNewSurface()">＋ New Proposal</button>
     <button class="tool-btn synth-btn" id="btn-synthesize" onclick="synthesizeSelectedOrKept()" title="Select 2+ panels (even a Spec + a UI Prototype!) to converge them into a unified hybrid surface">⊕ Synthesize Panels</button>
+    <button class="tool-btn" onclick="openComparisonMatrix()" title="Project 2+ selected or speculative sibling forks into a single side-by-side Comparison Matrix Lens">⊞ Compare Matrix Lens</button>
+    <button class="tool-btn" onclick="pulseBasalFreeEnergy()" title="Allocate excess 'effective free' Basal Metabolic Energy to exhausted or high-EVOI frontier directions">🔋 Basal Energy Pulse</button>
     <button class="tool-btn" onclick="pruneUnkeptForks()" title="Remove only speculative branches you haven't marked Keep">✂ Prune Unkept</button>
     <button class="tool-btn" onclick="clearSketches()">⌫ Clear Ink</button>
     <button class="tool-btn" onclick="resetCanvas()">↺ Reset</button>
     <span class="zoom-readout" id="zoom-label">84%</span>
+  </div>
+
+  <div id="compare-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.95);border-bottom:1px solid rgba(148,163,184,0.2);">
+      <div>
+        <strong style="color:#38bdf8;font-size:13px;">⊞ Crystallization Lens: Multi-Fork Comparison Matrix</strong>
+        <span id="compare-subtitle" style="color:#94a3b8;font-size:11.5px;margin-left:10px;">Side-by-side projection over sibling Speculative Thoughts</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="tool-btn synth-btn" onclick="synthesizeFromComparisonMatrix()">⊕ Synthesize Compared Forks</button>
+        <button class="tool-btn" onclick="closeComparisonMatrix()">✕ Close Matrix</button>
+      </div>
+    </div>
+    <div class="compare-grid" id="compare-grid"></div>
   </div>
 
   <div id="canvas-viewport">
@@ -816,6 +931,18 @@
                 <button class="mini-btn del-btn" title="Delete Panel">✕</button>
               </div>
             </div>
+            <div class="facet-tab-bar">
+              <div class="facet-tabs">
+                <button class="facet-tab" data-facet="dialogue" title="Crystallize as 💬 Steer / Dialogue Worksheet">💬 Steer</button>
+                <button class="facet-tab" data-facet="spec-diagram" title="Crystallize as 📐 Spec / Universal Contract">📐 Spec</button>
+                <button class="facet-tab" data-facet="ui-prototype" title="Crystallize as 🎨 UI Sample / Exhibit">🎨 UI</button>
+                <button class="facet-tab" data-facet="artifact-harness" title="Crystallize as ⚙ Live Worktree / Code">⚙ Code</button>
+              </div>
+              <div class="facet-meta-right">
+                <span class="energy-pill" title="Metabolic Energy Envelope + Basal Free-Energy Floor (click to pulse Basal Energy)">🔋 3.6k</span>
+                <button class="tearoff-btn" title="Tear off active Facet into a side-by-side linked Lens Panel">⧉ Tear Off</button>
+              </div>
+            </div>
             <div class="worktree-bar">
               <div class="wt-meta">
                 <span class="wt-branch-label">⚙ worktree</span>
@@ -835,7 +962,7 @@
             </div>
             <div class="node-footer">
               <span class="state-pill" title="Persisted Interactive Widget State (window.asterism.state)">⚡ 0</span>
-              <input class="node-prompt-input" type="text" placeholder="Collaborate or ask agent to 'spawn a UI prototype for this'..." />
+              <input class="node-prompt-input" type="text" placeholder="Collaborate (auto-branches if downstream exists to minimize regret)..." />
               <button class="node-send-btn">Collaborate</button>
             </div>
             <div class="resize-handle"></div>
@@ -872,6 +999,21 @@
         const roleSelect = card.querySelector('.role-select');
         if (roleSelect.value !== resolvedRole) {
           roleSelect.value = resolvedRole;
+        }
+
+        // Update Facet Tabs & Energy Pill
+        const facetsObj = node.facets || { [resolvedRole]: node.html };
+        card.querySelectorAll('.facet-tab').forEach(tab => {
+          const f = tab.dataset.facet;
+          tab.classList.toggle('active', f === resolvedRole);
+          tab.classList.toggle('cached', Boolean(facetsObj[f]));
+        });
+        const energyPill = card.querySelector('.energy-pill');
+        if (energyPill) {
+          const rem = node.energy?.remainingTokens ?? 3600;
+          const basal = node.energy?.basalRechargedTokens ?? 0;
+          energyPill.textContent = `🔋 ${(rem / 1000).toFixed(1)}k${basal > 0 ? '+' : ''}`;
+          energyPill.title = `Remaining Envelope: ${rem} tokens | Recharged from Basal Free-Energy Floor: +${basal} tokens`;
         }
 
         const stageLabel = (node.stage || 'note').toUpperCase();
@@ -952,6 +1094,32 @@
       const editor = card.querySelector('.node-code-editor');
       const promptInput = card.querySelector('.node-prompt-input');
       const sendBtn = card.querySelector('.node-send-btn');
+      const tearOffBtn = card.querySelector('.tearoff-btn');
+      const energyPill = card.querySelector('.energy-pill');
+
+      card.querySelectorAll('.facet-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          e.stopPropagation();
+          switchOrTearOffFacet(nodeId, tab.dataset.facet, false);
+        });
+      });
+
+      if (tearOffBtn) {
+        tearOffBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const node = state.nodes.find(n => n.id === nodeId);
+          const curRole = node?.surfaceRole || defaultRoleForStage(node?.stage);
+          const nextFacet = curRole === 'dialogue' ? 'spec-diagram' : curRole === 'spec-diagram' ? 'ui-prototype' : curRole;
+          switchOrTearOffFacet(nodeId, nextFacet, true);
+        });
+      }
+
+      if (energyPill) {
+        energyPill.addEventListener('click', (e) => {
+          e.stopPropagation();
+          pulseBasalFreeEnergy();
+        });
+      }
 
       checkBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -961,14 +1129,7 @@
       roleSelect.addEventListener('change', async (e) => {
         e.stopPropagation();
         const surfaceRole = roleSelect.value;
-        const node = state.nodes.find(n => n.id === nodeId);
-        if (node) node.surfaceRole = surfaceRole;
-        showToast(`Changed panel collaboration role to "${surfaceRole}"`);
-        await fetch('/api/nodes/state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodeId, surfaceRole })
-        });
+        await switchOrTearOffFacet(nodeId, surfaceRole, false);
       });
 
       modelSelect.addEventListener('change', async (e) => {
@@ -1173,15 +1334,98 @@
       });
     }
 
+    let comparedNodeIds = [];
+
+    async function switchOrTearOffFacet(nodeId, facetRole, tearOff = false) {
+      showToast(
+        tearOff
+          ? `⧉ Tearing off "${facetRole}" facet lens into a linked side-by-side panel...`
+          : `Switching Crystallization Facet to "${facetRole}"...`,
+        14000
+      );
+      const res = await fetch('/api/nodes/facet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId, facetRole, tearOff })
+      });
+      const data = await res.json();
+      if (data.tornOffLens) {
+        showToast(`⧉ Torn off "${data.tornOffLens.title}" as a linked side-by-side lens!`);
+      } else {
+        showToast(`Switched facet to "${facetRole}".`);
+      }
+    }
+
+    async function pulseBasalFreeEnergy() {
+      showToast('🔋 Allocating excess Basal Free-Energy Floor across exhausted & high-EVOI frontier nodes...', 8000);
+      const res = await fetch('/api/energy/basal-tick', { method: 'POST' });
+      const data = await res.json();
+      if (data.totalGrantedTokens) {
+        const top = data.attentionQueue?.[0];
+        showToast(
+          `🔋 Basal Free-Energy Floor distributed +${data.totalGrantedTokens} tokens across ${data.allocations?.length || 0} nodes! Top EVOI: "${top?.title || 'root'}" (EVOI=${top?.evoiScore ?? 0})`
+        );
+      }
+    }
+
+    function openComparisonMatrix() {
+      let candidates = [...selectedForSynth]
+        .map(id => state.nodes.find(n => n.id === id))
+        .filter(Boolean);
+      if (candidates.length < 2) {
+        const specs = state.nodes.filter(n => n.kind === 'speculative' || n.id.startsWith('node-spec-'));
+        candidates = specs.length >= 2 ? specs.slice(0, 3) : state.nodes.slice(0, 3);
+      }
+      comparedNodeIds = candidates.map(n => n.id);
+      const grid = document.getElementById('compare-grid');
+      const sub = document.getElementById('compare-subtitle');
+      sub.textContent = `Projecting ${candidates.length} sibling thoughts side-by-side (${candidates.map(c => c.title).join(' vs. ')})`;
+      grid.innerHTML = '';
+      for (const n of candidates) {
+        const col = document.createElement('div');
+        col.className = 'compare-col';
+        const shortModel = (n.model || 'gpt-6-luna').replace('openai/', '');
+        const pScore = typeof n.jevScore === 'number' ? `p=${n.jevScore}` : 'calibrated';
+        col.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(30,41,59,0.92);border-bottom:1px solid rgba(148,163,184,0.2);font-size:11px;">
+            <div>
+              <strong style="color:#f8fafc;">${n.title}</strong>
+              <span style="margin-left:6px;color:#38bdf8;font-family:ui-monospace,monospace;font-size:10px;">${shortModel} • ${pScore}</span>
+            </div>
+            <button class="mini-btn" onclick="commitBranch('${n.id}', false); closeComparisonMatrix();">✓ Keep</button>
+          </div>
+          <iframe style="flex:1;width:100%;border:none;background:transparent;" sandbox="allow-scripts allow-same-origin"></iframe>
+        `;
+        const iframe = col.querySelector('iframe');
+        iframe.srcdoc = buildSrcDoc(n);
+        grid.appendChild(col);
+      }
+      document.getElementById('compare-modal').classList.add('open');
+    }
+
+    function closeComparisonMatrix() {
+      document.getElementById('compare-modal').classList.remove('open');
+    }
+
+    async function synthesizeFromComparisonMatrix() {
+      const ids = [...comparedNodeIds];
+      closeComparisonMatrix();
+      if (ids.length >= 2) {
+        await synthesizeSelectedOrKept(ids);
+      }
+    }
+
     async function mutateNode(nodeId, instruction) {
-      showToast(`Collaborating with agent on "${nodeId}" (neighborhood-aware)...`, 18000);
+      showToast(`Collaborating with agent on "${nodeId}" (regret-minimizing)...`, 18000);
       const res = await fetch('/api/nodes/mutate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId, instruction })
       });
       const data = await res.json();
-      if (data.spawnedPanels && data.spawnedPanels.length > 0) {
+      if (data.branchedNewFuture && data.branchedRevisionNode) {
+        showToast(`🌱 Regret-Free Branch: Created "${data.branchedRevisionNode.title}" while preserving the existing downstream timeline intact!`);
+      } else if (data.spawnedPanels && data.spawnedPanels.length > 0) {
         showToast(`Agent updated panel AND spawned ${data.spawnedPanels.length} companion panel(s): ${data.spawnedPanels.map(p => p.title).join(', ')}!`);
       } else {
         showToast('Panel updated!');
