@@ -154,7 +154,7 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.equal(diffData.hasWorktree, true);
     assert.match(diffData.diff.patch, /createSurfaceController/);
 
-    // Commit changes inside the isolated Git worktree branch
+    // Feature 1: Commit changes inside the isolated Git worktree branch
     const commitRes = await fetch(`${baseUrl}/api/nodes/implement/commit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -167,6 +167,44 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     const commitData = await commitRes.json();
     assert.equal(commitData.commit.committed, true);
     assert.ok(commitData.commit.commitSha.length >= 6);
+
+    // Multi-Panel Typed Relations: Spawn a companion UI Prototype panel (`visualizes-ui`) from a Dialogue proposal panel (`node-brief`)
+    const spawnUiRes = await fetch(`${baseUrl}/api/nodes/spawn-related`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceNodeId: "node-brief",
+        relation: "visualizes-ui",
+        surfaceRole: "ui-prototype",
+        prompt: "Build an interactive sample UI for the feature proposal",
+        model: "offline-fast-ui",
+      }),
+    });
+    assert.equal(spawnUiRes.status, 200);
+    const spawnUiData = await spawnUiRes.json();
+    assert.equal(spawnUiData.childNode.surfaceRole, "ui-prototype");
+    assert.equal(spawnUiData.childNode.relationFromParent, "visualizes-ui");
+    const relEdge = spawnUiData.state.edges.find(
+      (e) => e.from === "node-brief" && e.to === spawnUiData.childNode.id,
+    );
+    assert.ok(relEdge);
+    assert.equal(relEdge.relation, "visualizes-ui");
+
+    // Multi-Panel Agent Collaboration via /api/nodes/mutate: asking a Dialogue panel to "spawn a spec panel" updates the source panel AND spawns a linked `spec-diagram` panel!
+    const multiCollabRes = await fetch(`${baseUrl}/api/nodes/mutate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nodeId: "node-brief",
+        instruction: "Spawn a separate spec panel for our multi-panel collaboration protocol",
+        model: "offline-fast-spec",
+      }),
+    });
+    assert.equal(multiCollabRes.status, 200);
+    const multiCollabData = await multiCollabRes.json();
+    assert.equal(multiCollabData.spawnedPanels.length, 1);
+    assert.equal(multiCollabData.spawnedPanels[0].surfaceRole, "spec-diagram");
+    assert.equal(multiCollabData.spawnedPanels[0].relationFromParent, "specifies");
 
     // Reset back to clean default state
     await fetch(`${baseUrl}/api/reset`, { method: "POST" });

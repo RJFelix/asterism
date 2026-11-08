@@ -9,7 +9,12 @@ import { getDefaultCanvasState } from "./src/default-state.mjs";
 import {
   ARENA_MODELS,
   DEFAULT_MODEL,
+  SURFACE_ROLES,
+  PANEL_RELATIONS,
+  defaultRoleForStage,
   mutateHtmlSurface,
+  collaborateAcrossPanels,
+  spawnRelatedPanel,
   generateSpeculativeBranches,
   synthesizeNodes,
   advanceNodeStage,
@@ -173,6 +178,41 @@ export function collectLineageNodes(canvasState, targetNodeId) {
 
   visit(targetNodeId);
   return ordered;
+}
+
+/**
+ * Collects all directly connected upstream and downstream panels around `nodeId`
+ * along with their `relation` and `surfaceRole` so agents can view & manipulate beyond one panel.
+ */
+export function collectNeighborhoodNodes(canvasState, nodeId) {
+  const byId = new Map((canvasState.nodes || []).map((n) => [n.id, n]));
+  const result = [];
+  const seen = new Set([nodeId]);
+
+  for (const edge of canvasState.edges || []) {
+    if (edge.from === nodeId && !seen.has(edge.to)) {
+      const target = byId.get(edge.to);
+      if (target) {
+        seen.add(edge.to);
+        result.push({
+          ...target,
+          direction: "downstream",
+          relation: edge.relation || edge.kind || "advances",
+        });
+      }
+    } else if (edge.to === nodeId && !seen.has(edge.from)) {
+      const source = byId.get(edge.from);
+      if (source) {
+        seen.add(edge.from);
+        result.push({
+          ...source,
+          direction: "upstream",
+          relation: edge.relation || edge.kind || "advances",
+        });
+      }
+    }
+  }
+  return result;
 }
 
 function readJsonBody(req) {
@@ -343,10 +383,12 @@ export function createAsterismServer(options = {}) {
         protocolVersion: MCP_PROTOCOL_VERSION,
         providers: EXTRACTED_PROVIDER_CATALOG.map((p) => p.id),
         arenaModels: ARENA_MODELS.map((m) => m.id),
+        surfaceRoles: Object.keys(SURFACE_ROLES),
+        panelRelations: Object.keys(PANEL_RELATIONS),
       });
     }
 
-    // 2. Extracted Provider Harness Catalog + Arena Models + Live CLI Binary Probing
+    // 2. Extracted Provider Harness Catalog + Arena Models + Surface Roles + Relations
     if (req.method === "GET" && url.pathname === "/api/providers") {
       const cliProbes = await Effect.runPromise(
         probeAvailableHarnesses(
@@ -364,6 +406,8 @@ export function createAsterismServer(options = {}) {
           binaryPath: probeById.get(p.id)?.binaryPath ?? null,
         })),
         arenaModels: ARENA_MODELS,
+        surfaceRoles: SURFACE_ROLES,
+        panelRelations: PANEL_RELATIONS,
       });
     }
 
@@ -374,7 +418,7 @@ export function createAsterismServer(options = {}) {
       return sendJson(res, 200, { events });
     }
 
-    // 4. Peer Federation `/mcp` Endpoint
+    // 4. Peer Federation & Multi-Panel Graph MCP Tools (`/mcp`)
     if (req.method === "POST" && url.pathname === "/mcp") {
       try {
         const rpc = await readJsonBody(req);
@@ -392,7 +436,7 @@ export function createAsterismServer(options = {}) {
               id: rpc.id ?? 0,
               result: {
                 protocolVersion: MCP_PROTOCOL_VERSION,
-                serverInfo: { name: "asterism-mcp", version: "0.3.0" },
+                serverInfo: { name: "asterism-mcp", version: "0.4.0" },
                 capabilities: { tools: {} },
               },
             },
@@ -411,6 +455,7 @@ export function createAsterismServer(options = {}) {
 
         if (rpc.method === "tools/call") {
           const toolName = rpc.params?.name;
+          const args = rpc.params?.arguments || {};
 
           if (toolName === "asterism_canvas_summary") {
             const summary = {
@@ -422,15 +467,72 @@ export function createAsterismServer(options = {}) {
                 id: n.id,
                 title: n.title,
                 stage: n.stage,
+                surfaceRole: n.surfaceRole || defaultRoleForStage(n.stage),
                 status: n.status,
                 model: n.model || DEFAULT_MODEL,
+                state: n.state || {},
               })),
+              edges: canvasState.edges,
             };
             return sendJson(res, 200, {
               jsonrpc: "2.0",
               id: rpc.id ?? 1,
               result: {
                 content: [{ type: "text", text: JSON.stringify(summary) }],
+              },
+            });
+          }
+
+          if (toolName === "asterism_spawn_related_panel") {
+            const sourceNode = canvasState.nodes.find(
+              (n) => n.id === args.sourceNodeId,
+            );
+            if (!sourceNode) {
+              return sendJson(res, 200, {
+                jsonrpc: "2.0",
+                id: rpc.id ?? 1,
+                result: {
+                  isError: true,
+                  content: [{ type: "text", text: "Source node not found" }],
+                },
+              });
+            }
+            const neighborhood = collectNeighborhoodNodes(
+              canvasState,
+              sourceNode.id,
+            );
+            const existingOut = canvasState.edges.filter(
+              (e) => e.from === sourceNode.id,
+            ).length;
+            const childNode = await spawnRelatedPanel({
+              sourceNode,
+              relation: args.relation || "visualizes-ui",
+              surfaceRole: args.surfaceRole,
+              title: args.title,
+              prompt: args.prompt,
+              neighborhood,
+              existingRelatedCount: existingOut,
+              model: args.model || sourceNode.model || DEFAULT_MODEL,
+            });
+            const relMeta =
+              PANEL_RELATIONS[childNode.relationFromParent] ||
+              PANEL_RELATIONS["visualizes-ui"];
+            canvasState.nodes.push(childNode);
+            canvasState.edges.push({
+              id: `edge-rel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              from: sourceNode.id,
+              to: childNode.id,
+              relation: childNode.relationFromParent,
+              kind: childNode.relationFromParent,
+              label: relMeta.label,
+            });
+            saveState(canvasState);
+            broadcastState();
+            return sendJson(res, 200, {
+              jsonrpc: "2.0",
+              id: rpc.id ?? 1,
+              result: {
+                content: [{ type: "text", text: JSON.stringify({ childNode }) }],
               },
             });
           }
@@ -500,10 +602,11 @@ export function createAsterismServer(options = {}) {
       }
     }
 
-    // Feature 3: Bidirectional Surface <-> Agent Bridge (`window.asterism.setState` & Model Selection)
+    // Feature 3: Bidirectional Surface <-> Agent Bridge (`window.asterism.setState`, Role & Model Selection)
     if (req.method === "POST" && url.pathname === "/api/nodes/state") {
       try {
-        const { nodeId, patch, model, provider, commandId } = await readJsonBody(req);
+        const { nodeId, patch, model, provider, surfaceRole, commandId } =
+          await readJsonBody(req);
         const node = canvasState.nodes.find((n) => n.id === nodeId);
         if (!node) return sendJson(res, 404, { error: "Node not found" });
 
@@ -516,6 +619,9 @@ export function createAsterismServer(options = {}) {
         if (typeof provider === "string" && provider.trim()) {
           node.provider = provider.trim();
         }
+        if (typeof surfaceRole === "string" && SURFACE_ROLES[surfaceRole]) {
+          node.surfaceRole = surfaceRole;
+        }
 
         saveState(canvasState);
         await recordDomainCommand(
@@ -526,6 +632,7 @@ export function createAsterismServer(options = {}) {
             nodeId: node.id,
             patch: patch || {},
             model: node.model,
+            surfaceRole: node.surfaceRole,
             state: node.state || {},
           },
           [],
@@ -538,41 +645,210 @@ export function createAsterismServer(options = {}) {
       }
     }
 
+    // Multi-Panel Aware Mutation: can update the focused panel AND spawn related companion panels
     if (req.method === "POST" && url.pathname === "/api/nodes/mutate") {
       try {
-        const { nodeId, instruction, selectedSelector, model, commandId } =
-          await readJsonBody(req);
+        const {
+          nodeId,
+          instruction,
+          selectedSelector,
+          model,
+          surfaceRole,
+          commandId,
+        } = await readJsonBody(req);
         const node = canvasState.nodes.find((n) => n.id === nodeId);
         if (!node) return sendJson(res, 404, { error: "Node not found" });
 
         if (model) node.model = model;
+        if (surfaceRole && SURFACE_ROLES[surfaceRole]) {
+          node.surfaceRole = surfaceRole;
+        }
         node.status = "mutating";
         broadcastState();
 
-        const updatedHtml = await mutateHtmlSurface({
-          currentHtml: node.html,
-          title: node.title,
-          instruction,
-          selectedSelector,
-          model: node.model || DEFAULT_MODEL,
-          nodeState: node.state,
-        });
+        const neighborhood = collectNeighborhoodNodes(canvasState, node.id);
+
+        let updatedHtml;
+        let spawnedPanels = [];
+        if (selectedSelector) {
+          updatedHtml = await mutateHtmlSurface({
+            currentHtml: node.html,
+            title: node.title,
+            surfaceRole: node.surfaceRole || defaultRoleForStage(node.stage),
+            instruction,
+            selectedSelector,
+            model: node.model || DEFAULT_MODEL,
+            nodeState: node.state,
+            neighborhood,
+          });
+        } else {
+          const collab = await collaborateAcrossPanels({
+            sourceNode: node,
+            instruction,
+            neighborhood,
+            model: node.model || DEFAULT_MODEL,
+          });
+          updatedHtml = collab.updatedHtml;
+          spawnedPanels = collab.spawnedPanels || [];
+        }
 
         node.html = updatedHtml;
         node.status = "ready";
+
+        for (const sp of spawnedPanels) {
+          const relMeta =
+            PANEL_RELATIONS[sp.relationFromParent] ||
+            PANEL_RELATIONS["visualizes-ui"];
+          canvasState.nodes.push(sp);
+          canvasState.edges.push({
+            id: `edge-rel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            from: node.id,
+            to: sp.id,
+            relation: sp.relationFromParent,
+            kind: sp.relationFromParent,
+            label: relMeta.label,
+          });
+        }
+
         saveState(canvasState);
 
         await recordDomainCommand(
           "node.mutate",
           node.id,
           "surface.mutated",
-          { nodeId: node.id, instruction, model: node.model },
+          {
+            nodeId: node.id,
+            instruction,
+            model: node.model,
+            surfaceRole: node.surfaceRole,
+            spawnedPanelIds: spawnedPanels.map((p) => p.id),
+          },
           [{ request: { type: "surface.mutate", nodeId: node.id, instruction } }],
           commandId,
         );
 
         broadcastState();
-        return sendJson(res, 200, { node, state: canvasState });
+        return sendJson(res, 200, {
+          node,
+          spawnedPanels,
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Spawn a Related Companion Panel with a Typed Relation (`visualizes-ui`, `specifies`, `implements`, `annotates`)
+    if (req.method === "POST" && url.pathname === "/api/nodes/spawn-related") {
+      try {
+        const {
+          sourceNodeId,
+          relation = "visualizes-ui",
+          surfaceRole,
+          title,
+          prompt,
+          model,
+          commandId,
+        } = await readJsonBody(req);
+
+        const sourceNode = canvasState.nodes.find((n) => n.id === sourceNodeId);
+        if (!sourceNode) {
+          return sendJson(res, 404, { error: "Source node not found" });
+        }
+
+        sourceNode.status = "mutating";
+        broadcastState();
+
+        const neighborhood = collectNeighborhoodNodes(canvasState, sourceNode.id);
+        const existingRelatedCount = canvasState.edges.filter(
+          (e) => e.from === sourceNode.id,
+        ).length;
+
+        const childNode = await spawnRelatedPanel({
+          sourceNode,
+          relation,
+          surfaceRole,
+          title,
+          prompt,
+          neighborhood,
+          existingRelatedCount,
+          model: model || sourceNode.model || DEFAULT_MODEL,
+        });
+
+        sourceNode.status = "ready";
+        const relMeta =
+          PANEL_RELATIONS[childNode.relationFromParent] ||
+          PANEL_RELATIONS["visualizes-ui"];
+
+        canvasState.nodes.push(childNode);
+        canvasState.edges.push({
+          id: `edge-rel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          from: sourceNode.id,
+          to: childNode.id,
+          relation: childNode.relationFromParent,
+          kind: childNode.relationFromParent,
+          label: relMeta.label,
+        });
+
+        const outboxEffects = [
+          {
+            request: {
+              type: "panel.spawn-related",
+              sourceNodeId: sourceNode.id,
+              childNodeId: childNode.id,
+              relation: childNode.relationFromParent,
+              surfaceRole: childNode.surfaceRole,
+              ...(prompt ? { prompt } : {}),
+            },
+          },
+        ];
+
+        if (childNode.surfaceRole === "artifact-harness" || childNode.stage === "implement") {
+          try {
+            const wt = await Effect.runPromise(
+              createIsolatedWorktree({
+                repoRoot: __dirname,
+                worktreesDir,
+                nodeId: childNode.id,
+              }),
+            );
+            childNode.worktree = wt;
+            outboxEffects.push({
+              request: {
+                type: "harness.run-turn",
+                nodeId: childNode.id,
+                provider: childNode.provider || "codex",
+                model: childNode.model || DEFAULT_MODEL,
+                prompt:
+                  prompt ||
+                  `Implement and verify ${childNode.title} inside isolated worktree`,
+                cwd: wt.worktreePath,
+              },
+            });
+          } catch {
+            // Ignore worktree error if git is unavailable
+          }
+        }
+
+        saveState(canvasState);
+        await recordDomainCommand(
+          "panel.spawn-related",
+          sourceNode.id,
+          "panel.related.spawned",
+          {
+            sourceNodeId: sourceNode.id,
+            childNodeId: childNode.id,
+            relation: childNode.relationFromParent,
+            surfaceRole: childNode.surfaceRole,
+          },
+          outboxEffects,
+          commandId,
+        );
+
+        await drainOutbox();
+        broadcastState();
+
+        return sendJson(res, 200, { childNode, state: canvasState });
       } catch (err) {
         return sendJson(res, 500, { error: err.message });
       }
@@ -586,6 +862,7 @@ export function createAsterismServer(options = {}) {
           prompt,
           count = 3,
           arenaMode = true,
+          surfaceRole,
           models,
           commandId,
         } = await readJsonBody(req);
@@ -596,12 +873,15 @@ export function createAsterismServer(options = {}) {
         sourceNode.status = "speculating";
         broadcastState();
 
+        const neighborhood = collectNeighborhoodNodes(canvasState, sourceNode.id);
         const branches = await generateSpeculativeBranches({
           sourceNode,
           prompt,
           count,
           arenaMode,
+          surfaceRole,
           models,
+          neighborhood,
         });
 
         sourceNode.status = "ready";
@@ -612,9 +892,10 @@ export function createAsterismServer(options = {}) {
             id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             from: sourceNode.id,
             to: b.id,
+            relation: "forks",
             kind: arenaMode ? "arena" : "speculative",
             label: arenaMode
-              ? `⚔ ${shortModel} (p=${b.jevScore})`
+              ? `⚔ forks (${shortModel} • p=${b.jevScore})`
               : `${b.branchTag} (p=${b.jevScore})`,
           });
         }
@@ -656,6 +937,7 @@ export function createAsterismServer(options = {}) {
           parentIds = [],
           instruction,
           targetStage,
+          surfaceRole,
           model,
           commandId,
         } = await readJsonBody(req);
@@ -683,6 +965,7 @@ export function createAsterismServer(options = {}) {
           parentNodes,
           instruction,
           targetStage,
+          surfaceRole,
           model: model || parentNodes[0]?.model || DEFAULT_MODEL,
         });
 
@@ -692,8 +975,9 @@ export function createAsterismServer(options = {}) {
             id: `edge-synth-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             from: p.id,
             to: synthNode.id,
+            relation: "synthesizes",
             kind: "synthesis",
-            label: `⊕ merge (${p.branchTag || p.stage})`,
+            label: `⊕ synthesizes (${p.surfaceRole || p.stage})`,
           });
         }
 
@@ -706,6 +990,7 @@ export function createAsterismServer(options = {}) {
             synthNodeId: synthNode.id,
             parentIds: parentNodes.map((p) => p.id),
             stage: synthNode.stage,
+            surfaceRole: synthNode.surfaceRole,
           },
           [
             {
@@ -815,7 +1100,7 @@ export function createAsterismServer(options = {}) {
 
     if (req.method === "POST" && url.pathname === "/api/nodes/advance") {
       try {
-        const { nodeId, targetStage, instruction, commandId } =
+        const { nodeId, targetStage, surfaceRole, instruction, commandId } =
           await readJsonBody(req);
         const sourceNode = canvasState.nodes.find((n) => n.id === nodeId);
         if (!sourceNode)
@@ -828,10 +1113,13 @@ export function createAsterismServer(options = {}) {
         sourceNode.status = "mutating";
         broadcastState();
 
+        const neighborhood = collectNeighborhoodNodes(canvasState, sourceNode.id);
         const childNode = await advanceNodeStage({
           sourceNode,
           targetStage,
+          surfaceRole,
           instruction,
+          neighborhood,
         });
 
         const existingDownstream = canvasState.edges.filter(
@@ -840,12 +1128,17 @@ export function createAsterismServer(options = {}) {
         childNode.y = sourceNode.y + existingDownstream * 140;
 
         sourceNode.status = "committed";
+        const relMeta =
+          PANEL_RELATIONS[childNode.relationFromParent] ||
+          PANEL_RELATIONS.advances;
         canvasState.nodes.push(childNode);
         canvasState.edges.push({
           id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           from: sourceNode.id,
           to: childNode.id,
-          label: `→ ${childNode.stage}`,
+          relation: childNode.relationFromParent || "advances",
+          kind: childNode.relationFromParent || "advances",
+          label: `${relMeta.label} (${childNode.stage})`,
         });
 
         const outboxEffects = [
@@ -896,6 +1189,7 @@ export function createAsterismServer(options = {}) {
             sourceNodeId: sourceNode.id,
             childNodeId: childNode.id,
             stage: childNode.stage,
+            surfaceRole: childNode.surfaceRole,
             worktree: childNode.worktree ?? null,
           },
           outboxEffects,
@@ -958,6 +1252,7 @@ export function createAsterismServer(options = {}) {
         if (!node) return sendJson(res, 404, { error: "Node not found" });
 
         node.stage = "implement";
+        node.surfaceRole = "artifact-harness";
         if (model) node.model = model;
         if (provider) node.provider = provider;
 

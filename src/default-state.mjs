@@ -1,247 +1,249 @@
 export const INNOVATION_STAGES = [
-  { id: "note", label: "1. Note", icon: "✎", color: "#94a3b8", next: "brainstorm", nextLabel: "Advance → Brainstorm (3x)" },
+  { id: "note", label: "1. Note", icon: "✎", color: "#94a3b8", next: "brainstorm", nextLabel: "Advance → Brainstorm" },
   { id: "brainstorm", label: "2. Brainstorm", icon: "⚡", color: "#c084fc", next: "refine", nextLabel: "Advance → Refine Spec" },
   { id: "refine", label: "3. Refine", icon: "◈", color: "#38bdf8", next: "design", nextLabel: "Advance → Interactive Design" },
-  { id: "design", label: "4. Design", icon: "❖", color: "#fbbf24", next: "implement", nextLabel: "Advance → Implementation" },
-  { id: "implement", label: "5. Implement", icon: "⚙", color: "#34d399", next: "refine", nextLabel: "Spawn Next Iteration" }
+  { id: "design", label: "4. Design", icon: "❖", color: "#f472b6", next: "implement", nextLabel: "Advance → Implementation" },
+  { id: "implement", label: "5. Implement", icon: "⚙", color: "#34d399", next: "refine", nextLabel: "Spawn Next Iteration" },
 ];
 
 export function getDefaultCanvasState() {
   return {
-    version: 2,
+    version: 3,
     updatedAt: new Date().toISOString(),
-    viewport: { x: 70, y: 55, scale: 0.85 },
+    viewport: { x: 65, y: 55, scale: 0.84 },
     strokes: [],
     edges: [
       {
         id: "edge-1",
         from: "node-brief",
         to: "node-hydro",
-        label: "Advance → Refine DSL"
+        relation: "specifies",
+        kind: "specifies",
+        label: "📐 specifies contract",
       },
       {
         id: "edge-2",
         from: "node-hydro",
         to: "node-spec-a",
-        label: "Fork A: Spatial HUD"
+        relation: "visualizes-ui",
+        kind: "visualizes-ui",
+        label: "🎨 visualizes UI (gpt-6-luna)",
       },
       {
         id: "edge-3",
         from: "node-hydro",
         to: "node-spec-b",
-        label: "Fork B: State Scrubber"
+        relation: "visualizes-ui",
+        kind: "visualizes-ui",
+        label: "🎨 visualizes UI (gpt-6.1-terra)",
       },
       {
         id: "edge-4",
         from: "node-hydro",
         to: "node-spec-c",
-        label: "Fork C: Physical + Voice"
+        relation: "visualizes-ui",
+        kind: "visualizes-ui",
+        label: "🎨 visualizes UI (gpt-6.1-sol)",
       },
       {
         id: "edge-5",
         from: "node-robotics",
         to: "node-hydro",
-        label: "Sensor telemetry"
-      }
+        relation: "implements",
+        kind: "implements",
+        label: "⚙ telemetry harness",
+      },
     ],
     nodes: [
       {
         id: "node-brief",
-        title: "Seed Note: The Innovation Train",
+        title: "Feature Proposal: Multi-Panel Innovation Train",
         kind: "brief",
         stage: "note",
+        surfaceRole: "dialogue",
         x: 30,
-        y: 50,
-        width: 390,
-        height: 375,
+        y: 45,
+        width: 395,
+        height: 365,
         model: "openai/gpt-6-luna",
         status: "ready",
-        branchTag: "seed-note",
+        branchTag: "seed-proposal",
+        state: {
+          autonomyLevel: "co-pilot",
+          spawnCompanionUiAutomatically: true,
+          maxParallelForks: 3,
+        },
         html: `<div class="surface-root">
   <style>
     .surface-root {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       color: #e2e8f0;
-      padding: 15px;
+      padding: 14px;
       line-height: 1.45;
-      font-size: 12.5px;
+      font-size: 12px;
     }
-    .train-track {
+    .role-banner {
       display: flex; align-items: center; justify-content: space-between;
-      background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; font-size: 10.5px;
+      background: rgba(56, 189, 248, 0.14); border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 7px; padding: 5px 9px; margin-bottom: 10px; font-size: 10.5px; color: #38bdf8;
     }
-    .station { display: flex; flex-direction: column; align-items: center; gap: 3px; color: #94a3b8; }
-    .station.active { color: #38bdf8; font-weight: 700; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-    h3 { margin: 0 0 6px; font-size: 14.5px; color: #f8fafc; }
-    p { margin: 0 0 10px; color: #94a3b8; }
-    .goal-list { display: grid; gap: 7px; margin: 10px 0; }
-    .goal-item {
-      background: rgba(15, 23, 42, 0.65);
-      border: 1px solid rgba(148, 163, 184, 0.16);
-      border-radius: 8px; padding: 8px 10px;
+    h3 { margin: 0 0 5px; font-size: 14px; color: #f8fafc; }
+    p { margin: 0 0 10px; color: #94a3b8; font-size: 11.5px; }
+    .decision-box {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px; padding: 9px 10px; margin-bottom: 8px;
     }
-    .goal-item strong { color: #e2e8f0; display: block; margin-bottom: 2px; font-size: 11.5px; }
-    .goal-item span { color: #94a3b8; font-size: 11px; }
-    .cta-row { display: flex; gap: 6px; margin-top: 8px; }
-    .cta-btn {
-      flex: 1; padding: 7px 10px; border-radius: 7px;
-      border: 1px solid rgba(168, 85, 247, 0.45);
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(59, 130, 246, 0.25));
-      color: #f3e8ff; font-weight: 600; font-size: 11.5px; cursor: pointer;
+    .decision-row {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 11px;
     }
-    .cta-btn:hover { background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(59, 130, 246, 0.4)); }
+    .spawn-bar {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px;
+    }
+    .spawn-btn {
+      padding: 6px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+      border: 1px solid rgba(244, 114, 182, 0.4); background: rgba(244, 114, 182, 0.15); color: #f9a8d4;
+    }
+    .spawn-btn.spec {
+      border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.15); color: #d8b4fe;
+    }
   </style>
-  <div class="train-track">
-    <div class="station active"><span class="dot"></span>Note</div>
-    <span>→</span>
-    <div class="station"><span class="dot"></span>Brainstorm</div>
-    <span>→</span>
-    <div class="station"><span class="dot"></span>Refine</div>
-    <span>→</span>
-    <div class="station"><span class="dot"></span>Design</div>
-    <span>→</span>
-    <div class="station"><span class="dot"></span>Implement</div>
+  <div class="role-banner">
+    <strong>💬 DIALOGUE / PROPOSAL</strong>
+    <span>Agent ↔ Developer Medium</span>
   </div>
-  <h3>Continuous Innovation Train</h3>
-  <p>Every node sits on a continuous pipeline from raw thought to running code. Keep <strong>as many speculative forks as you want</strong>—each kept fork becomes its own parallel train car that can advance to the next stage.</p>
-  <div class="goal-list">
-    <div class="goal-item">
-      <strong>Keep Multiple Forks &amp; Synthesize</strong>
-      <span>Click <em>✓ Keep Fork</em> on any number of branches without destroying siblings, or <em>⊕ Synthesize Kept</em> to merge two kept designs into a hybrid child.</span>
+  <h3>What is each panel on this canvas?</h3>
+  <p>Every panel is an <strong>Agent ↔ Developer collaboration surface</strong> with an explicit role badge in its header—so neither you nor the agent confuses a <em>decision worksheet</em> with a <em>sample of the target UI</em>.</p>
+  <div class="decision-box">
+    <div style="font-size:10.5px;color:#38bdf8;font-weight:700;margin-bottom:6px;">COLLABORATION PREFERENCES (window.asterism.state)</div>
+    <div class="decision-row">
+      <span>Agent Collaboration Mode</span>
+      <select data-state-key="autonomyLevel" style="background:#1e293b;color:#f8fafc;border:1px solid rgba(148,163,184,0.3);border-radius:4px;padding:2px 6px;font-size:11px;">
+        <option value="co-pilot">Interactive Co-Pilot</option>
+        <option value="autonomous">Autonomous Multi-Panel</option>
+      </select>
     </div>
-    <div class="goal-item">
-      <strong>Advance Stage (→)</strong>
-      <span>Click the stage button on any card header to spawn a downstream node for the next phase (Brainstorm → Refine → Design → Implement).</span>
-    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#cbd5e1;cursor:pointer;">
+      <input type="checkbox" checked data-state-key="spawnCompanionUiAutomatically" style="accent-color:#38bdf8;" />
+      <span>Allow agent to spawn linked 🎨 UI Prototype &amp; 📐 Spec panels</span>
+    </label>
   </div>
-  <div class="cta-row">
-    <button class="cta-btn" onclick="window.parent.postMessage({type:'asterism:advance-stage', nodeId:'node-brief'}, '*')">
-      🚂 Advance Note → Next Stage
+  <div class="spawn-bar">
+    <button class="spawn-btn" onclick="window.asterism.spawnRelatedPanel({relation:'visualizes-ui', surfaceRole:'ui-prototype', prompt:'Create an interactive UI prototype for this feature proposal'})">
+      🎨 + Spawn UI Prototype
+    </button>
+    <button class="spawn-btn spec" onclick="window.asterism.spawnRelatedPanel({relation:'specifies', surfaceRole:'spec-diagram', prompt:'Create a technical contract & architecture spec for this proposal'})">
+      📐 + Spawn Spec Panel
     </button>
   </div>
-</div>`
+</div>`,
       },
       {
         id: "node-hydro",
-        title: "Hydro Workflow & Jev Evaluator",
+        title: "Spec: Hydro Workflow & Multi-Panel Graph Contract",
         kind: "workflow",
         stage: "refine",
-        x: 495,
-        y: 50,
+        surfaceRole: "spec-diagram",
+        relationFromParent: "specifies",
+        x: 505,
+        y: 45,
         width: 430,
-        height: 390,
+        height: 375,
         model: "openai/gpt-6-luna",
         status: "ready",
         branchTag: "dsl-core",
+        state: { jevThreshold: 0.75, allowMultiParentSynthesis: true },
         html: `<div class="hydro-root">
   <style>
     .hydro-root {
       font-family: 'JetBrains Mono', ui-monospace, monospace;
-      color: #e2e8f0; padding: 14px; font-size: 12px;
+      color: #e2e8f0; padding: 14px; font-size: 11.5px;
     }
-    .hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .hdr-title { font-weight: 700; color: #38bdf8; font-size: 12.5px; }
-    .pill {
-      padding: 2px 8px; border-radius: 99px; font-size: 10px;
-      background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);
+    .hdr {
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(168, 85, 247, 0.14); border: 1px solid rgba(168, 85, 247, 0.35);
+      border-radius: 7px; padding: 5px 9px; margin-bottom: 10px; font-size: 10.5px; color: #d8b4fe;
     }
     .step {
-      background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(148, 163, 184, 0.18);
-      border-radius: 7px; padding: 8px 10px; margin-bottom: 8px;
+      background: rgba(15, 23, 42, 0.78); border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 7px; padding: 8px 10px; margin-bottom: 7px;
     }
-    .step-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .step-top { display: flex; justify-content: space-between; margin-bottom: 3px; }
     .kw { color: #c084fc; font-weight: 700; }
-    .cost-free { color: #34d399; font-size: 10.5px; }
-    .cost-jev { color: #fbbf24; font-size: 10.5px; }
-    .desc { color: #94a3b8; font-family: system-ui, sans-serif; font-size: 11.5px; }
+    .cost-free { color: #34d399; font-size: 10px; }
+    .cost-jev { color: #fbbf24; font-size: 10px; }
+    .desc { color: #94a3b8; font-family: system-ui, sans-serif; font-size: 11px; }
     .prob-bar {
       height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; margin-top: 6px;
     }
     .prob-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #a855f7); transition: width 0.3s; }
-    .controls { display: flex; gap: 6px; margin-top: 10px; }
-    .btn {
-      flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(148,163,184,0.25);
-      background: rgba(30, 41, 59, 0.8); color: #e2e8f0; cursor: pointer; font-size: 11px;
-    }
-    .btn:hover { border-color: #38bdf8; color: #38bdf8; }
   </style>
   <div class="hdr">
-    <span class="hdr-title">do-notation :: Workflow [UIVariant]</span>
-    <span class="pill" id="hydro-state">Multi-Fork Active</span>
+    <strong>📐 SPEC / ARCHITECTURE CONTRACT</strong>
+    <span id="hydro-state"> specifies: node-brief</span>
   </div>
   <div class="step">
     <div class="step-top">
-      <span><span class="kw">Intent</span> "Fan out speculative UI branches"</span>
-      <span class="cost-free">0 tokens</span>
+      <span><span class="kw">SurfaceRole</span> = Dialogue | Spec | UIPrototype | Artifact</span>
+      <span class="cost-free">Typed Role</span>
     </div>
-    <div class="desc">Keep 1, 2, or all 3 branches alive simultaneously as independent innovation tracks.</div>
+    <div class="desc">Every panel declares whether it is direct agent↔dev dialogue, a technical contract, a sample UI to mark up, or a worktree test harness.</div>
   </div>
   <div class="step">
     <div class="step-top">
-      <span><span class="kw">PCheck</span> (ExitZero domRenderCheck)</span>
-      <span class="cost-free">CheckSpec • Free</span>
+      <span><span class="kw">PanelRelation</span> = visualizes-ui | specifies | forks | synthesizes</span>
+      <span class="cost-free">Graph Edges</span>
     </div>
-    <div class="desc">Local deterministic check verifies HTML/JS sandbox mounts cleanly with 0 console errors.</div>
+    <div class="desc">Agents inspect connected panels across the graph and can spawn companion UI or Spec panels automatically.</div>
   </div>
   <div class="step">
     <div class="step-top">
-      <span><span class="kw">PJudge</span> (LastN 3) QChoice</span>
+      <span><span class="kw">PJudge</span> (Arena 3x) QChoice</span>
       <span class="cost-jev" id="jev-label">Jev • p = 0.86</span>
     </div>
-    <div class="desc">Fast small model scores layout density, interaction ergonomics, and accessibility.</div>
+    <div class="desc">Calibrated evaluator scores parallel UI prototypes on the right.</div>
     <div class="prob-bar"><div class="prob-fill" id="jev-bar" style="width: 86%"></div></div>
   </div>
-  <div class="controls">
-    <button class="btn" onclick="
-      const p = (0.65 + Math.random()*0.32).toFixed(2);
-      document.getElementById('jev-label').textContent = 'Jev • p = ' + p;
-      document.getElementById('jev-bar').style.width = (p*100) + '%';
-      document.getElementById('hydro-state').textContent = p >= 0.75 ? 'Pass >= 0.75' : 'Abstain / Ask User';
-    ">Re-run Jev Calibration</button>
-    <button class="btn" onclick="window.parent.postMessage({type:'asterism:prune-unkept', parentId:'node-hydro'}, '*')">
-      ✂ Prune Unkept Forks
-    </button>
-  </div>
-</div>`
+</div>`,
       },
       {
         id: "node-robotics",
-        title: "Physical World: Desk Arm & Depth Sensor",
+        title: "Artifact Harness: SO-100 Arm & Telemetry",
         kind: "robotics",
         stage: "implement",
+        surfaceRole: "artifact-harness",
         x: 30,
-        y: 465,
-        width: 390,
+        y: 445,
+        width: 395,
         height: 330,
         model: "openai/gpt-6-luna",
         status: "ready",
         branchTag: "hardware-node",
+        state: { shoulderDeg: -25, elbowDeg: 55 },
         html: `<div class="robo-root">
   <style>
     .robo-root {
-      font-family: system-ui, -apple-system, sans-serif; color: #e2e8f0; padding: 14px; font-size: 12px;
+      font-family: system-ui, -apple-system, sans-serif; color: #e2e8f0; padding: 12px; font-size: 12px;
     }
     .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-right: 6px; box-shadow: 0 0 8px #10b981; }
     .viewport-box {
       background: radial-gradient(circle at 50% 40%, #1e293b, #090d16);
-      border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px;
-      height: 145px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+      border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 8px;
+      height: 135px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
     }
-    .sliders { display: grid; gap: 6px; margin-top: 10px; }
+    .sliders { display: grid; gap: 6px; margin-top: 8px; }
     .slider-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #94a3b8; }
     .slider-row span.lbl { width: 65px; }
-    .slider-row input { flex: 1; accent-color: #38bdf8; }
-    .slider-row code { width: 42px; text-align: right; color: #38bdf8; }
+    .slider-row input { flex: 1; accent-color: #34d399; }
+    .slider-row code { width: 42px; text-align: right; color: #34d399; }
   </style>
   <div class="top-bar">
-    <div><span class="status-dot"></span><strong>SO-100 Follower Arm</strong> (6-DOF)</div>
-    <span style="font-size:11px;color:#38bdf8;" id="gripper-readout">Gripper: Open</span>
+    <div><span class="status-dot"></span><strong>⚙ Live Artifact Harness: SO-100 Arm</strong></div>
+    <span style="font-size:10.5px;color:#34d399;">6-DOF Joint State</span>
   </div>
   <div class="viewport-box">
-    <svg width="260" height="130" viewBox="0 0 260 130">
+    <svg width="260" height="125" viewBox="0 0 260 130">
       <defs>
         <linearGradient id="armGrad" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#38bdf8"/>
@@ -282,17 +284,18 @@ export function getDefaultCanvasState() {
     </div>
   </div>
 </div>`,
-        state: { shoulderDeg: -25, elbowDeg: 55 }
       },
       {
         id: "node-spec-a",
-        title: "fork-A [gpt-6-luna]: Spatial Direct-Manipulation HUD",
+        title: "UI Sample A [gpt-6-luna]: Direct-Manipulation HUD",
         kind: "speculative",
         stage: "design",
-        x: 1010,
-        y: 25,
-        width: 385,
-        height: 270,
+        surfaceRole: "ui-prototype",
+        relationFromParent: "visualizes-ui",
+        x: 1025,
+        y: 20,
+        width: 390,
+        height: 265,
         model: "openai/gpt-6-luna",
         provider: "chatgpt-gateway",
         harness: "@t3tools/provider-codex",
@@ -302,40 +305,41 @@ export function getDefaultCanvasState() {
         parentId: "node-hydro",
         parentIds: ["node-hydro"],
         jevScore: 0.89,
-        state: { cornerRadiusPx: 12, inspectorOverlay: true },
-        html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
+        state: {
+          cornerRadiusPx: 12,
+          markupNote: "Great inline token sliders; keep this layout",
+        },
+        html: `<div style="font-family:system-ui,sans-serif;padding:13px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:rgba(56,189,248,0.18);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⚔ FORK A • gpt-6-luna</span>
-    <span style="color:#94a3b8;font-size:11px;">Jev: 0.89</span>
+    <span style="background:rgba(244,114,182,0.18);color:#f472b6;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">🎨 UI SAMPLE • gpt-6-luna</span>
+    <span style="color:#94a3b8;font-size:10.5px;">Jev: 0.89</span>
   </div>
-  <h4 style="margin:0 0 6px;font-size:14px;">Zero-Chat Spatial Inspector</h4>
-  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Overlays bounding-box handles and inline CSS/token sliders directly onto live components via <code>window.asterism.state</code>.</p>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;color:#cbd5e1;">
-    <span>Radius:</span>
-    <input type="range" min="0" max="24" value="12" data-state-key="cornerRadiusPx" style="flex:1;accent-color:#38bdf8;" oninput="document.getElementById('rad-lbl').textContent=this.value+'px'" />
-    <code id="rad-lbl" style="color:#38bdf8;">12px</code>
-  </div>
-  <div style="background:rgba(15,23,42,0.8);border:1px dashed rgba(56,189,248,0.45);border-radius:8px;padding:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
-    <div>
-      <div style="font-size:10.5px;color:#38bdf8;font-family:monospace;">@t3tools/provider-codex</div>
-      <div style="font-size:10px;color:#64748b;">Keep multiple &amp; ⊕ Synthesize</div>
-    </div>
-    <div style="display:flex;gap:5px;">
-      <button onclick="window.asterism.keepFork()" style="background:#0284c7;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
-      <button onclick="window.asterism.advanceStage()" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
+  <div style="background:#0b1120;border:1px solid rgba(56,189,248,0.35);border-radius:8px;padding:9px;margin-bottom:8px;">
+    <div style="font-size:12px;font-weight:600;color:#f8fafc;margin-bottom:4px;">Target UI: Zero-Chat Spatial Inspector</div>
+    <p style="margin:0 0 8px;color:#94a3b8;font-size:11px;">Sample of the intended inspector HUD with live bounding-box radius controls:</p>
+    <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#cbd5e1;">
+      <span>Card Radius:</span>
+      <input type="range" min="0" max="24" value="12" data-state-key="cornerRadiusPx" style="flex:1;accent-color:#38bdf8;" oninput="document.getElementById('rad-lbl').textContent=this.value+'px'" />
+      <code id="rad-lbl" style="color:#38bdf8;">12px</code>
     </div>
   </div>
-</div>`
+  <div style="background:rgba(15,23,42,0.75);border:1px dashed rgba(244,114,182,0.35);border-radius:6px;padding:5px 8px;display:flex;gap:6px;align-items:center;">
+    <span style="font-size:10px;color:#f472b6;white-space:nowrap;">✎ Markup:</span>
+    <input type="text" data-state-key="markupNote" value="Great inline token sliders; keep this layout" style="flex:1;background:transparent;border:none;color:#e2e8f0;font-size:11px;outline:none;" />
+  </div>
+</div>`,
       },
       {
         id: "node-spec-b",
-        title: "fork-B [gpt-6.1-terra]: Keyframe & Constraint Timeline",
+        title: "UI Sample B [gpt-6.1-terra]: State-Graph Scrubber",
         kind: "speculative",
         stage: "design",
-        x: 1010,
-        y: 315,
-        width: 385,
-        height: 270,
+        surfaceRole: "ui-prototype",
+        relationFromParent: "visualizes-ui",
+        x: 1025,
+        y: 305,
+        width: 390,
+        height: 265,
         model: "openai/gpt-6.1-terra",
         provider: "chatgpt-gateway",
         harness: "@t3tools/provider-claude",
@@ -345,41 +349,41 @@ export function getDefaultCanvasState() {
         parentId: "node-hydro",
         parentIds: ["node-hydro"],
         jevScore: 0.84,
-        state: { timelineFps: 60, deterministicGuard: true },
-        html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
+        state: {
+          timelineFps: 60,
+          markupNote: "Combine this state scrubber with Sample A",
+        },
+        html: `<div style="font-family:system-ui,sans-serif;padding:13px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:rgba(168,85,247,0.18);color:#c084fc;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⚔ FORK B • gpt-6.1-terra</span>
-    <span style="color:#94a3b8;font-size:11px;">Jev: 0.84</span>
+    <span style="background:rgba(244,114,182,0.18);color:#f472b6;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">🎨 UI SAMPLE • gpt-6.1-terra</span>
+    <span style="color:#94a3b8;font-size:10.5px;">Jev: 0.84</span>
   </div>
-  <h4 style="margin:0 0 6px;font-size:14px;">State-Graph &amp; Motion Scrubbing</h4>
-  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Treats UI/UX as a state machine with scrubbable transitions between empty, loading, error, and populated states.</p>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;color:#cbd5e1;">
-    <span>FPS Target:</span>
-    <input type="range" min="24" max="120" value="60" data-state-key="timelineFps" style="flex:1;accent-color:#c084fc;" oninput="document.getElementById('fps-lbl').textContent=this.value+'fps'" />
-    <code id="fps-lbl" style="color:#c084fc;">60fps</code>
-  </div>
-  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(168,85,247,0.35);border-radius:8px;padding:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
-    <div style="display:flex;gap:4px;align-items:center;">
-      <span style="padding:3px 5px;background:#3b0764;color:#e9d5ff;border-radius:4px;font-size:10px;">Idle</span>
-      <span style="color:#64748b;">→</span>
-      <span style="padding:3px 5px;background:#581c87;color:#f3e8ff;border-radius:4px;font-size:10px;">Live</span>
-    </div>
-    <div style="display:flex;gap:5px;">
-      <button onclick="window.asterism.keepFork()" style="background:#7e22ce;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
-      <button onclick="window.asterism.advanceStage()" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
+  <div style="background:#0b1120;border:1px solid rgba(168,85,247,0.35);border-radius:8px;padding:9px;margin-bottom:8px;">
+    <div style="font-size:12px;font-weight:600;color:#f8fafc;margin-bottom:4px;">Target UI: Keyframe &amp; State Scrubber</div>
+    <p style="margin:0 0 8px;color:#94a3b8;font-size:11px;">Sample of a timeline scrubber for switching between Idle, Loading, and Live states:</p>
+    <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#cbd5e1;">
+      <span>FPS Target:</span>
+      <input type="range" min="24" max="120" value="60" data-state-key="timelineFps" style="flex:1;accent-color:#c084fc;" oninput="document.getElementById('fps-lbl').textContent=this.value+'fps'" />
+      <code id="fps-lbl" style="color:#c084fc;">60fps</code>
     </div>
   </div>
-</div>`
+  <div style="background:rgba(15,23,42,0.75);border:1px dashed rgba(244,114,182,0.35);border-radius:6px;padding:5px 8px;display:flex;gap:6px;align-items:center;">
+    <span style="font-size:10px;color:#f472b6;white-space:nowrap;">✎ Markup:</span>
+    <input type="text" data-state-key="markupNote" value="Combine this state scrubber with Sample A" style="flex:1;background:transparent;border:none;color:#e2e8f0;font-size:11px;outline:none;" />
+  </div>
+</div>`,
       },
       {
         id: "node-spec-c",
-        title: "fork-C [gpt-6.1-sol]: Embodied Sketch + Telemetry",
+        title: "UI Sample C [gpt-6.1-sol]: Camera + Voice Table",
         kind: "speculative",
         stage: "design",
-        x: 1010,
-        y: 605,
-        width: 385,
-        height: 270,
+        surfaceRole: "ui-prototype",
+        relationFromParent: "visualizes-ui",
+        x: 1025,
+        y: 590,
+        width: 390,
+        height: 265,
         model: "openai/gpt-6.1-sol",
         provider: "chatgpt-gateway",
         harness: "@t3tools/provider-antigravity",
@@ -389,23 +393,26 @@ export function getDefaultCanvasState() {
         parentId: "node-hydro",
         parentIds: ["node-hydro"],
         jevScore: 0.79,
-        state: { confidenceThreshold: 0.85 },
-        html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
+        state: {
+          confidenceThreshold: 0.85,
+          markupNote: "Defer overhead camera hardware to v2",
+        },
+        html: `<div style="font-family:system-ui,sans-serif;padding:13px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:rgba(16,185,129,0.18);color:#34d399;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⚔ FORK C • gpt-6.1-sol</span>
-    <span style="color:#94a3b8;font-size:11px;">Jev: 0.79</span>
+    <span style="background:rgba(244,114,182,0.18);color:#f472b6;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">🎨 UI SAMPLE • gpt-6.1-sol</span>
+    <span style="color:#94a3b8;font-size:10.5px;">Jev: 0.79</span>
   </div>
-  <h4 style="margin:0 0 6px;font-size:14px;">Physical Camera + Paper Sketch Sync</h4>
-  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Uses overhead desk camera + Whisper voice stream to turn pen-and-paper wireframes into live DOM surfaces.</p>
-  <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(16,185,129,0.35);border-radius:8px;padding:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
-    <div style="font-size:10.5px;color:#6ee7b7;">📷 @t3tools/provider-antigravity</div>
-    <div style="display:flex;gap:5px;">
-      <button onclick="window.asterism.keepFork()" style="background:#059669;color:white;border:none;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Keep Fork</button>
-      <button onclick="window.asterism.advanceStage()" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:6px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Implement →</button>
-    </div>
+  <div style="background:#0b1120;border:1px solid rgba(16,185,129,0.35);border-radius:8px;padding:9px;margin-bottom:8px;">
+    <div style="font-size:12px;font-weight:600;color:#f8fafc;margin-bottom:4px;">Target UI: Physical Desk Camera Overlay</div>
+    <p style="margin:0 0 6px;color:#94a3b8;font-size:11px;">Sample of an overhead camera projection HUD syncing paper sketches into DOM nodes.</p>
+    <div style="font-size:10.5px;color:#6ee7b7;">📷 Feed: /dev/video0 • Whisper VAD Ready</div>
   </div>
-</div>`
-      }
-    ]
+  <div style="background:rgba(15,23,42,0.75);border:1px dashed rgba(244,114,182,0.35);border-radius:6px;padding:5px 8px;display:flex;gap:6px;align-items:center;">
+    <span style="font-size:10px;color:#f472b6;white-space:nowrap;">✎ Markup:</span>
+    <input type="text" data-state-key="markupNote" value="Defer overhead camera hardware to v2" style="flex:1;background:transparent;border:none;color:#e2e8f0;font-size:11px;outline:none;" />
+  </div>
+</div>`,
+      },
+    ],
   };
 }

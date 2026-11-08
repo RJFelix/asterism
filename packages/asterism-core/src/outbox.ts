@@ -19,6 +19,25 @@ export const CanvasNodeStage = Schema.Literals([
 ]);
 export type CanvasNodeStage = typeof CanvasNodeStage.Type;
 
+export const SurfaceRole = Schema.Literals([
+  "dialogue",
+  "ui-prototype",
+  "spec-diagram",
+  "artifact-harness",
+]);
+export type SurfaceRole = typeof SurfaceRole.Type;
+
+export const PanelRelation = Schema.Literals([
+  "advances",
+  "forks",
+  "synthesizes",
+  "visualizes-ui",
+  "specifies",
+  "implements",
+  "annotates",
+]);
+export type PanelRelation = typeof PanelRelation.Type;
+
 export const AsterismEffectRequest = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("surface.mutate"),
@@ -37,6 +56,14 @@ export const AsterismEffectRequest = Schema.Union([
     parentIds: Schema.Array(Schema.String),
     targetStage: CanvasNodeStage,
     instruction: Schema.optional(Schema.String),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("panel.spawn-related"),
+    sourceNodeId: Schema.String,
+    childNodeId: Schema.String,
+    relation: PanelRelation,
+    surfaceRole: SurfaceRole,
+    prompt: Schema.optional(Schema.String),
   }),
   Schema.Struct({
     type: Schema.Literal("train.advance"),

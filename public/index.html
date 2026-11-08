@@ -11,6 +11,7 @@
       --border-subtle: rgba(148, 163, 184, 0.18);
       --accent-cyan: #38bdf8;
       --accent-purple: #a855f7;
+      --accent-pink: #f472b6;
       --accent-emerald: #10b981;
       --accent-amber: #fbbf24;
       --text-main: #f1f5f9;
@@ -115,6 +116,18 @@
       overflow: hidden;
       transition: box-shadow 0.2s, border-color 0.2s;
     }
+    .canvas-node.role-dialogue {
+      border-top: 2px solid rgba(56, 189, 248, 0.65);
+    }
+    .canvas-node.role-spec-diagram {
+      border-top: 2px solid rgba(192, 132, 252, 0.65);
+    }
+    .canvas-node.role-ui-prototype {
+      border-top: 2px solid rgba(244, 114, 182, 0.72);
+    }
+    .canvas-node.role-artifact-harness {
+      border-top: 2px solid rgba(52, 211, 153, 0.72);
+    }
     .canvas-node.kind-speculative {
       border-color: rgba(168, 85, 247, 0.48);
       box-shadow: 0 16px 38px rgba(88, 28, 135, 0.25);
@@ -137,18 +150,18 @@
       background: rgba(30, 41, 59, 0.9);
       border-bottom: 1px solid rgba(148, 163, 184, 0.16);
       cursor: grab;
-      gap: 5px;
+      gap: 4px;
     }
     .node-header:active { cursor: grabbing; }
     .node-title-wrap {
-      display: flex; align-items: center; gap: 5px; overflow: hidden; flex: 1;
+      display: flex; align-items: center; gap: 4px; overflow: hidden; flex: 1;
     }
     .synth-check-btn {
       background: rgba(15, 23, 42, 0.7);
       border: 1px solid rgba(148, 163, 184, 0.3);
       color: #94a3b8;
       border-radius: 4px;
-      width: 18px; height: 18px;
+      width: 17px; height: 17px;
       font-size: 10px; line-height: 1;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; flex-shrink: 0; padding: 0;
@@ -158,12 +171,37 @@
       border-color: #fbbf24;
       color: #fde68a;
     }
+    .role-select {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      border-radius: 5px;
+      font-size: 9px;
+      font-family: ui-monospace, monospace;
+      font-weight: 700;
+      padding: 2px 4px;
+      cursor: pointer;
+      outline: none;
+      flex-shrink: 0;
+    }
+    .canvas-node.role-spec-diagram .role-select {
+      border-color: rgba(192, 132, 252, 0.45);
+      color: #d8b4fe;
+    }
+    .canvas-node.role-ui-prototype .role-select {
+      border-color: rgba(244, 114, 182, 0.45);
+      color: #f9a8d4;
+    }
+    .canvas-node.role-artifact-harness .role-select {
+      border-color: rgba(52, 211, 153, 0.45);
+      color: #6ee7b7;
+    }
     .node-stage-pill {
-      font-family: ui-monospace, monospace; font-size: 9px; font-weight: 700;
+      font-family: ui-monospace, monospace; font-size: 8.5px; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.04em;
       padding: 2px 5px; border-radius: 5px;
-      background: rgba(56, 189, 248, 0.16); color: var(--accent-cyan);
-      border: 1px solid rgba(56, 189, 248, 0.3);
+      background: rgba(148, 163, 184, 0.14); color: #cbd5e1;
+      border: 1px solid rgba(148, 163, 184, 0.25);
       white-space: nowrap; flex-shrink: 0;
     }
     .node-title {
@@ -173,19 +211,26 @@
     .node-actions {
       display: flex; align-items: center; gap: 3px; flex-shrink: 0;
     }
-    .model-select {
+    .model-select, .spawn-rel-select {
       background: rgba(15, 23, 42, 0.85);
       color: #cbd5e1;
       border: 1px solid rgba(148, 163, 184, 0.25);
       border-radius: 5px;
-      font-size: 9.5px;
+      font-size: 9px;
       font-family: ui-monospace, monospace;
       padding: 2px 4px;
       cursor: pointer;
       outline: none;
-      max-width: 92px;
+      max-width: 86px;
     }
-    .model-select:hover { border-color: var(--accent-cyan); color: #f8fafc; }
+    .spawn-rel-select {
+      color: #f9a8d4;
+      border-color: rgba(244, 114, 182, 0.4);
+      background: rgba(244, 114, 182, 0.12);
+      font-weight: 600;
+      max-width: 78px;
+    }
+    .model-select:hover, .spawn-rel-select:hover { border-color: var(--accent-cyan); color: #f8fafc; }
     .mini-btn {
       background: rgba(15, 23, 42, 0.7);
       color: var(--text-muted);
@@ -195,6 +240,15 @@
       white-space: nowrap;
     }
     .mini-btn:hover { color: #f8fafc; border-color: var(--accent-cyan); }
+    .mini-btn.keep-btn {
+      display: none;
+      color: #fde68a; border-color: rgba(251, 191, 36, 0.5);
+      background: rgba(251, 191, 36, 0.16);
+      font-weight: 600;
+    }
+    .canvas-node.kind-speculative .mini-btn.keep-btn {
+      display: inline-block;
+    }
     .mini-btn.spec-btn {
       color: #e9d5ff; border-color: rgba(168, 85, 247, 0.45);
       background: rgba(168, 85, 247, 0.16);
@@ -221,7 +275,8 @@
       font-size: 10px;
       color: #6ee7b7;
     }
-    .canvas-node.stage-implement .worktree-bar {
+    .canvas-node.stage-implement .worktree-bar,
+    .canvas-node.role-artifact-harness .worktree-bar {
       display: flex;
     }
     .wt-meta {
@@ -336,13 +391,13 @@
     </div>
     <button class="tool-btn active" id="mode-select" onclick="setMode('select')">↖ Pan / Interact</button>
     <button class="tool-btn" id="mode-draw" onclick="setMode('draw')">✎ Sketch</button>
-    <button class="tool-btn" id="mode-connect" onclick="setMode('connect')">⤳ Wire Nodes</button>
-    <button class="tool-btn" onclick="createNewSurface()">＋ New Note</button>
-    <button class="tool-btn synth-btn" id="btn-synthesize" onclick="synthesizeSelectedOrKept()" title="Select 2+ nodes (or Keep 2+ forks) to converge them into a unified hybrid surface">⊕ Synthesize Forks</button>
+    <button class="tool-btn" id="mode-connect" onclick="setMode('connect')">⤳ Wire Panels</button>
+    <button class="tool-btn" onclick="createNewSurface()">＋ New Proposal</button>
+    <button class="tool-btn synth-btn" id="btn-synthesize" onclick="synthesizeSelectedOrKept()" title="Select 2+ panels (even a Spec + a UI Prototype!) to converge them into a unified hybrid surface">⊕ Synthesize Panels</button>
     <button class="tool-btn" onclick="pruneUnkeptForks()" title="Remove only speculative branches you haven't marked Keep">✂ Prune Unkept</button>
     <button class="tool-btn" onclick="clearSketches()">⌫ Clear Ink</button>
     <button class="tool-btn" onclick="resetCanvas()">↺ Reset</button>
-    <span class="zoom-readout" id="zoom-label">85%</span>
+    <span class="zoom-readout" id="zoom-label">84%</span>
   </div>
 
   <div id="canvas-viewport">
@@ -354,6 +409,15 @@
           </marker>
           <marker id="arrow-synth" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 0 1 L 8 5 L 0 9 z" fill="rgba(251, 191, 36, 0.85)" />
+          </marker>
+          <marker id="arrow-ui" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="rgba(244, 114, 182, 0.85)" />
+          </marker>
+          <marker id="arrow-spec" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="rgba(192, 132, 252, 0.85)" />
+          </marker>
+          <marker id="arrow-impl" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="rgba(52, 211, 153, 0.85)" />
           </marker>
         </defs>
         <g id="edges-group"></g>
@@ -374,8 +438,15 @@
       { id: 'openai/gpt-5.3-codex', label: 'gpt-5.3-codex' },
     ];
 
+    const AVAILABLE_ROLES = [
+      { id: 'dialogue', label: '💬 Dialogue' },
+      { id: 'spec-diagram', label: '📐 Spec' },
+      { id: 'ui-prototype', label: '🎨 UI Sample' },
+      { id: 'artifact-harness', label: '⚙ Artifact' },
+    ];
+
     let state = {
-      viewport: { x: 70, y: 55, scale: 0.85 },
+      viewport: { x: 65, y: 55, scale: 0.84 },
       nodes: [],
       edges: [],
       strokes: []
@@ -397,7 +468,7 @@
     const toastEl = document.getElementById('status-toast');
     const synthBtnEl = document.getElementById('btn-synthesize');
 
-    function showToast(msg, ms = 3500) {
+    function showToast(msg, ms = 3800) {
       toastEl.textContent = msg;
       toastEl.style.display = 'block';
       clearTimeout(toastEl._timer);
@@ -406,12 +477,19 @@
       }
     }
 
+    function defaultRoleForStage(stage) {
+      if (stage === 'refine') return 'spec-diagram';
+      if (stage === 'design') return 'ui-prototype';
+      if (stage === 'implement') return 'artifact-harness';
+      return 'dialogue';
+    }
+
     function updateSynthButtonLabel() {
       const count = selectedForSynth.size;
       if (count >= 2) {
         synthBtnEl.textContent = `⊕ Synthesize Selected (${count})`;
       } else {
-        synthBtnEl.textContent = '⊕ Synthesize Forks';
+        synthBtnEl.textContent = '⊕ Synthesize Panels';
       }
     }
 
@@ -432,7 +510,7 @@
       const btn = document.getElementById('mode-' + nextMode);
       if (btn) btn.classList.add('active');
       viewportEl.className = nextMode === 'draw' ? 'mode-draw' : nextMode === 'connect' ? 'mode-connect' : '';
-      if (nextMode === 'connect') showToast('Click a source node header, then click a target node header to wire them.');
+      if (nextMode === 'connect') showToast('Click a source panel header, then click a target panel header to link them.');
     }
 
     function applyTransform() {
@@ -449,6 +527,26 @@
       };
     }
 
+    function edgeStyleFor(edge, toNode) {
+      const rel = edge.relation || edge.kind || 'advances';
+      if (rel === 'synthesizes' || rel === 'synthesis') {
+        return { stroke: 'rgba(251, 191, 36, 0.85)', marker: 'url(#arrow-synth)', textFill: '#fde68a', dash: '' };
+      }
+      if (rel === 'visualizes-ui') {
+        return { stroke: 'rgba(244, 114, 182, 0.82)', marker: 'url(#arrow-ui)', textFill: '#f9a8d4', dash: '' };
+      }
+      if (rel === 'specifies') {
+        return { stroke: 'rgba(192, 132, 252, 0.82)', marker: 'url(#arrow-spec)', textFill: '#d8b4fe', dash: '' };
+      }
+      if (rel === 'implements') {
+        return { stroke: 'rgba(52, 211, 153, 0.85)', marker: 'url(#arrow-impl)', textFill: '#6ee7b7', dash: '' };
+      }
+      if (rel === 'forks' || (toNode && toNode.kind === 'speculative' && toNode.status !== 'committed')) {
+        return { stroke: 'rgba(168, 85, 247, 0.6)', marker: 'url(#arrow-spec)', textFill: '#c084fc', dash: '6 4' };
+      }
+      return { stroke: 'rgba(56, 189, 248, 0.65)', marker: 'url(#arrow)', textFill: '#94a3b8', dash: '' };
+    }
+
     function renderEdges() {
       edgesGroup.innerHTML = '';
       for (const edge of state.edges) {
@@ -462,22 +560,14 @@
         const y2 = to.y + to.height / 2;
         const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
 
-        const isSynth = edge.kind === 'synthesis';
-        const isSpeculative = !isSynth && to.kind === 'speculative' && to.status !== 'committed';
+        const style = edgeStyleFor(edge, to);
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
         path.setAttribute('fill', 'none');
-        path.setAttribute(
-          'stroke',
-          isSynth
-            ? 'rgba(251, 191, 36, 0.85)'
-            : isSpeculative
-              ? 'rgba(168, 85, 247, 0.58)'
-              : 'rgba(56, 189, 248, 0.65)'
-        );
-        path.setAttribute('stroke-width', isSynth ? '2.6' : isSpeculative ? '2' : '2.4');
-        path.setAttribute('stroke-dasharray', isSpeculative ? '6 4' : '');
-        path.setAttribute('marker-end', isSynth ? 'url(#arrow-synth)' : 'url(#arrow)');
+        path.setAttribute('stroke', style.stroke);
+        path.setAttribute('stroke-width', '2.4');
+        path.setAttribute('stroke-dasharray', style.dash);
+        path.setAttribute('marker-end', style.marker);
         edgesGroup.appendChild(path);
 
         if (edge.label) {
@@ -485,8 +575,8 @@
           text.setAttribute('x', String((x1 + x2) / 2));
           text.setAttribute('y', String((y1 + y2) / 2 - 7));
           text.setAttribute('text-anchor', 'middle');
-          text.setAttribute('fill', isSynth ? '#fde68a' : '#94a3b8');
-          text.setAttribute('font-size', '11');
+          text.setAttribute('fill', style.textFill);
+          text.setAttribute('font-size', '10.5');
           text.setAttribute('font-family', 'ui-monospace, monospace');
           text.textContent = edge.label;
           edgesGroup.appendChild(text);
@@ -510,12 +600,13 @@
     }
 
     /**
-     * Feature 3: Injects the bidirectional `window.asterism` bridge into every surface iframe!
+     * Feature 3 + Multi-Panel Tools: Injects the bidirectional `window.asterism` SDK into every surface iframe!
      */
     function buildSrcDoc(node) {
       const initialStateJson = JSON.stringify(node.state || {}).replace(/</g, '\\u003c');
       const nodeIdJson = JSON.stringify(node.id);
       const stageJson = JSON.stringify(node.stage || 'note');
+      const roleJson = JSON.stringify(node.surfaceRole || defaultRoleForStage(node.stage));
       const modelJson = JSON.stringify(node.model || 'openai/gpt-6-luna');
 
       return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -529,6 +620,7 @@
           window.asterism = {
             nodeId: ${nodeIdJson},
             stage: ${stageJson},
+            surfaceRole: ${roleJson},
             model: ${modelJson},
             state: _state,
             getState() {
@@ -550,6 +642,24 @@
                 type: 'asterism:mutate-node',
                 nodeId: this.nodeId,
                 instruction: instruction
+              }, '*');
+            },
+            updatePanel(targetNodeId, instruction) {
+              window.parent.postMessage({
+                type: 'asterism:mutate-node',
+                nodeId: targetNodeId || this.nodeId,
+                instruction: instruction
+              }, '*');
+            },
+            spawnRelatedPanel(options) {
+              const opts = typeof options === 'string' ? { prompt: options } : (options || {});
+              window.parent.postMessage({
+                type: 'asterism:spawn-related',
+                sourceNodeId: this.nodeId,
+                relation: opts.relation || 'visualizes-ui',
+                surfaceRole: opts.surfaceRole,
+                title: opts.title,
+                prompt: opts.prompt
               }, '*');
             },
             spawnFork(prompt, options) {
@@ -658,7 +768,7 @@
             <span>HEAD: ${wt?.headCommit || diff?.headCommit || wt?.baseCommit || 'HEAD'}</span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">${filesHtml || '<span style="color:#64748b;">Working tree clean (all changes committed)</span>'}</div>
-          ${impl?.testOutput ? `<details style="margin-top:4px;"><summary style="cursor:pointer;color:${impl.testPassed ? '#34d399' : '#f87171'};font-weight:600;">${impl.testPassed ? '✓ node --test Passed' : '✕ node --test Failed'} (${impl.lineageCount || 1} stage lineage)</summary><pre style="margin:4px 0 0;padding:6px;background:#020617;border-radius:4px;color:#cbd5e1;white-space:pre-wrap;font-size:10px;">${impl.testOutput.replace(/</g, '&lt;')}</pre></details>` : ''}
+          ${impl?.testOutput ? `<details style="margin-top:4px;"><summary style="cursor:pointer;color:${impl.testPassed ? '#34d399' : '#f87171'};font-weight:600;">${impl.testPassed ? '✓ node --test Passed' : '✕ node --test Failed'} (${impl.lineageCount || 1} panel lineage)</summary><pre style="margin:4px 0 0;padding:6px;background:#020617;border-radius:4px;color:#cbd5e1;white-space:pre-wrap;font-size:10px;">${impl.testOutput.replace(/</g, '&lt;')}</pre></details>` : ''}
         </div>
         <div style="font-size:10px;line-height:1.4;white-space:pre-wrap;">${coloredPatch || '<span style="color:#64748b;">No uncommitted diff lines.</span>'}</div>
       `;
@@ -678,20 +788,32 @@
           const modelOptionsHtml = AVAILABLE_MODELS.map(
             m => `<option value="${m.id}">${m.label}</option>`
           ).join('');
+          const roleOptionsHtml = AVAILABLE_ROLES.map(
+            r => `<option value="${r.id}">${r.label}</option>`
+          ).join('');
 
           card.innerHTML = `
             <div class="node-header">
               <div class="node-title-wrap">
-                <button class="synth-check-btn" title="Select node for multi-parent ⊕ Synthesis">☐</button>
+                <button class="synth-check-btn" title="Select panel for multi-parent ⊕ Synthesis">☐</button>
+                <select class="role-select" title="Panel Collaboration Role (Dialogue vs. Spec vs. UI Sample vs. Live Artifact)">${roleOptionsHtml}</select>
                 <span class="node-stage-pill"></span>
                 <span class="node-title"></span>
               </div>
               <div class="node-actions">
-                <select class="model-select" title="Active Model / Provider Harness for this Node">${modelOptionsHtml}</select>
-                <button class="mini-btn code-toggle-btn" title="Edit Live HTML">‹/›</button>
+                <select class="model-select" title="Active Model / Provider Harness for this Panel">${modelOptionsHtml}</select>
+                <button class="mini-btn keep-btn" title="Mark this speculative fork as Kept (without deleting siblings)">✓ Keep</button>
+                <select class="spawn-rel-select" title="Spawn a linked companion panel with a typed relation">
+                  <option value="">＋ Companion...</option>
+                  <option value="visualizes-ui:ui-prototype">🎨 + UI Prototype</option>
+                  <option value="specifies:spec-diagram">📐 + Spec Contract</option>
+                  <option value="implements:artifact-harness">⚙ + Worktree Harness</option>
+                  <option value="annotates:dialogue">💬 + Critique / Markup</option>
+                </select>
                 <button class="mini-btn spec-btn" title="Arena Fork: Pit 3 Models & Harnesses in Parallel">⚔ Arena 3x</button>
-                <button class="mini-btn advance-btn" title="Advance to Next Innovation Train Stage">🚂 Advance →</button>
-                <button class="mini-btn del-btn" title="Delete Surface">✕</button>
+                <button class="mini-btn advance-btn" title="Advance to Next Innovation Train Stage">🚂 →</button>
+                <button class="mini-btn code-toggle-btn" title="Edit Live HTML">‹/›</button>
+                <button class="mini-btn del-btn" title="Delete Panel">✕</button>
               </div>
             </div>
             <div class="worktree-bar">
@@ -713,8 +835,8 @@
             </div>
             <div class="node-footer">
               <span class="state-pill" title="Persisted Interactive Widget State (window.asterism.state)">⚡ 0</span>
-              <input class="node-prompt-input" type="text" placeholder="Mutate surface, or type directive for ⚔ Arena / 🚂 Advance / ▶ Run Agent..." />
-              <button class="node-send-btn">Mutate</button>
+              <input class="node-prompt-input" type="text" placeholder="Collaborate or ask agent to 'spawn a UI prototype for this'..." />
+              <button class="node-send-btn">Collaborate</button>
             </div>
             <div class="resize-handle"></div>
           `;
@@ -725,12 +847,14 @@
         const isSelected = selectedForSynth.has(node.id);
         const keepEditing = card.classList.contains('editing-html');
         const keepViewingDiff = card.classList.contains('viewing-diff');
+        const resolvedRole = node.surfaceRole || defaultRoleForStage(node.stage);
 
         card.className = [
           'canvas-node',
           `kind-${node.kind || 'surface'}`,
           `status-${node.status || 'ready'}`,
           `stage-${node.stage || 'note'}`,
+          `role-${resolvedRole}`,
           isSelected ? 'selected-for-synth' : '',
           keepEditing ? 'editing-html' : '',
           keepViewingDiff ? 'viewing-diff' : ''
@@ -745,7 +869,12 @@
         checkBtn.textContent = isSelected ? '☑' : '☐';
         checkBtn.classList.toggle('checked', isSelected);
 
-        const stageLabel = (node.stage || node.branchTag || 'surface').toUpperCase();
+        const roleSelect = card.querySelector('.role-select');
+        if (roleSelect.value !== resolvedRole) {
+          roleSelect.value = resolvedRole;
+        }
+
+        const stageLabel = (node.stage || 'note').toUpperCase();
         card.querySelector('.node-stage-pill').textContent =
           node.status === 'committed' ? `✓ ${stageLabel}` : stageLabel;
         card.querySelector('.node-title').textContent = node.title;
@@ -764,9 +893,8 @@
           ? `window.asterism.state: ${JSON.stringify(node.state)}`
           : 'window.asterism.state (interactive widget state)';
 
-        // Update Worktree Bar if stage === 'implement'
-        if (node.stage === 'implement' || node.worktree || node.implementation) {
-          card.classList.add('stage-implement');
+        // Update Worktree Bar if stage === 'implement' or role === 'artifact-harness'
+        if (node.stage === 'implement' || resolvedRole === 'artifact-harness' || node.worktree || node.implementation) {
           const branchLbl = card.querySelector('.wt-branch-label');
           const shortBranch = (node.worktree?.branchName || 'unprovisioned').replace(/^asterism\//, '');
           branchLbl.textContent = `⚙ ${shortBranch.slice(0, 20)}`;
@@ -809,7 +937,10 @@
     function setupNodeInteractions(card, nodeId) {
       const header = card.querySelector('.node-header');
       const checkBtn = card.querySelector('.synth-check-btn');
+      const roleSelect = card.querySelector('.role-select');
       const modelSelect = card.querySelector('.model-select');
+      const keepBtn = card.querySelector('.keep-btn');
+      const spawnRelSelect = card.querySelector('.spawn-rel-select');
       const resizeHandle = card.querySelector('.resize-handle');
       const codeBtn = card.querySelector('.code-toggle-btn');
       const specBtn = card.querySelector('.spec-btn');
@@ -827,16 +958,50 @@
         toggleNodeSynthSelection(nodeId);
       });
 
+      roleSelect.addEventListener('change', async (e) => {
+        e.stopPropagation();
+        const surfaceRole = roleSelect.value;
+        const node = state.nodes.find(n => n.id === nodeId);
+        if (node) node.surfaceRole = surfaceRole;
+        showToast(`Changed panel collaboration role to "${surfaceRole}"`);
+        await fetch('/api/nodes/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId, surfaceRole })
+        });
+      });
+
       modelSelect.addEventListener('change', async (e) => {
         e.stopPropagation();
         const model = modelSelect.value;
         const node = state.nodes.find(n => n.id === nodeId);
         if (node) node.model = model;
-        showToast(`Switched node model to ${model.replace('openai/', '')}`);
+        showToast(`Switched panel model to ${model.replace('openai/', '')}`);
         await fetch('/api/nodes/state', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nodeId, model })
+        });
+      });
+
+      keepBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        commitBranch(nodeId, false);
+      });
+
+      spawnRelSelect.addEventListener('change', async (e) => {
+        e.stopPropagation();
+        const val = spawnRelSelect.value;
+        spawnRelSelect.value = '';
+        if (!val) return;
+        const [relation, surfaceRole] = val.split(':');
+        const customPrompt = promptInput.value.trim();
+        promptInput.value = '';
+        await triggerSpawnRelated({
+          sourceNodeId: nodeId,
+          relation,
+          surfaceRole,
+          prompt: customPrompt || undefined
         });
       });
 
@@ -852,13 +1017,18 @@
         if (mode === 'connect') {
           if (!connectSourceId) {
             connectSourceId = nodeId;
-            showToast(`Source selected (${nodeId}). Now click a target node header.`);
+            showToast(`Source panel selected (${nodeId}). Now click a target panel header.`);
           } else if (connectSourceId !== nodeId) {
+            const targetNode = state.nodes.find(n => n.id === nodeId);
+            const tRole = targetNode?.surfaceRole || defaultRoleForStage(targetNode?.stage);
+            const rel = tRole === 'ui-prototype' ? 'visualizes-ui' : tRole === 'spec-diagram' ? 'specifies' : tRole === 'artifact-harness' ? 'implements' : 'annotates';
             state.edges.push({
               id: 'edge-' + Date.now(),
               from: connectSourceId,
               to: nodeId,
-              label: 'wired'
+              relation: rel,
+              kind: rel,
+              label: rel
             });
             connectSourceId = null;
             setMode('select');
@@ -901,7 +1071,7 @@
         const origH = node.height;
 
         function onMove(ev) {
-          node.width = Math.max(280, Math.round(origW + (ev.clientX - startX) / state.viewport.scale));
+          node.width = Math.max(300, Math.round(origW + (ev.clientX - startX) / state.viewport.scale));
           node.height = Math.max(210, Math.round(origH + (ev.clientY - startY) / state.viewport.scale));
           card.style.width = `${node.width}px`;
           card.style.height = `${node.height}px`;
@@ -970,7 +1140,7 @@
         promptInput.value = '';
         triggerSpeculate(
           nodeId,
-          customPrompt || 'Explore 3 divergent interactive UI designs across Arena models',
+          customPrompt || 'Explore 3 divergent variants across Arena models',
           { arenaMode: true }
         );
       });
@@ -1004,13 +1174,31 @@
     }
 
     async function mutateNode(nodeId, instruction) {
-      showToast(`Mutating surface "${nodeId}" via LLM...`, 15000);
-      await fetch('/api/nodes/mutate', {
+      showToast(`Collaborating with agent on "${nodeId}" (neighborhood-aware)...`, 18000);
+      const res = await fetch('/api/nodes/mutate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId, instruction })
       });
-      showToast('Surface updated!');
+      const data = await res.json();
+      if (data.spawnedPanels && data.spawnedPanels.length > 0) {
+        showToast(`Agent updated panel AND spawned ${data.spawnedPanels.length} companion panel(s): ${data.spawnedPanels.map(p => p.title).join(', ')}!`);
+      } else {
+        showToast('Panel updated!');
+      }
+    }
+
+    async function triggerSpawnRelated({ sourceNodeId, relation = 'visualizes-ui', surfaceRole, title, prompt }) {
+      showToast(`Spawning companion "${surfaceRole || relation}" panel linked via "${relation}"...`, 18000);
+      const res = await fetch('/api/nodes/spawn-related', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceNodeId, relation, surfaceRole, title, prompt })
+      });
+      const data = await res.json();
+      if (data.childNode) {
+        showToast(`✦ Spawned companion panel "${data.childNode.title}" (${data.childNode.surfaceRole})!`);
+      }
     }
 
     async function triggerSpeculate(nodeId, prompt, options = {}) {
@@ -1023,16 +1211,16 @@
           prompt,
           count: options.count || 3,
           arenaMode: options.arenaMode ?? true,
+          surfaceRole: options.surfaceRole,
           models: options.models
         })
       });
-      showToast('3 Arena branches ready! Keep multiple forks or click "⊕ Synthesize Forks" to merge them.');
+      showToast('3 Arena branches ready! Use "✓ Keep" in the card header or "⊕ Synthesize Panels" to merge them.');
     }
 
     async function synthesizeSelectedOrKept(customParentIds, instruction, targetStage) {
       let parentIds = Array.isArray(customParentIds) ? customParentIds : [...selectedForSynth];
       if (parentIds.length < 2) {
-        // Look for committed/kept speculative branches first
         const committedForks = state.nodes.filter(n => n.status === 'committed' && n.parentId);
         if (committedForks.length >= 2) {
           parentIds = committedForks.slice(-2).map(n => n.id);
@@ -1043,11 +1231,11 @@
       }
 
       if (parentIds.length < 2) {
-        showToast('Select at least 2 nodes using their ☐ header checkboxes to synthesize!');
+        showToast('Select at least 2 panels using their ☐ header checkboxes to synthesize!');
         return;
       }
 
-      showToast(`⊕ Synthesizing ${parentIds.length} parent branches into a unified hybrid surface...`, 20000);
+      showToast(`⊕ Synthesizing ${parentIds.length} parent panels into a unified hybrid surface...`, 20000);
       const res = await fetch('/api/nodes/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1057,7 +1245,7 @@
       selectedForSynth.clear();
       updateSynthButtonLabel();
       if (data.synthNode) {
-        showToast(`⊕ Created "${data.synthNode.title}" with convergence edges from ${parentIds.length} parents!`);
+        showToast(`⊕ Created "${data.synthNode.title}" (${data.synthNode.surfaceRole}) from ${parentIds.length} parents!`);
       }
     }
 
@@ -1077,7 +1265,7 @@
     }
 
     async function commitBranch(nodeId, pruneSiblings = false) {
-      showToast('✓ Marked fork as Kept! (Select 2+ forks and click "⊕ Synthesize Forks" to merge them.)');
+      showToast('✓ Marked fork as Kept! (Select 2+ panels and click "⊕ Synthesize Panels" to merge them.)');
       await fetch('/api/nodes/commit-branch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1096,7 +1284,7 @@
     }
 
     async function advanceStage(nodeId, instruction, targetStage) {
-      showToast('🚂 Advancing node to next Innovation Train stage...', 20000);
+      showToast('🚂 Advancing branch to next Innovation Train stage...', 20000);
       await fetch('/api/nodes/advance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1105,7 +1293,7 @@
       showToast('Next stage spawned on the Innovation Train!');
     }
 
-    // Listen to messages from surface iframes (both `window.asterism.*` and legacy `postMessage`)
+    // Listen to messages from surface iframes (`window.asterism.*`)
     window.addEventListener('message', async (e) => {
       if (!e.data || typeof e.data !== 'object') return;
       const msg = e.data;
@@ -1130,6 +1318,8 @@
         });
       } else if (msg.type === 'asterism:mutate-node') {
         mutateNode(msg.nodeId, msg.instruction);
+      } else if (msg.type === 'asterism:spawn-related') {
+        triggerSpawnRelated(msg);
       } else if (msg.type === 'asterism:trigger-speculate') {
         triggerSpeculate(msg.nodeId, msg.prompt, msg);
       } else if (msg.type === 'asterism:commit-branch') {
@@ -1200,30 +1390,35 @@
 
     function createNewSurface() {
       const center = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
-      const id = 'node-note-' + Date.now();
+      const id = 'node-proposal-' + Date.now();
       state.nodes.push({
         id,
-        title: 'Seed Note / Idea',
+        title: 'Feature Proposal / Dialogue',
         kind: 'surface',
         stage: 'note',
-        x: Math.round(center.x - 190),
-        y: Math.round(center.y - 140),
-        width: 380,
-        height: 300,
+        surfaceRole: 'dialogue',
+        x: Math.round(center.x - 195),
+        y: Math.round(center.y - 145),
+        width: 395,
+        height: 295,
         model: 'openai/gpt-6-luna',
         status: 'ready',
-        branchTag: 'note',
-        state: { priority: 80 },
-        html: `<div style="font-family:system-ui,sans-serif;padding:16px;color:#e2e8f0;">
-  <h4 style="margin:0 0 8px;color:#38bdf8;">New Innovation Train Seed</h4>
-  <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">Jot down a raw note, adjust interactive state via <code>window.asterism</code>, click <strong>⚔ Arena 3x</strong> to pit models in parallel, or click <strong>🚂 Advance →</strong>.</p>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:11px;color:#cbd5e1;">
+        branchTag: 'dialogue',
+        state: { priority: 80, scope: 'mvp' },
+        html: `<div style="font-family:system-ui,sans-serif;padding:15px;color:#e2e8f0;font-size:12px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <span style="background:rgba(56,189,248,0.16);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">💬 DIALOGUE / PROPOSAL</span>
+    <span style="color:#94a3b8;font-size:10.5px;">Agent ↔ Dev Medium</span>
+  </div>
+  <h4 style="margin:0 0 6px;color:#f8fafc;font-size:13.5px;">New Feature Proposal</h4>
+  <p style="font-size:11.5px;color:#94a3b8;margin:0 0 10px;">Use this panel to align on decisions and trade-offs with the agent—or spawn a linked <strong>🎨 UI Prototype</strong> or <strong>📐 Spec Contract</strong> companion panel.</p>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:#cbd5e1;">
     <span>Priority:</span>
     <input type="range" min="1" max="100" value="80" data-state-key="priority" style="flex:1;accent-color:#38bdf8;" />
   </div>
   <div style="display:flex;gap:6px;">
-    <button onclick="window.asterism.spawnFork('Explore 3 divergent directions')" style="flex:1;background:#7e22ce;color:white;border:none;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">⚔ Arena 3x</button>
-    <button onclick="window.asterism.advanceStage()" style="flex:1;background:#0284c7;color:white;border:none;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚂 Advance →</button>
+    <button onclick="window.asterism.spawnRelatedPanel({relation:'visualizes-ui', surfaceRole:'ui-prototype', prompt:'Build an interactive UI prototype for this proposal'})" style="flex:1;background:rgba(244,114,182,0.18);color:#f9a8d4;border:1px solid rgba(244,114,182,0.4);padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;cursor:pointer;">🎨 + UI Prototype</button>
+    <button onclick="window.asterism.spawnRelatedPanel({relation:'specifies', surfaceRole:'spec-diagram', prompt:'Create an architecture & contract spec for this proposal'})" style="flex:1;background:rgba(192,132,252,0.18);color:#d8b4fe;border:1px solid rgba(192,132,252,0.4);padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;cursor:pointer;">📐 + Spec Panel</button>
   </div>
 </div>`
       });
@@ -1241,7 +1436,7 @@
       selectedForSynth.clear();
       updateSynthButtonLabel();
       await fetch('/api/reset', { method: 'POST' });
-      showToast('Canvas reset to default Innovation Train state.');
+      showToast('Canvas reset to default Multi-Role Innovation Train state.');
     }
 
     async function persistState() {
