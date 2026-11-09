@@ -20,6 +20,9 @@ import {
   advanceNodeStage,
   generateWorktreeImplementationBundle,
   runIdeonomyAndMatchmakerPipeline,
+  pickIdeonomyTuple,
+  getIdeonomyCatalogSummary,
+  renderIdeonomyMachineryHtml,
 } from "./src/llm.mjs";
 import {
   makeSqliteEventSink,
@@ -653,6 +656,41 @@ export function createAsterismServer(options = {}) {
       }
     }
 
+    // Ideonomy Tuple Picker Endpoint (`GET /api/ideonomy/pick` & `POST /api/ideonomy/pick`)
+    // Exposes Patrick Gunkel's Ideonomy tuple sampler (2 Operators × 1 Organon × 3 Dimension-Prompts)
+    // with 1-hour half-life mtime cooldown across `ideonomy-plain` and `ideonomy-rich`.
+    if (
+      (req.method === "GET" || req.method === "POST") &&
+      url.pathname === "/api/ideonomy/pick"
+    ) {
+      try {
+        const body = req.method === "POST" ? await readJsonBody(req) : {};
+        const mode = url.searchParams.get("mode") || body.mode || "rich";
+        const seedParam = url.searchParams.get("seed") ?? body.seed;
+        const seed = seedParam !== undefined && seedParam !== null ? Number(seedParam) : undefined;
+        const tuple = pickIdeonomyTuple({
+          mode,
+          seed: Number.isFinite(seed) ? seed : undefined,
+          forceOperators: Array.isArray(body.forceOperators) ? body.forceOperators : [],
+          touchCooldown: seed === undefined,
+        });
+        return sendJson(res, 200, {
+          tuple: {
+            mode: tuple.mode,
+            operatorIds: tuple.operatorIds,
+            organonIds: tuple.organonIds,
+            dimensionIds: tuple.dimensionIds,
+            pivotDimensionId: tuple.pivotDimensionId,
+            tupleLabel: tuple.tupleLabel,
+            promptBlock: tuple.promptBlock,
+          },
+          catalog: getIdeonomyCatalogSummary(),
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
     // Multi-Panel Aware Mutation:
     // - By default ("minimization of regret"), if the node already has downstream children in the graph,
     //   acting on it branches into an additional future (`revisions-from`) rather than destructively
@@ -689,9 +727,16 @@ export function createAsterismServer(options = {}) {
         broadcastState();
 
         const neighborhood = collectNeighborhoodNodes(canvasState, node.id);
+        const mutationTuple = pickIdeonomyTuple({ mode: "rich" });
 
         let updatedHtml;
         let spawnedPanels = [];
+        let activeIdeonomyTuple = {
+          operatorIds: mutationTuple.operatorIds,
+          organonIds: mutationTuple.organonIds,
+          dimensionIds: mutationTuple.dimensionIds,
+          tupleLabel: mutationTuple.tupleLabel,
+        };
         if (selectedSelector) {
           updatedHtml = await mutateHtmlSurface({
             currentHtml: node.facets?.[targetRole] || node.html,
@@ -702,6 +747,7 @@ export function createAsterismServer(options = {}) {
             model: targetModel,
             nodeState: node.state,
             neighborhood,
+            ideonomyTuple: mutationTuple,
           });
         } else {
           const collab = await collaborateAcrossPanels({
@@ -716,6 +762,9 @@ export function createAsterismServer(options = {}) {
           });
           updatedHtml = collab.updatedHtml;
           spawnedPanels = collab.spawnedPanels || [];
+          if (collab.ideonomyTuple) {
+            activeIdeonomyTuple = collab.ideonomyTuple;
+          }
         }
 
         node.status = "ready";
@@ -741,6 +790,7 @@ export function createAsterismServer(options = {}) {
             status: "ready",
             commitment: "speculative",
             html: updatedHtml,
+            ideonomyTuple: activeIdeonomyTuple,
             facets: {
               ...(node.facets || { [node.surfaceRole || defaultRoleForStage(node.stage)]: node.html }),
               [targetRole]: updatedHtml,
@@ -772,6 +822,7 @@ export function createAsterismServer(options = {}) {
           node.revision = prevRev + 1;
           node.model = targetModel;
           node.surfaceRole = targetRole;
+          node.ideonomyTuple = activeIdeonomyTuple;
           node.facets = {
             ...(node.facets || {}),
             [targetRole]: updatedHtml,
@@ -817,6 +868,7 @@ export function createAsterismServer(options = {}) {
             instruction,
             model: targetNode.model,
             surfaceRole: targetNode.surfaceRole,
+            ideonomyTuple: targetNode.ideonomyTuple,
             spawnedPanelIds: spawnedPanels.map((p) => p.id),
           },
           [{ request: { type: "surface.mutate", nodeId: targetNode.id, instruction } }],
@@ -829,6 +881,7 @@ export function createAsterismServer(options = {}) {
           branchedNewFuture: branchNewFuture,
           branchedRevisionNode,
           spawnedPanels,
+          ideonomyTuple: targetNode.ideonomyTuple,
           state: canvasState,
         });
       } catch (err) {
@@ -1113,6 +1166,7 @@ export function createAsterismServer(options = {}) {
           ? canvasState.nodes.find((n) => n.id === sourceNodeId)
           : null;
 
+        const seedTuple = pickIdeonomyTuple({ mode: "rich" });
         if (!seedNode) {
           const ts = Date.now();
           const seedId = `node-seed-${ts}`;
@@ -1130,6 +1184,10 @@ export function createAsterismServer(options = {}) {
     <button onclick="window.asterism.unfoldShadowChildren()" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid rgba(251,191,36,0.5);background:rgba(251,191,36,0.18);color:#fde68a;font-size:10.5px;font-weight:700;cursor:pointer;">🌑 Unfold Staged Shadow Branches</button>
     <button onclick="window.asterism.openAttentionBroker()" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(56,189,248,0.45);background:rgba(56,189,248,0.15);color:#38bdf8;font-size:10.5px;font-weight:600;cursor:pointer;">📡 Attention Queue</button>
   </div>
+  ${renderIdeonomyMachineryHtml({
+    tuple: seedTuple,
+    ideaTitle: `Seed: ${prompt.slice(0, 36)}`,
+  })}
 </div>`;
           seedNode = {
             id: seedId,
@@ -1140,6 +1198,12 @@ export function createAsterismServer(options = {}) {
             surfaceRole: "dialogue",
             commitment: "committed",
             shadowStaged: false,
+            ideonomyTuple: {
+              operatorIds: seedTuple.operatorIds,
+              organonIds: seedTuple.organonIds,
+              dimensionIds: seedTuple.dimensionIds,
+              tupleLabel: seedTuple.tupleLabel,
+            },
             warrant: {
               _tag: "Open",
               pass: 0.75,
@@ -1149,7 +1213,7 @@ export function createAsterismServer(options = {}) {
             x: typeof x === "number" ? x : 25,
             y: typeof y === "number" ? y : maxY + 45,
             width: 405,
-            height: 255,
+            height: 295,
             model: DEFAULT_MODEL,
             status: "ready",
             branchTag: "idea-seed",
@@ -1160,6 +1224,14 @@ export function createAsterismServer(options = {}) {
           canvasState.nodes.push(seedNode);
         } else {
           seedNode.shadowStaged = false;
+          if (!seedNode.ideonomyTuple) {
+            seedNode.ideonomyTuple = {
+              operatorIds: seedTuple.operatorIds,
+              organonIds: seedTuple.organonIds,
+              dimensionIds: seedTuple.dimensionIds,
+              tupleLabel: seedTuple.tupleLabel,
+            };
+          }
         }
 
         // Matchmaker Stance: search the rest of the Brain graph for the highest-affinity distant thought

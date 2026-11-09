@@ -1,3 +1,15 @@
+import {
+  pickIdeonomyTuple,
+  renderIdeonomyMachineryHtml,
+  getIdeonomyCatalogSummary,
+} from "./ideonomy.mjs";
+
+export {
+  pickIdeonomyTuple,
+  renderIdeonomyMachineryHtml,
+  getIdeonomyCatalogSummary,
+};
+
 const LLM_BASE_URL = process.env.ASTERISM_LLM_URL || "https://llm.int.exe.xyz";
 export const DEFAULT_MODEL = process.env.ASTERISM_MODEL || "openai/gpt-6-luna";
 
@@ -295,6 +307,18 @@ export function formatNeighborhoodDigest(neighborhood = []) {
     .join("\n");
 }
 
+function compactTupleMetadata(tuple) {
+  if (!tuple) return null;
+  return {
+    operatorIds: tuple.operatorIds,
+    organonIds: tuple.organonIds,
+    dimensionIds: tuple.dimensionIds,
+    primaryOrganon: tuple.primaryOrganon,
+    pivotDimension: tuple.pivotDimension,
+    tupleLabel: tuple.tupleLabel,
+  };
+}
+
 export async function mutateHtmlSurface({
   currentHtml,
   title,
@@ -304,14 +328,19 @@ export async function mutateHtmlSurface({
   model,
   nodeState,
   neighborhood = [],
+  ideonomyTuple,
 }) {
+  const tuple = ideonomyTuple || pickIdeonomyTuple();
   const systemInstructions = `You are a Principal Collaborative Agent inside Asterism, an infinite spatial canvas where panels are Agent <-> Developer collaboration mediums connected by typed relations.
 ${roleGuidanceFor(surfaceRole)}
+
+${tuple.promptBlock}
 
 Rules:
 - Return ONLY a self-contained HTML fragment (a root <div> with an inline <style> tag and inline event handlers or <script> tag if interactive). Do NOT wrap in markdown code fences, and do NOT include <html> or <head> tags.
 - Use a sleek dark-mode aesthetic (#0f172a / #1e293b backgrounds, #e2e8f0 text, #38bdf8 / #a855f7 / #f472b6 / #34d399 accents).
 - Make controls genuinely interactive and bind them with \`data-state-key="..."\` or \`window.asterism.setState({...})\`.
+- Make the Ideonomy machinery visible: structure the body around the picked ORGANON (${tuple.primaryOrganon.toUpperCase()}), name both the OPERATOR and the concrete move ("X" -> "Y"), and end with the compact [ideonomy · ... · not surfaced: ...] trail!
 ${ASTERISM_BRIDGE_SYSTEM_NOTE}`;
 
   const stateContext =
@@ -326,6 +355,7 @@ ${ASTERISM_BRIDGE_SYSTEM_NOTE}`;
 
   const userPrompt = `Panel Title: ${title}
 Panel Surface Role: ${surfaceRole}
+Ideonomy Method Tuple: ${tuple.tupleLabel}
 ${selectedSelector ? `Focused Element: ${selectedSelector}\n` : ""}${stateContext}${neighborhoodContext}User Instruction: ${instruction}
 
 Current HTML:
@@ -337,7 +367,11 @@ ${currentHtml}`;
     model,
   });
 
-  return extractHtmlSnippet(output);
+  let snippet = extractHtmlSnippet(output);
+  if (!/not surfaced:/i.test(snippet) && !/IDEONOMY TUPLE/i.test(snippet)) {
+    snippet += "\n" + renderIdeonomyMachineryHtml({ tuple, ideaTitle: title });
+  }
+  return snippet;
 }
 
 /**
@@ -354,6 +388,7 @@ export async function collaborateAcrossPanels({
 }) {
   const sourceRole =
     sourceNode.surfaceRole || defaultRoleForStage(sourceNode.stage);
+  const ideonomyTuple = pickIdeonomyTuple();
 
   // Check if the user's instruction asks to spawn/break out a related panel (UI design, spec, critique, implementation)
   const wantsSpawn =
@@ -362,17 +397,30 @@ export async function collaborateAcrossPanels({
     );
 
   if (!wantsSpawn) {
-    const updatedHtml = await mutateHtmlSurface({
-      currentHtml: sourceNode.html,
-      title: sourceNode.title,
-      surfaceRole: sourceRole,
-      instruction,
-      model,
-      nodeState: sourceNode.state,
-      neighborhood,
-    });
+    let updatedHtml;
+    try {
+      updatedHtml = await mutateHtmlSurface({
+        currentHtml: sourceNode.html,
+        title: sourceNode.title,
+        surfaceRole: sourceRole,
+        instruction,
+        model,
+        nodeState: sourceNode.state,
+        neighborhood,
+        ideonomyTuple,
+      });
+    } catch {
+      updatedHtml =
+        sourceNode.html +
+        "\n" +
+        renderIdeonomyMachineryHtml({
+          tuple: ideonomyTuple,
+          ideaTitle: `${sourceNode.title}: ${instruction}`,
+        });
+    }
     return {
       updatedHtml,
+      ideonomyTuple: compactTupleMetadata(ideonomyTuple),
       spawnedSpecs: [],
       updatedOtherPanels: [],
     };
@@ -401,6 +449,7 @@ export async function collaborateAcrossPanels({
     prompt: instruction,
     neighborhood,
     model,
+    ideonomyTuple,
   });
 
   // Also add a cross-reference banner/note to the source panel so both panels clearly reference each other
@@ -414,15 +463,14 @@ export async function collaborateAcrossPanels({
 
   return {
     updatedHtml: sourceNode.html + "\n" + linkFooter,
+    ideonomyTuple: compactTupleMetadata(ideonomyTuple),
     spawnedPanels: [companionNode],
   };
 }
 
 /**
  * Spawns a new panel related to `sourceNode` with an explicit `relation` and `surfaceRole`.
- * For example, if `sourceNode` is a Feature Proposal (`surfaceRole: "dialogue"`),
- * the agent can spawn a UI Design (`surfaceRole: "ui-prototype"`, `relation: "visualizes-ui"`)
- * or a Technical Contract (`surfaceRole: "spec-diagram"`, `relation: "specifies"`).
+ * Uses the Ideonomy skill (`pickIdeonomyTuple`) to draw a fresh `(Operators × Organon × Dimension-Prompts)` tuple.
  */
 export async function spawnRelatedPanel({
   sourceNode,
@@ -433,7 +481,9 @@ export async function spawnRelatedPanel({
   neighborhood = [],
   existingRelatedCount = 0,
   model,
+  ideonomyTuple,
 }) {
+  const tuple = ideonomyTuple || pickIdeonomyTuple();
   const relationMeta = PANEL_RELATIONS[relation] || PANEL_RELATIONS["visualizes-ui"];
   const resolvedRole =
     surfaceRole ||
@@ -475,6 +525,7 @@ export async function spawnRelatedPanel({
       surfaceRole: resolvedRole,
       nodeState: sourceNode.state,
       neighborhood,
+      ideonomyTuple: tuple,
       instruction: `You are spawning a new companion panel connected to "${sourceNode.title}" (id: ${sourceNode.id}, role: ${sourceNode.surfaceRole || "dialogue"}) via relation "${relation}" (${relationMeta.label}).
 New Panel Role: ${roleMeta.label} (${resolvedRole}).
 Directive: ${prompt || defaultDirective}`,
@@ -488,9 +539,11 @@ Directive: ${prompt || defaultDirective}`,
       relation,
       sourceNode,
       prompt: prompt || defaultDirective,
+      ideonomyTuple: tuple,
     });
   }
 
+  const tupleMeta = compactTupleMetadata(tuple);
   return {
     id: nodeId,
     title: resolvedTitle,
@@ -498,17 +551,22 @@ Directive: ${prompt || defaultDirective}`,
     stage: resolvedStage,
     surfaceRole: resolvedRole,
     relationFromParent: relation,
+    ideonomyTuple: tupleMeta,
     x: sourceNode.x + (sourceNode.width || 390) + 115,
     y: sourceNode.y + existingRelatedCount * 305,
     width: 405,
-    height: resolvedRole === "artifact-harness" ? 360 : 300,
+    height: resolvedRole === "artifact-harness" ? 360 : 320,
     model: chosenModel,
     provider: sourceNode.provider || "chatgpt-gateway",
     status: "committed",
     branchTag: `${relation}:${resolvedRole}`,
     parentId: sourceNode.id,
     parentIds: [sourceNode.id],
-    state: { ...(sourceNode.state || {}), spawnedViaRelation: relation },
+    state: {
+      ...(sourceNode.state || {}),
+      spawnedViaRelation: relation,
+      ideonomyTuple: tupleMeta.tupleLabel,
+    },
     html,
   };
 }
@@ -519,19 +577,25 @@ export function buildFallbackRoleHtml({
   relation,
   sourceNode,
   prompt,
+  ideonomyTuple,
 }) {
+  const tuple = ideonomyTuple || pickIdeonomyTuple();
   const roleMeta = SURFACE_ROLES[surfaceRole] || SURFACE_ROLES.dialogue;
   const relMeta = PANEL_RELATIONS[relation] || PANEL_RELATIONS["visualizes-ui"];
+  const machineryHtml = renderIdeonomyMachineryHtml({
+    tuple,
+    ideaTitle: title,
+  });
 
   if (surfaceRole === "ui-prototype") {
     return `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • TARGET UI SAMPLE</span>
+    <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • ORGANON: ${tuple.primaryOrganon.toUpperCase()}</span>
     <span style="color:#94a3b8;font-size:10.5px;">${relMeta.label} "${sourceNode.title.slice(0, 22)}"</span>
   </div>
   <div style="background:#0b1120;border:1px solid rgba(244,114,182,0.35);border-radius:8px;padding:10px;margin-bottom:9px;">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(148,163,184,0.15);padding-bottom:6px;margin-bottom:8px;">
-      <strong style="color:#f8fafc;font-size:12px;">Interactive Component Preview</strong>
+      <strong style="color:#f8fafc;font-size:12px;">Interactive Specimen (${tuple.primaryOrganon})</strong>
       <select data-state-key="uiDensity" style="background:#1e293b;color:#f472b6;border:1px solid rgba(244,114,182,0.4);border-radius:4px;font-size:10px;padding:2px 5px;">
         <option value="compact">Compact HUD</option>
         <option value="spacious">Spacious Split</option>
@@ -547,13 +611,14 @@ export function buildFallbackRoleHtml({
     <span style="font-size:10px;color:#f472b6;white-space:nowrap;">✎ Markup Note:</span>
     <input type="text" data-state-key="designMarkupNote" value="Looks clean — let's wire this to the spec" style="flex:1;background:transparent;border:none;color:#e2e8f0;font-size:11px;outline:none;" />
   </div>
+  ${machineryHtml}
 </div>`;
   }
 
   if (surfaceRole === "spec-diagram") {
     return `<div style="font-family:'JetBrains Mono',monospace;padding:14px;color:#e2e8f0;font-size:11.5px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • CONTRACT &amp; INVARIANTS</span>
+    <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • ORGANON: ${tuple.primaryOrganon.toUpperCase()}</span>
     <span style="color:#94a3b8;font-size:10px;">${relMeta.label}</span>
   </div>
   <h4 style="margin:0 0 6px;font-family:system-ui,sans-serif;font-size:13.5px;color:#f8fafc;">${title}</h4>
@@ -561,7 +626,7 @@ export function buildFallbackRoleHtml({
   <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(192,132,252,0.35);border-radius:7px;padding:8px;margin-bottom:8px;">
     <label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;">
       <input type="checkbox" checked data-state-key="invariantIdempotent" style="accent-color:#c084fc;" />
-      <span>Idempotent Command Receipts</span>
+      <span>Idempotent Command Receipts (${tuple.pivotDimension})</span>
     </label>
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
       <input type="checkbox" checked data-state-key="invariantTypedRelations" style="accent-color:#c084fc;" />
@@ -569,12 +634,13 @@ export function buildFallbackRoleHtml({
     </label>
   </div>
   <button onclick="window.asterism.spawnRelatedPanel({relation:'visualizes-ui', surfaceRole:'ui-prototype', prompt:'Generate interactive UI prototype for this contract'})" style="width:100%;background:rgba(244,114,182,0.18);color:#f472b6;border:1px solid rgba(244,114,182,0.4);padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🎨 Spawn Companion UI Prototype →</button>
+  ${machineryHtml}
 </div>`;
   }
 
   return `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • AGENT ↔ DEV MEDIUM</span>
+    <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • ORGANON: ${tuple.primaryOrganon.toUpperCase()}</span>
     <span style="color:#94a3b8;font-size:10.5px;">${relMeta.label}</span>
   </div>
   <h4 style="margin:0 0 6px;font-size:14px;">${title}</h4>
@@ -583,12 +649,14 @@ export function buildFallbackRoleHtml({
     <button onclick="window.asterism.spawnRelatedPanel({relation:'visualizes-ui', surfaceRole:'ui-prototype'})" style="flex:1;background:rgba(244,114,182,0.18);color:#f472b6;border:1px solid rgba(244,114,182,0.4);padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;cursor:pointer;">🎨 + UI Prototype</button>
     <button onclick="window.asterism.spawnRelatedPanel({relation:'specifies', surfaceRole:'spec-diagram'})" style="flex:1;background:rgba(168,85,247,0.18);color:#c084fc;border:1px solid rgba(168,85,247,0.4);padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;cursor:pointer;">📐 + Spec Panel</button>
   </div>
+  ${machineryHtml}
 </div>`;
 }
 
 /**
- * Feature 4: Multi-Provider / Multi-Model Arena Forking
- * Pits distinct models/harnesses and architectural lenses against the same prompt in parallel.
+ * Feature 4: Multi-Provider / Multi-Model Arena Forking + Ideonomy Skill
+ * Pits distinct models/harnesses AND distinct Ideonomy Method Tuples `(Operators × Organon × Dimension-Prompts)`
+ * against the same prompt in parallel so every fork explores a genuinely orthogonal combination.
  */
 export async function generateSpeculativeBranches({
   sourceNode,
@@ -609,16 +677,19 @@ export async function generateSpeculativeBranches({
     {
       tag: "fork-A",
       combatant: ARENA_MODELS[0],
+      forceOperators: ["negation", "substitution"],
       lens: "Direct Manipulation & Spatial Controls (sliders, inline canvas handles, zero-chat visual feedback)",
     },
     {
       tag: "fork-B",
       combatant: ARENA_MODELS[1],
+      forceOperators: ["dimension-identification", "organon-construction"],
       lens: "State Machine & Constraint Scrubber (timeline states, live tokens, deterministic checks)",
     },
     {
       tag: "fork-C",
       combatant: ARENA_MODELS[2],
+      forceOperators: ["abstraction-lift", "cross-domain-reinstantiation"],
       lens: "Algorithmic Telemetry & High-Density Verification (live metrics, Jev probability gauge, automated checks)",
     },
   ].slice(0, count);
@@ -626,6 +697,8 @@ export async function generateSpeculativeBranches({
   const results = await Promise.all(
     archetypes.map(async (arch, idx) => {
       const nodeId = `node-spec-${Date.now()}-${idx}`;
+      const tuple = pickIdeonomyTuple({ forceOperators: arch.forceOperators });
+      const tupleMeta = compactTupleMetadata(tuple);
       const chosenModel =
         Array.isArray(models) && models[idx]
           ? models[idx]
@@ -644,8 +717,10 @@ export async function generateSpeculativeBranches({
           surfaceRole: resolvedRole,
           nodeState: sourceNode.state,
           neighborhood,
+          ideonomyTuple: tuple,
           instruction: `${prompt || "Create a distinct interactive variant"}.
 Specifically take this architectural lens: ${arch.lens}.
+Apply your drawn Ideonomy Method Tuple: ${tuple.tupleLabel}.
 You are competing in an Arena Fork as model "${combatantMeta.shortLabel}" (${combatantMeta.harness}).
 Panel Role: ${roleMeta.label} (${resolvedRole}).
 Include a compact top header bar showing badge "⚔ ${arch.tag.toUpperCase()} • ${combatantMeta.shortLabel}" and "${roleMeta.shortBadge} • Jev: ${score}", plus interactive controls bound with data-state-key attributes. Do NOT include Keep/Advance buttons inside the HTML (they live in the outer card chrome).`,
@@ -654,15 +729,16 @@ Include a compact top header bar showing badge "⚔ ${arch.tag.toUpperCase()} �
         const latencyMs = Date.now() - startedAt;
         return {
           id: nodeId,
-          title: `${arch.tag} [${combatantMeta.shortLabel}]: ${arch.lens.split("(")[0].trim()}`,
+          title: `${arch.tag} [${combatantMeta.shortLabel} • ${tuple.primaryOrganon}]: ${arch.lens.split("(")[0].trim()}`,
           kind: "speculative",
           stage: targetStage,
           surfaceRole: resolvedRole,
           relationFromParent: "forks",
+          ideonomyTuple: tupleMeta,
           x: sourceNode.x + sourceNode.width + 115,
-          y: sourceNode.y + (idx - 1) * 295,
-          width: 395,
-          height: 275,
+          y: sourceNode.y + (idx - 1) * 310,
+          width: 405,
+          height: 315,
           model: chosenModel,
           provider: combatantMeta.provider,
           harness: combatantMeta.harness,
@@ -672,23 +748,32 @@ Include a compact top header bar showing badge "⚔ ${arch.tag.toUpperCase()} �
           branchTag: `${arch.tag}:${combatantMeta.shortLabel}`,
           parentId: sourceNode.id,
           parentIds: [sourceNode.id],
-          state: { ...(sourceNode.state || {}), arenaModel: combatantMeta.shortLabel },
+          state: {
+            ...(sourceNode.state || {}),
+            arenaModel: combatantMeta.shortLabel,
+            ideonomyTuple: tupleMeta.tupleLabel,
+          },
           jevScore: Number(score),
           html,
         };
       } catch {
         const latencyMs = Date.now() - startedAt;
+        const machineryHtml = renderIdeonomyMachineryHtml({
+          tuple,
+          ideaTitle: `${sourceNode.title} (${arch.tag})`,
+        });
         return {
           id: nodeId,
-          title: `${arch.tag} [${combatantMeta.shortLabel}]: ${arch.lens.split("(")[0].trim()}`,
+          title: `${arch.tag} [${combatantMeta.shortLabel} • ${tuple.primaryOrganon}]: ${arch.lens.split("(")[0].trim()}`,
           kind: "speculative",
           stage: targetStage,
           surfaceRole: resolvedRole,
           relationFromParent: "forks",
+          ideonomyTuple: tupleMeta,
           x: sourceNode.x + sourceNode.width + 115,
-          y: sourceNode.y + (idx - 1) * 295,
-          width: 395,
-          height: 275,
+          y: sourceNode.y + (idx - 1) * 310,
+          width: 405,
+          height: 315,
           model: chosenModel,
           provider: combatantMeta.provider,
           harness: combatantMeta.harness,
@@ -698,7 +783,11 @@ Include a compact top header bar showing badge "⚔ ${arch.tag.toUpperCase()} �
           branchTag: `${arch.tag}:${combatantMeta.shortLabel}`,
           parentId: sourceNode.id,
           parentIds: [sourceNode.id],
-          state: { ...(sourceNode.state || {}), arenaModel: combatantMeta.shortLabel },
+          state: {
+            ...(sourceNode.state || {}),
+            arenaModel: combatantMeta.shortLabel,
+            ideonomyTuple: tupleMeta.tupleLabel,
+          },
           jevScore: Number(score),
           html: `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -706,11 +795,12 @@ Include a compact top header bar showing badge "⚔ ${arch.tag.toUpperCase()} �
     <span style="color:#94a3b8;font-size:10.5px;">${roleMeta.shortBadge} • Jev: ${score}</span>
   </div>
   <h4 style="margin:0 0 6px;font-size:13.5px;">${arch.lens.split("(")[0].trim()}</h4>
-  <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">Harness: <code>${combatantMeta.harness}</code> — ${prompt || "Parallel Arena exploration"}</p>
+  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Harness: <code>${combatantMeta.harness}</code> — ${prompt || "Parallel Arena exploration"}</p>
   <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#cbd5e1;">
     <span>Weight:</span>
     <input type="range" min="1" max="100" value="75" data-state-key="branchWeight" style="flex:1;accent-color:${combatantMeta.badgeColor};" />
   </div>
+  ${machineryHtml}
 </div>`,
         };
       }
@@ -721,9 +811,9 @@ Include a compact top header bar showing badge "⚔ ${arch.tag.toUpperCase()} �
 }
 
 /**
- * Feature 2: Multi-Parent Convergence ("Synthesize / Merge Forks" Node)
- * Takes 2+ parent nodes on the canvas (even of different roles, e.g. a Spec panel + a UI Prototype panel!)
- * and synthesizes their designs, specs, and interactive states into a unified child node.
+ * Feature 2: Multi-Parent Convergence ("Synthesize / Merge Forks" Node) + Ideonomy Combination Operator
+ * Takes 2+ parent nodes on the canvas and applies Patrick Gunkel's `combination` operator (`Organon A × Organon B`)
+ * along with a fresh Organon & 3 Dimension-Prompts from the Ideonomy catalog.
  */
 export async function synthesizeNodes({
   parentNodes,
@@ -732,6 +822,11 @@ export async function synthesizeNodes({
   surfaceRole,
   model = DEFAULT_MODEL,
 }) {
+  const tuple = pickIdeonomyTuple({
+    forceOperators: ["combination", "organon-construction"],
+  });
+  const tupleMeta = compactTupleMetadata(tuple);
+
   const highestParentStage = highestStageOf(parentNodes.map((n) => n.stage || "note"));
   const resolvedStage =
     targetStage ||
@@ -754,6 +849,7 @@ export async function synthesizeNodes({
       Object.assign(mergedState, p.state);
     }
   }
+  mergedState.ideonomyTuple = tupleMeta.tupleLabel;
 
   const maxRight = Math.max(...parentNodes.map((p) => p.x + (p.width || 380)));
   const avgY = Math.round(
@@ -772,13 +868,16 @@ ${p.html}`,
   const systemInstructions = `You are a Principal Synthesis Architect inside Asterism's Innovation Train.
 The user has selected ${parentNodes.length} panels to CONVERGE (N -> 1 Synthesis) into a single hybrid panel.
 ${roleGuidanceFor(resolvedRole)}
+
+${tuple.promptBlock}
+
 Rules:
-- Combine the strongest interactive controls, visual insights, and technical constraints from ALL ${parentNodes.length} parent panels into a cohesive, interactive dark-mode HTML fragment.
+- Combine the strongest interactive controls, visual insights, and technical constraints from ALL ${parentNodes.length} parent panels into a cohesive, interactive dark-mode HTML fragment structured around the picked ORGANON (${tuple.primaryOrganon.toUpperCase()}).
 - Include a top synthesis banner showing "⊕ SYNTHESIZED (${parentNodes.map((p) => p.surfaceRole || p.stage).join(" + ")}) • ${roleMeta.shortBadge}".
 - Bind interactive controls using \`data-state-key="..."\` or \`window.asterism.setState(...)\`.
 - Return ONLY the raw HTML fragment (no markdown fences, no <html>/<head>).`;
 
-  const prompt = `Synthesize these ${parentNodes.length} parent panels into a unified "${resolvedRole}" (${resolvedStage} stage) panel.
+  const prompt = `Synthesize these ${parentNodes.length} parent panels into a unified "${resolvedRole}" (${resolvedStage} stage) panel using Ideonomy Tuple: ${tuple.tupleLabel}.
 ${instruction ? `User Synthesis Directive: ${instruction}\n` : ""}
 Merged Interactive Widget State: ${JSON.stringify(mergedState)}
 
@@ -792,10 +891,29 @@ ${parentsDigest}`;
       model,
     });
     html = extractHtmlSnippet(raw);
+    if (!/not surfaced:/i.test(html) && !/IDEONOMY TUPLE/i.test(html)) {
+      html +=
+        "\n" +
+        renderIdeonomyMachineryHtml({
+          tuple,
+          ideaTitle: `Synthesis of ${parentNodes.length} Parents`,
+        });
+    }
   } catch {
+    const machineryHtml = renderIdeonomyMachineryHtml({
+      tuple,
+      ideaTitle: `Synthesis: ${parentNodes.map((p) => p.title.slice(0, 15)).join(" × ")}`,
+      moves: [
+        {
+          operator: "combination",
+          from: parentNodes[0]?.title.slice(0, 22) || "Parent A",
+          to: `cross-product with ${parentNodes[1]?.title.slice(0, 22) || "Parent B"}`,
+        },
+      ],
+    });
     html = `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:rgba(251,191,36,0.18);color:#fbbf24;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⊕ SYNTHESIZED (${parentNodes.length} PANELS)</span>
+    <span style="background:rgba(251,191,36,0.18);color:#fbbf24;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⊕ SYNTHESIZED (${parentNodes.length} PANELS) • ${tuple.primaryOrganon.toUpperCase()}</span>
     <span style="color:${roleMeta.color};font-size:10.5px;font-weight:600;">${roleMeta.shortBadge}</span>
   </div>
   <h4 style="margin:0 0 6px;font-size:14px;">Hybrid Convergence: ${parentNodes.map((p) => p.branchTag || p.title.slice(0, 18)).join(" × ")}</h4>
@@ -804,6 +922,7 @@ ${parentsDigest}`;
     <div style="font-size:10.5px;color:#fcd34d;margin-bottom:4px;font-weight:600;">Merged Lineage &amp; Interactive State</div>
     <code style="font-size:10px;color:#cbd5e1;display:block;white-space:pre-wrap;">${JSON.stringify(mergedState)}</code>
   </div>
+  ${machineryHtml}
 </div>`;
   }
 
@@ -814,10 +933,11 @@ ${parentsDigest}`;
     stage: resolvedStage,
     surfaceRole: resolvedRole,
     relationFromParent: "synthesizes",
+    ideonomyTuple: tupleMeta,
     x: maxRight + 115,
     y: avgY,
     width: 415,
-    height: 310,
+    height: 335,
     model,
     provider: "chatgpt-gateway",
     status: "committed",
@@ -844,6 +964,8 @@ export async function advanceNodeStage({
   instruction,
   neighborhood = [],
 }) {
+  const tuple = pickIdeonomyTuple();
+  const tupleMeta = compactTupleMetadata(tuple);
   const nextStage = targetStage || nextStageFor(sourceNode.stage || "note");
   const resolvedRole = surfaceRole || defaultRoleForStage(nextStage);
   const roleMeta = SURFACE_ROLES[resolvedRole] || SURFACE_ROLES.dialogue;
@@ -871,6 +993,7 @@ export async function advanceNodeStage({
       surfaceRole: resolvedRole,
       nodeState: sourceNode.state,
       neighborhood,
+      ideonomyTuple: tuple,
       instruction: `Advance this branch along the Innovation Train from stage "${sourceNode.stage || "note"}" (${sourceNode.surfaceRole || "dialogue"}) to stage "${nextStage}" with Panel Role "${roleMeta.label}" (${resolvedRole}).
 Directive: ${directive}
 Include a top badge showing "${roleMeta.shortBadge} • STAGE: ${nextStage.toUpperCase()}". Do NOT include generic Keep/Advance buttons inside the HTML.`,
@@ -884,6 +1007,7 @@ Include a top badge showing "${roleMeta.shortBadge} • STAGE: ${nextStage.toUpp
       relation: nextStage === "implement" ? "implements" : "advances",
       sourceNode,
       prompt: directive,
+      ideonomyTuple: tuple,
     });
   }
 
@@ -903,17 +1027,21 @@ Include a top badge showing "${roleMeta.shortBadge} • STAGE: ${nextStage.toUpp
     stage: nextStage,
     surfaceRole: resolvedRole,
     relationFromParent: relation,
+    ideonomyTuple: tupleMeta,
     x: sourceNode.x + sourceNode.width + 115,
     y: sourceNode.y,
     width: 410,
-    height: nextStage === "implement" ? 360 : 300,
+    height: nextStage === "implement" ? 360 : 325,
     model: sourceNode.model || DEFAULT_MODEL,
     provider: sourceNode.provider || "chatgpt-gateway",
     status: "committed",
     branchTag: nextStage,
     parentId: sourceNode.id,
     parentIds: [sourceNode.id],
-    state: { ...(sourceNode.state || {}) },
+    state: {
+      ...(sourceNode.state || {}),
+      ideonomyTuple: tupleMeta.tupleLabel,
+    },
     html,
   };
 }
@@ -1052,7 +1180,8 @@ test("Malleable HTML surface artifact is present and non-empty", () => {
 
 /**
  * Autonomous Idea Box Pipeline (Ideonomist Δ + Matchmaker ⋈ + Calibrated Jev Verify ∇):
- * Takes a 1-sentence seed thought (or existing node), spawns combinatorial Ideonomy forks,
+ * Takes a 1-sentence seed thought (or existing node), draws fresh `(Operators × Organon × Dimension-Prompts)`
+ * tuples from Patrick Gunkel / Grace Kind's Ideonomy skill (`skills/ideonomy-rich/methods/`),
  * discovers a high-affinity lateral Jump link to an existing thought in the Brain graph,
  * and stages the resulting branches in the Shadow Graph (`shadowStaged: true`) with EVOI Attention Bids!
  */
@@ -1067,12 +1196,24 @@ export async function runIdeonomyAndMatchmakerPipeline({
   const baseX = seedNode.x + (seedNode.width || 400) + 120;
   const baseY = seedNode.y - 60;
 
+  // Draw 3 distinct Ideonomy Method Tuples from the 8 Operators × 17 Organons × 29 Dimension-Prompts catalog!
+  const tupleInvert = pickIdeonomyTuple({
+    forceOperators: ["negation", "substitution"],
+  });
+  const tupleAdvocate = pickIdeonomyTuple({
+    forceOperators: ["abstraction-lift", "cross-domain-reinstantiation"],
+  });
+  const tupleCritic = pickIdeonomyTuple({
+    forceOperators: ["dimension-identification", "tree-finding"],
+  });
+
   const ideonomySpecs = [
     {
       suffix: "ideo-invert",
       stance: "ideonomist",
-      operator: "Δ Expand (Inversion)",
-      title: `Ideonomy Δ: Zero-UI Ambient ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 26)}`,
+      tuple: tupleInvert,
+      operator: `Δ Ideonomy (${tupleInvert.operatorIds.join(" · ")} × ${tupleInvert.primaryOrganon})`,
+      title: `Ideonomy Δ [${tupleInvert.primaryOrganon}]: ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 26)}`,
       surfaceRole: "dialogue",
       stage: "brainstorm",
       stratum: "intent",
@@ -1080,56 +1221,105 @@ export async function runIdeonomyAndMatchmakerPipeline({
       pass: 0.86,
       abstain: 0.14,
       yOffset: 0,
-      badge: "💡 IDEONOMIST (Δ INVERSION)",
+      badge: `💡 IDEONOMIST (◆ ${tupleInvert.operatorIds[0].toUpperCase()} × ${tupleInvert.primaryOrganon.toUpperCase()})`,
       accent: "#38bdf8",
-      summary: `Inverts manual user workflows into an ambient background daemon for "${seedPrompt}".`,
+      summary: `Applies Patrick Gunkel's ${tupleInvert.operatorIds.join(" & ")} along ★ ${tupleInvert.pivotDimension} into a ${tupleInvert.primaryOrganon} organon for "${seedPrompt}".`,
+      moves: [
+        {
+          operator: tupleInvert.operatorIds[0] || "negation",
+          from: "synchronous manual user trigger",
+          to: `autonomous ${tupleInvert.pivotDimension}-driven background flow`,
+        },
+        {
+          operator: tupleInvert.operatorIds[1] || "substitution",
+          from: "single-panel chat",
+          to: `multi-node ${tupleInvert.primaryOrganon} projection`,
+        },
+      ],
+      notSurfaced: `full negation of ${tupleInvert.dimensionIds[2] || "materiality"} (zero-persistence ephemeral mode) reserved for next tuple`,
       askDefaultLabel: "Adopt Ambient Daemon Strategy",
     },
     {
       suffix: "ideo-advocate",
       stance: "advocate",
-      operator: "↓ Translate (Steelman UI)",
-      title: `Advocate ∃: Interactive Specimen — ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 22)}`,
+      tuple: tupleAdvocate,
+      operator: `↓ Translate (${tupleAdvocate.operatorIds.join(" · ")} × ${tupleAdvocate.primaryOrganon})`,
+      title: `Advocate ∃ [${tupleAdvocate.primaryOrganon}]: ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 22)}`,
       surfaceRole: "ui-prototype",
       stage: "design",
       stratum: "prototype",
       model: "openai/gpt-6.1-terra",
       pass: 0.88,
       abstain: 0.12,
-      yOffset: 295,
-      badge: "🎨 ADVOCATE (∃ PROTOTYPE)",
+      yOffset: 325,
+      badge: `🎨 ADVOCATE (◆ ${tupleAdvocate.operatorIds[0].toUpperCase()} × ${tupleAdvocate.primaryOrganon.toUpperCase()})`,
       accent: "#f472b6",
-      summary: `Steelmans "${seedPrompt}" with a direct-manipulation UI specimen & live parameter sliders.`,
+      summary: `Cross-domain re-instantiates "${seedPrompt}" along ★ ${tupleAdvocate.pivotDimension} into an interactive ${tupleAdvocate.primaryOrganon} UI specimen.`,
+      moves: [
+        {
+          operator: tupleAdvocate.operatorIds[0] || "abstraction-lift",
+          from: "domain-specific UI chrome",
+          to: `abstract ${tupleAdvocate.primaryOrganon} invariant`,
+        },
+        {
+          operator:
+            tupleAdvocate.operatorIds[1] || "cross-domain-reinstantiation",
+          from: "static document card",
+          to: `live ${tupleAdvocate.pivotDimension} scrubber`,
+        },
+      ],
+      notSurfaced: `extreme ${tupleAdvocate.dimensionIds[1] || "size"} scaling (10,000-node macro-view) left for follow-up tuple`,
       askDefaultLabel: "Promote Prototype to Active Train",
     },
     {
       suffix: "ideo-critic",
       stance: "critic",
-      operator: "∇ Verify (Red-Team)",
-      title: `Critic ∇: Invariant & Edge-Case Stress Test`,
+      tuple: tupleCritic,
+      operator: `∇ Verify (${tupleCritic.operatorIds.join(" · ")} × ${tupleCritic.primaryOrganon})`,
+      title: `Critic ∇ [${tupleCritic.primaryOrganon}]: Invariant Stress Test`,
       surfaceRole: "spec-diagram",
       stage: "refine",
       stratum: "spec",
       model: "openai/gpt-6.1-sol",
       pass: 0.54,
       abstain: 0.38,
-      yOffset: 590,
-      badge: "🛡 RED-TEAM CRITIC (∇ VERIFY)",
+      yOffset: 650,
+      badge: `🛡 RED-TEAM CRITIC (◆ ${tupleCritic.operatorIds[0].toUpperCase()} × ${tupleCritic.primaryOrganon.toUpperCase()})`,
       accent: "#fbbf24",
-      summary: `Identifies latency, state-drift, and safety invariants for "${seedPrompt}" (high epistemic entropy → high EVOI for human Steer!).`,
+      summary: `Uses ${tupleCritic.operatorIds.join(" & ")} along ★ ${tupleCritic.pivotDimension} to expose boundary failure modes for "${seedPrompt}" (high epistemic entropy → top EVOI!).`,
+      moves: [
+        {
+          operator: tupleCritic.operatorIds[0] || "dimension-identification",
+          from: "unbounded fan-out",
+          to: `bounded ${tupleCritic.pivotDimension} envelope`,
+        },
+        {
+          operator: tupleCritic.operatorIds[1] || "tree-finding",
+          from: "implicit failure path",
+          to: `explicit ${tupleCritic.primaryOrganon} fault tree`,
+        },
+      ],
+      notSurfaced: `adversarial multi-tenant clock skew along ${tupleCritic.dimensionIds[2] || "rate"} axis`,
       askDefaultLabel: "Enforce Fail-Closed Invariant",
     },
   ];
 
   const shadowBranches = ideonomySpecs.map((spec, idx) => {
     const id = `node-${spec.suffix}-${ts}-${idx}`;
+    const tupleMeta = compactTupleMetadata(spec.tuple);
+    const machineryHtml = renderIdeonomyMachineryHtml({
+      tuple: spec.tuple,
+      ideaTitle: spec.title,
+      moves: spec.moves,
+      notSurfaced: spec.notSurfaced,
+    });
     const html = `<div style="font-family:system-ui,sans-serif;padding:12px;color:#e2e8f0;font-size:11.5px;line-height:1.42;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
     <span style="background:rgba(56,189,248,0.16);color:${spec.accent};padding:2px 7px;border-radius:99px;font-size:9.5px;font-weight:700;">${spec.badge}</span>
     <span style="color:#34d399;font-family:monospace;font-size:10px;">ANoul(p=${spec.pass}, u=${spec.abstain})</span>
   </div>
-  <div style="background:#0b1120;border:1px solid rgba(148,163,184,0.25);border-radius:8px;padding:9px;margin-bottom:8px;">
-    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">${spec.title}</div>
+  <div style="background:#0b1120;border:1px solid rgba(148,163,184,0.25);border-radius:8px;padding:9px;margin-bottom:6px;">
+    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">═══ ◆ ${spec.tuple.primaryOrganon.toUpperCase()} ◆ ═══ ${spec.title}</div>
     <p style="margin:0 0 8px;color:#94a3b8;font-size:10.5px;">${spec.summary}</p>
     <div style="display:flex;align-items:center;gap:8px;font-size:10.5px;color:#cbd5e1;">
       <span>Confidence Threshold:</span>
@@ -1140,6 +1330,7 @@ export async function runIdeonomyAndMatchmakerPipeline({
     <span>AskDefault: <code>${spec.askDefaultLabel}</code></span>
     <button onclick="window.asterism.keepFork(false)" style="background:rgba(16,185,129,0.18);color:#6ee7b7;border:1px solid rgba(16,185,129,0.45);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;">✓ Keep</button>
   </div>
+  ${machineryHtml}
 </div>`;
 
     return {
@@ -1150,6 +1341,7 @@ export async function runIdeonomyAndMatchmakerPipeline({
       stratum: spec.stratum,
       surfaceRole: spec.surfaceRole,
       stance: spec.stance,
+      ideonomyTuple: tupleMeta,
       relationFromParent:
         spec.surfaceRole === "ui-prototype"
           ? "visualizes-ui"
@@ -1168,8 +1360,8 @@ export async function runIdeonomyAndMatchmakerPipeline({
       jevScore: spec.pass,
       x: baseX,
       y: baseY + spec.yOffset,
-      width: 395,
-      height: 265,
+      width: 410,
+      height: 315,
       model: spec.model,
       provider: "chatgpt-gateway",
       status: "speculative",
@@ -1180,15 +1372,20 @@ export async function runIdeonomyAndMatchmakerPipeline({
         thresholdPct: Math.round(spec.pass * 100),
         stance: spec.stance,
         askDefault: spec.askDefaultLabel,
+        ideonomyTuple: tupleMeta.tupleLabel,
       },
       facets: { [spec.surfaceRole]: html },
       html,
     };
   });
 
-  // Matchmaker Cross-Pollination Hybrid (`Couple ⋈` across Seed + Distant Graph Node)
+  // Matchmaker Cross-Pollination Hybrid (`Couple ⋈` + Ideonomy `combination` Operator across Seed + Distant Graph Node)
   let matchmakerHybrid = null;
   if (matchedTargetNode) {
+    const tupleMatch = pickIdeonomyTuple({
+      forceOperators: ["combination", "organon-construction"],
+    });
+    const tupleMatchMeta = compactTupleMetadata(tupleMatch);
     const hybridId = `node-matchmaker-${ts}`;
     const hybridPass = 0.87;
     const hybridAbstain = 0.11;
@@ -1196,30 +1393,49 @@ export async function runIdeonomyAndMatchmakerPipeline({
       sharedConcepts.length > 0
         ? sharedConcepts.join(", ")
         : "reactive state & verification";
+    const matchMachineryHtml = renderIdeonomyMachineryHtml({
+      tuple: tupleMatch,
+      ideaTitle: `${seedNode.title.slice(0, 18)} × ${matchedTargetNode.title.slice(0, 18)}`,
+      moves: [
+        {
+          operator: "combination",
+          from: seedNode.title.slice(0, 22),
+          to: `cross-product with "${matchedTargetNode.title.slice(0, 22)}"`,
+        },
+        {
+          operator: "organon-construction",
+          from: `shared concepts (${sharedStr})`,
+          to: `${tupleMatch.primaryOrganon} synthesis along ★ ${tupleMatch.pivotDimension}`,
+        },
+      ],
+      notSurfaced: `3-way combination with unvisited leaf nodes along ${tupleMatch.dimensionIds[1] || "connectivity"}`,
+    });
     const hybridHtml = `<div style="font-family:system-ui,sans-serif;padding:12px;color:#e2e8f0;font-size:11.5px;line-height:1.42;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
-    <span style="background:rgba(251,191,36,0.18);color:#fbbf24;padding:2px 7px;border-radius:99px;font-size:9.5px;font-weight:700;">🧲 MATCHMAKER (⋈ CROSS-POLLINATION)</span>
+    <span style="background:rgba(251,191,36,0.18);color:#fbbf24;padding:2px 7px;border-radius:99px;font-size:9.5px;font-weight:700;">🧲 MATCHMAKER (◆ COMBINATION × ${tupleMatch.primaryOrganon.toUpperCase()})</span>
     <span style="color:#fde68a;font-family:monospace;font-size:10px;">Affinity=${affinityScore} • p=${hybridPass}</span>
   </div>
-  <div style="background:#0b1120;border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:9px;margin-bottom:8px;">
-    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">⊕ Lateral Jump Synthesis: "${seedNode.title.slice(0, 22)}" × "${matchedTargetNode.title.slice(0, 22)}"</div>
-    <p style="margin:0 0 6px;color:#94a3b8;font-size:10.5px;">The Matchmaker agent scanned the Brain graph and discovered a high-affinity lateral connection (<code>${sharedStr}</code>) with <strong>${matchedTargetNode.title}</strong>.</p>
+  <div style="background:#0b1120;border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:9px;margin-bottom:6px;">
+    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">═══ ◆ ${tupleMatch.primaryOrganon.toUpperCase()} ◆ ═══ "${seedNode.title.slice(0, 20)}" × "${matchedTargetNode.title.slice(0, 20)}"</div>
+    <p style="margin:0 0 6px;color:#94a3b8;font-size:10.5px;">The Matchmaker agent scanned the Brain graph and applied Ideonomy <strong>combination</strong> across <code>${sharedStr}</code> with <strong>${matchedTargetNode.title}</strong>.</p>
     <div style="font-size:10px;color:#fcd34d;">Couples seed intent with existing <code>${matchedTargetNode.surfaceRole || matchedTargetNode.stage}</code> state.</div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#94a3b8;background:rgba(15,23,42,0.8);padding:5px 8px;border-radius:6px;">
     <span>AskDefault: <code>Merge Cross-Pollinated Hybrid</code></span>
     <button onclick="window.asterism.keepFork(false)" style="background:rgba(251,191,36,0.2);color:#fde68a;border:1px solid rgba(251,191,36,0.5);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;">✓ Keep Hybrid</button>
   </div>
+  ${matchMachineryHtml}
 </div>`;
 
     matchmakerHybrid = {
       id: hybridId,
-      title: `⊕ Matchmaker ⋈: ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 18)} × ${matchedTargetNode.title.slice(0, 18)}`,
+      title: `⊕ Matchmaker ⋈ [${tupleMatch.primaryOrganon}]: ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 16)} × ${matchedTargetNode.title.slice(0, 16)}`,
       kind: "speculative",
       stage: "design",
       stratum: "prototype",
       surfaceRole: "ui-prototype",
       stance: "matchmaker",
+      ideonomyTuple: tupleMatchMeta,
       relationFromParent: "synthesizes",
       commitment: "speculative",
       shadowStaged: true,
@@ -1231,10 +1447,10 @@ export async function runIdeonomyAndMatchmakerPipeline({
         statement: `Matchmaker lateral synthesis with ${matchedTargetNode.id} (affinity=${affinityScore})`,
       },
       jevScore: hybridPass,
-      x: baseX + 430,
+      x: baseX + 435,
       y: baseY + 180,
-      width: 405,
-      height: 270,
+      width: 415,
+      height: 315,
       model: "openai/gpt-6-astra",
       provider: "chatgpt-gateway",
       status: "speculative",
@@ -1245,6 +1461,7 @@ export async function runIdeonomyAndMatchmakerPipeline({
         ...(seedNode.state || {}),
         ...(matchedTargetNode.state || {}),
         affinityScore,
+        ideonomyTuple: tupleMatchMeta.tupleLabel,
       },
       facets: { "ui-prototype": hybridHtml },
       html: hybridHtml,
@@ -1256,4 +1473,5 @@ export async function runIdeonomyAndMatchmakerPipeline({
     matchmakerHybrid,
   };
 }
+
 

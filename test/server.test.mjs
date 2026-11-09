@@ -237,6 +237,18 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.ok(energyData.attentionQueue.length >= 6);
     assert.ok(typeof energyData.attentionQueue[0].evoiScore === "number");
 
+    // Ideonomy Tuple Picker (`GET /api/ideonomy/pick?seed=42`)
+    const pickRes = await fetch(`${baseUrl}/api/ideonomy/pick?seed=42`);
+    assert.equal(pickRes.status, 200);
+    const pickData = await pickRes.json();
+    assert.equal(pickData.catalog.operatorCount, 8);
+    assert.equal(pickData.catalog.organonCount, 17);
+    assert.equal(pickData.catalog.dimensionPromptCount, 29);
+    assert.equal(pickData.tuple.operatorIds.length, 2);
+    assert.equal(pickData.tuple.organonIds.length, 1);
+    assert.equal(pickData.tuple.dimensionIds.length, 3);
+    assert.ok(pickData.tuple.tupleLabel.includes("×"));
+
     // Autonomous Idea Box + Shadow Graph + Matchmaker Lateral Jump + EVOI Attention Broker (`/api/ideabox/seed`)
     const seedRes = await fetch(`${baseUrl}/api/ideabox/seed`, {
       method: "POST",
@@ -249,8 +261,12 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     const seedData = await seedRes.json();
     assert.ok(seedData.seedNode.id.startsWith("node-seed-"));
     assert.equal(seedData.seedNode.shadowStaged, false, "Seed node itself is visible on canvas");
+    assert.ok(seedData.seedNode.ideonomyTuple, "Seed node must carry its sampled Ideonomy tuple");
+    assert.ok(seedData.seedNode.html.includes("IDEONOMY TUPLE"), "Seed node must render visible Ideonomy tuple machinery");
+    assert.ok(seedData.seedNode.html.includes("not surfaced:"), "Seed node must render the mandatory not surfaced trail line");
     assert.equal(seedData.shadowBranches.length, 4, "Pipeline must stage 3 Ideonomy branches + 1 Matchmaker hybrid in the Shadow Graph");
     assert.ok(seedData.shadowBranches.every((b) => b.shadowStaged === true), "All 4 generated background branches must be shadowStaged: true initially");
+    assert.ok(seedData.shadowBranches.every((b) => b.ideonomyTuple && b.html.includes("IDEONOMY TUPLE") && b.html.includes("not surfaced:")), "Every Ideonomy + Matchmaker shadow branch must carry its Ideonomy tuple and visible machinery");
     assert.ok(seedData.matchedTargetNode, "Matchmaker must discover a distant existing node to cross-pollinate");
     assert.ok(seedData.jumpEdge, "Matchmaker must create a lateral Jump link (cross-pollinates)");
     assert.equal(seedData.jumpEdge.kind, "jump");
