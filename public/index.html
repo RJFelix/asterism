@@ -815,6 +815,34 @@
                 instruction: instruction
               }, '*');
             },
+            switchFacet(facetRole, tearOff) {
+              window.parent.postMessage({
+                type: 'asterism:switch-facet',
+                nodeId: this.nodeId,
+                facetRole: facetRole || 'spec-diagram',
+                tearOff: Boolean(tearOff)
+              }, '*');
+            },
+            tearOffFacet(facetRole) {
+              window.parent.postMessage({
+                type: 'asterism:switch-facet',
+                nodeId: this.nodeId,
+                facetRole: facetRole || 'spec-diagram',
+                tearOff: true
+              }, '*');
+            },
+            pulseBasalEnergy() {
+              window.parent.postMessage({
+                type: 'asterism:pulse-basal-energy',
+                nodeId: this.nodeId
+              }, '*');
+            },
+            openComparisonMatrix() {
+              window.parent.postMessage({
+                type: 'asterism:open-compare-matrix',
+                nodeId: this.nodeId
+              }, '*');
+            },
             bindInputs(root) {
               const container = root || document;
               const els = container.querySelectorAll('input[data-state-key], select[data-state-key], textarea[data-state-key], input[name], select[name], textarea[name]');
@@ -1576,6 +1604,12 @@
         synthesizeSelectedOrKept(msg.parentIds, msg.instruction, msg.targetStage);
       } else if (msg.type === 'asterism:run-implement') {
         runImplementAgent(msg.nodeId, msg.instruction);
+      } else if (msg.type === 'asterism:switch-facet') {
+        switchOrTearOffFacet(msg.nodeId, msg.facetRole || 'spec-diagram', Boolean(msg.tearOff));
+      } else if (msg.type === 'asterism:pulse-basal-energy') {
+        pulseBasalFreeEnergy();
+      } else if (msg.type === 'asterism:open-compare-matrix') {
+        openComparisonMatrix();
       }
     });
 
