@@ -7,8 +7,8 @@
   <style>
     :root {
       --bg-deep: #070a12;
-      --bg-panel: rgba(15, 23, 42, 0.85);
-      --border-subtle: rgba(148, 163, 184, 0.18);
+      --bg-panel: rgba(15, 23, 42, 0.88);
+      --border-subtle: rgba(148, 163, 184, 0.15);
       --accent-cyan: #38bdf8;
       --accent-purple: #a855f7;
       --accent-pink: #f472b6;
@@ -31,8 +31,8 @@
       position: absolute; inset: 0; overflow: hidden; cursor: grab;
       background-color: var(--bg-deep);
       background-image:
-        radial-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px),
-        radial-gradient(rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+        radial-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+        radial-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px);
       background-size: 28px 28px, 140px 140px;
     }
     #canvas-viewport.panning { cursor: grabbing; }
@@ -50,432 +50,408 @@
       width: 6000px; height: 4000px;
       pointer-events: none; overflow: visible;
     }
+    .edge-item { pointer-events: stroke; cursor: pointer; }
+    .edge-hit { pointer-events: stroke; stroke: transparent; stroke-width: 16px; fill: none; }
+    .edge-line {
+      fill: none; stroke-width: 1.6px; opacity: 0.42;
+      transition: opacity 0.18s ease, stroke-width 0.18s ease;
+    }
+    .edge-label-group {
+      opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
+    }
+    .edge-item:hover .edge-line,
+    .edge-item.is-connected-active .edge-line {
+      opacity: 0.92; stroke-width: 2.2px;
+    }
+    .edge-item:hover .edge-label-group,
+    .edge-item.is-connected-active .edge-label-group {
+      opacity: 1;
+    }
 
-    /* Top Floating HUD Toolbar */
+    /* Calm Unified Single-Row Top Bar */
     .hud-topbar {
       position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
-      z-index: 100; display: flex; align-items: center; gap: 7px;
-      padding: 7px 12px; border-radius: 12px;
-      background: rgba(15, 23, 42, 0.9);
-      backdrop-filter: blur(14px);
-      border: 1px solid rgba(148, 163, 184, 0.22);
-      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+      z-index: 100; display: flex; align-items: center; gap: 10px;
+      padding: 6px 12px; border-radius: 12px;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
       max-width: 96vw;
-      flex-wrap: wrap;
     }
     .brand {
       display: flex; align-items: center; gap: 7px;
-      font-weight: 700; font-size: 13px; letter-spacing: 0.03em;
+      font-weight: 600; font-size: 13px; letter-spacing: 0.01em;
       padding-right: 10px; border-right: 1px solid var(--border-subtle);
-      color: #f8fafc;
+      color: #f8fafc; white-space: nowrap;
     }
     .brand-star {
-      color: var(--accent-cyan); font-size: 16px;
-      text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+      color: var(--accent-cyan); font-size: 14px;
     }
-    .tool-btn {
-      background: rgba(30, 41, 59, 0.75);
-      color: var(--text-muted);
-      border: 1px solid rgba(148, 163, 184, 0.16);
-      padding: 6px 10px; border-radius: 8px;
-      font-size: 11.5px; font-weight: 500; cursor: pointer;
-      display: flex; align-items: center; gap: 5px;
-      transition: all 0.15s ease;
-      white-space: nowrap;
-    }
-    .tool-btn:hover { color: var(--text-main); border-color: rgba(148, 163, 184, 0.38); }
-    .tool-btn.active {
-      background: rgba(56, 189, 248, 0.18);
-      color: var(--accent-cyan);
-      border-color: rgba(56, 189, 248, 0.5);
-    }
-    .tool-btn.synth-btn {
-      background: rgba(251, 191, 36, 0.15);
-      color: #fcd34d;
-      border-color: rgba(251, 191, 36, 0.42);
-      font-weight: 600;
-    }
-    .tool-btn.synth-btn:hover {
-      background: rgba(251, 191, 36, 0.28);
-      border-color: #fbbf24;
-    }
-    .zoom-readout {
-      font-family: ui-monospace, monospace; font-size: 11px;
-      color: var(--text-muted); min-width: 44px; text-align: center;
+    .brand-health-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
     }
 
-    /* Spatial Node Cards */
+    /* Integrated Idea Box */
+    .ideabox-wrap {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(9, 13, 24, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 3px 5px 3px 9px;
+      transition: border-color 0.15s ease;
+    }
+    .ideabox-wrap:focus-within {
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+    .ideabox-input {
+      background: transparent; border: none; color: #f8fafc;
+      font-size: 11.5px; width: 210px; outline: none;
+    }
+    .ideabox-input::placeholder { color: #64748b; }
+    .ideabox-btn {
+      background: rgba(56, 189, 248, 0.15);
+      color: #bae6fd;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .ideabox-btn:hover {
+      background: rgba(56, 189, 248, 0.25);
+      color: #ffffff;
+    }
+
+    /* Segmented Mode Switcher */
+    .mode-segmented {
+      display: flex; align-items: center;
+      background: rgba(9, 13, 24, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 8px; padding: 2px; gap: 2px;
+    }
+    .seg-btn {
+      background: transparent; color: var(--text-muted);
+      border: none; padding: 4px 9px; border-radius: 6px;
+      font-size: 11px; font-weight: 500; cursor: pointer;
+      transition: all 0.15s ease; white-space: nowrap;
+    }
+    .seg-btn:hover { color: var(--text-main); }
+    .seg-btn.active {
+      background: rgba(56, 189, 248, 0.16);
+      color: var(--accent-cyan);
+    }
+
+    /* Contextual Multi-Select Bar */
+    .selection-context-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding-left: 6px; border-left: 1px solid var(--border-subtle);
+    }
+    .selection-context-bar[hidden] { display: none !important; }
+
+    .tool-btn {
+      background: rgba(30, 41, 59, 0.65);
+      color: var(--text-muted);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      padding: 5px 10px; border-radius: 7px;
+      font-size: 11px; font-weight: 500; cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      transition: all 0.15s ease; white-space: nowrap;
+    }
+    .tool-btn:hover { color: var(--text-main); border-color: rgba(148, 163, 184, 0.35); }
+    .tool-btn.synth-btn {
+      background: rgba(251, 191, 36, 0.14);
+      color: #fde68a;
+      border-color: rgba(251, 191, 36, 0.38);
+    }
+
+    .topbar-right {
+      display: flex; align-items: center; gap: 6px;
+      padding-left: 8px; border-left: 1px solid var(--border-subtle);
+    }
+    .attn-pill-btn {
+      background: rgba(30, 41, 59, 0.65);
+      color: #cbd5e1;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 7px; padding: 5px 9px;
+      font-size: 11px; font-weight: 500; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      white-space: nowrap;
+    }
+    .attn-pill-btn:hover { border-color: rgba(56, 189, 248, 0.45); color: #f8fafc; }
+    .attn-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent-cyan);
+    }
+    .attn-pill-btn.has-shadow .attn-dot {
+      background: var(--accent-amber);
+      box-shadow: 0 0 6px var(--accent-amber);
+    }
+
+    .zoom-readout {
+      font-family: ui-monospace, monospace; font-size: 11px;
+      color: #64748b; min-width: 38px; text-align: center; cursor: pointer;
+    }
+    .zoom-readout:hover { color: var(--text-main); }
+
+    /* Workspace Overflow Menu ('⋯') */
+    .workspace-menu-wrap { position: relative; }
+    .icon-btn {
+      background: rgba(30, 41, 59, 0.65); color: var(--text-muted);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 7px; width: 28px; height: 27px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; cursor: pointer;
+    }
+    .icon-btn:hover { color: var(--text-main); border-color: rgba(148, 163, 184, 0.35); }
+    .workspace-dropdown {
+      position: absolute; top: calc(100% + 8px); right: 0;
+      width: 210px; padding: 5px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 10px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(16px);
+      display: flex; flex-direction: column; gap: 2px;
+      z-index: 260;
+    }
+    .workspace-dropdown[hidden] { display: none !important; }
+    .workspace-dropdown button {
+      background: transparent; border: none; color: #cbd5e1;
+      text-align: left; padding: 6px 9px; border-radius: 6px;
+      font-size: 11.5px; cursor: pointer;
+    }
+    .workspace-dropdown button:hover {
+      background: rgba(56, 189, 248, 0.12); color: #f8fafc;
+    }
+    .workspace-dropdown button.danger:hover {
+      background: rgba(239, 68, 68, 0.15); color: #fca5a5;
+    }
+    .workspace-dropdown hr {
+      border: none; border-top: 1px solid rgba(148, 163, 184, 0.12);
+      margin: 3px 0;
+    }
+
+    /* Spatial Node Cards — Calm by Default, Capable on Focus/Hover */
     .canvas-node {
       position: absolute;
       display: flex; flex-direction: column;
-      border-radius: 12px;
-      background: rgba(15, 23, 42, 0.94);
-      border: 1px solid rgba(148, 163, 184, 0.24);
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.52);
+      border-radius: 11px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
       backdrop-filter: blur(10px);
       overflow: hidden;
-      transition: box-shadow 0.2s, border-color 0.2s;
+      transition: box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+    .canvas-node:hover {
+      border-color: rgba(148, 163, 184, 0.28);
+    }
+    .canvas-node.is-focused {
+      z-index: 25;
+      border-color: rgba(56, 189, 248, 0.48);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2), 0 20px 44px rgba(0, 0, 0, 0.62);
     }
     .canvas-node.role-dialogue {
-      border-top: 2px solid rgba(56, 189, 248, 0.65);
+      border-top: 2px solid rgba(56, 189, 248, 0.55);
     }
     .canvas-node.role-spec-diagram {
-      border-top: 2px solid rgba(192, 132, 252, 0.65);
+      border-top: 2px solid rgba(192, 132, 252, 0.55);
     }
     .canvas-node.role-ui-prototype {
-      border-top: 2px solid rgba(244, 114, 182, 0.72);
+      border-top: 2px solid rgba(244, 114, 182, 0.55);
     }
     .canvas-node.role-artifact-harness {
-      border-top: 2px solid rgba(52, 211, 153, 0.72);
-    }
-    .canvas-node.kind-speculative {
-      border-color: rgba(168, 85, 247, 0.48);
-      box-shadow: 0 16px 38px rgba(88, 28, 135, 0.25);
-    }
-    .canvas-node.status-committed {
-      border-color: rgba(16, 185, 129, 0.55);
-      box-shadow: 0 16px 38px rgba(16, 185, 129, 0.16);
+      border-top: 2px solid rgba(52, 211, 153, 0.55);
     }
     .canvas-node.selected-for-synth {
-      border-color: #fbbf24 !important;
-      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45), 0 18px 40px rgba(0, 0, 0, 0.6) !important;
+      border-color: rgba(251, 191, 36, 0.7) !important;
+      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3), 0 18px 40px rgba(0, 0, 0, 0.6) !important;
     }
     .canvas-node.status-mutating, .canvas-node.status-speculating {
       border-color: var(--accent-cyan);
-      box-shadow: 0 0 25px rgba(56, 189, 248, 0.35);
+      box-shadow: 0 0 22px rgba(56, 189, 248, 0.28);
     }
+
+    /* Clean, Breathable Node Header */
     .node-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 8px;
-      background: rgba(30, 41, 59, 0.9);
-      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+      padding: 7px 10px;
+      background: rgba(30, 41, 59, 0.65);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
       cursor: grab;
-      gap: 4px;
+      gap: 8px;
     }
     .node-header:active { cursor: grabbing; }
     .node-title-wrap {
-      display: flex; align-items: center; gap: 4px; overflow: hidden; flex: 1;
+      display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1;
     }
     .synth-check-btn {
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: transparent;
+      border: 1px solid rgba(148, 163, 184, 0.25);
       color: #94a3b8;
       border-radius: 4px;
-      width: 17px; height: 17px;
-      font-size: 10px; line-height: 1;
+      width: 15px; height: 15px;
+      font-size: 9.5px; line-height: 1;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; flex-shrink: 0; padding: 0;
+      opacity: 0; transition: opacity 0.15s ease;
+    }
+    .canvas-node:hover .synth-check-btn,
+    .canvas-node.is-focused .synth-check-btn,
+    .synth-check-btn.checked {
+      opacity: 1;
     }
     .synth-check-btn.checked {
-      background: rgba(251, 191, 36, 0.25);
+      background: rgba(251, 191, 36, 0.2);
       border-color: #fbbf24;
       color: #fde68a;
     }
-    .role-select {
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      color: #38bdf8;
-      border-radius: 5px;
-      font-size: 9px;
-      font-family: ui-monospace, monospace;
-      font-weight: 700;
-      padding: 2px 4px;
-      cursor: pointer;
-      outline: none;
-      flex-shrink: 0;
-    }
-    .canvas-node.role-spec-diagram .role-select {
-      border-color: rgba(192, 132, 252, 0.45);
-      color: #d8b4fe;
-    }
-    .canvas-node.role-ui-prototype .role-select {
-      border-color: rgba(244, 114, 182, 0.45);
-      color: #f9a8d4;
-    }
-    .canvas-node.role-artifact-harness .role-select {
-      border-color: rgba(52, 211, 153, 0.45);
-      color: #6ee7b7;
-    }
-    .node-stage-pill {
-      font-family: ui-monospace, monospace; font-size: 8.5px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.04em;
-      padding: 2px 5px; border-radius: 5px;
-      background: rgba(148, 163, 184, 0.14); color: #cbd5e1;
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      white-space: nowrap; flex-shrink: 0;
-    }
     .node-title {
-      font-size: 11px; font-weight: 600; color: #f8fafc;
+      font-size: 12px; font-weight: 600; color: #f1f5f9;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .node-actions {
-      display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
     }
-    .model-select, .spawn-rel-select {
-      background: rgba(15, 23, 42, 0.85);
-      color: #cbd5e1;
-      border: 1px solid rgba(148, 163, 184, 0.25);
+    .node-stage-pill {
+      font-family: ui-monospace, monospace; font-size: 8.5px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      padding: 2px 5px; border-radius: 4px;
+      background: rgba(148, 163, 184, 0.1); color: #94a3b8;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .header-hover-actions {
+      display: none; align-items: center; gap: 3px;
+    }
+    .canvas-node:hover .header-hover-actions,
+    .canvas-node.is-focused .header-hover-actions {
+      display: flex;
+    }
+    .model-select {
+      background: rgba(15, 23, 42, 0.8);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.2);
       border-radius: 5px;
       font-size: 9px;
       font-family: ui-monospace, monospace;
       padding: 2px 4px;
       cursor: pointer;
       outline: none;
-      max-width: 86px;
+      max-width: 82px;
     }
-    .spawn-rel-select {
-      color: #f9a8d4;
-      border-color: rgba(244, 114, 182, 0.4);
-      background: rgba(244, 114, 182, 0.12);
-      font-weight: 600;
-      max-width: 78px;
-    }
-    .model-select:hover, .spawn-rel-select:hover { border-color: var(--accent-cyan); color: #f8fafc; }
+    .model-select:hover { border-color: var(--accent-cyan); color: #f8fafc; }
     .mini-btn {
-      background: rgba(15, 23, 42, 0.7);
+      background: rgba(15, 23, 42, 0.65);
       color: var(--text-muted);
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 6px; padding: 3px 5px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 5px; padding: 2px 6px;
       font-size: 9.5px; cursor: pointer;
       white-space: nowrap;
     }
-    .mini-btn:hover { color: #f8fafc; border-color: var(--accent-cyan); }
+    .mini-btn:hover { color: #f8fafc; border-color: rgba(148, 163, 184, 0.4); }
     .mini-btn.keep-btn {
       display: none;
-      color: #fde68a; border-color: rgba(251, 191, 36, 0.5);
-      background: rgba(251, 191, 36, 0.16);
-      font-weight: 600;
+      color: #fde68a; border-color: rgba(251, 191, 36, 0.4);
+      background: rgba(251, 191, 36, 0.12);
+      font-weight: 500;
     }
     .canvas-node.kind-speculative .mini-btn.keep-btn {
       display: inline-block;
     }
     .mini-btn.spec-btn {
-      color: #e9d5ff; border-color: rgba(168, 85, 247, 0.45);
-      background: rgba(168, 85, 247, 0.16);
-      font-weight: 600;
+      color: #e9d5ff; border-color: rgba(168, 85, 247, 0.35);
+      background: rgba(168, 85, 247, 0.12);
+      font-weight: 500;
     }
-    .mini-btn.spec-btn:hover { background: rgba(168, 85, 247, 0.32); }
     .mini-btn.advance-btn {
-      color: #6ee7b7; border-color: rgba(16, 185, 129, 0.45);
-      background: rgba(16, 185, 129, 0.16);
-      font-weight: 600;
+      color: #6ee7b7; border-color: rgba(16, 185, 129, 0.35);
+      background: rgba(16, 185, 129, 0.12);
+      font-weight: 500;
     }
-    .mini-btn.advance-btn:hover { background: rgba(16, 185, 129, 0.32); }
 
-    /* Feature 1: Worktree & Diff Inspector Sub-Bar for IMPLEMENT nodes */
-    .worktree-bar {
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      padding: 4px 8px;
-      background: rgba(6, 78, 59, 0.35);
-      border-bottom: 1px solid rgba(16, 185, 129, 0.3);
-      font-family: 'JetBrains Mono', ui-monospace, monospace;
-      font-size: 10px;
-      color: #6ee7b7;
-    }
-    .canvas-node.stage-implement .worktree-bar,
-    .canvas-node.role-artifact-harness .worktree-bar {
-      display: flex;
-    }
-    /* Crystallization Facet Tab Bar (`[💬 Steer | 📐 Spec | 🎨 UI | ⚙ Code]`) */
+    /* Quiet Facet Strip (dims when card is at rest, full clarity on hover/focus) */
     .facet-tab-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 3px 8px;
-      background: rgba(15, 23, 42, 0.88);
-      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+      padding: 3px 10px;
+      background: rgba(15, 23, 42, 0.55);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
       gap: 4px;
+      opacity: 0.6;
+      transition: opacity 0.16s ease, background 0.16s ease;
+    }
+    .canvas-node:hover .facet-tab-bar,
+    .canvas-node.is-focused .facet-tab-bar {
+      opacity: 1;
+      background: rgba(15, 23, 42, 0.9);
     }
     .facet-tabs {
-      display: flex;
-      align-items: center;
-      gap: 3px;
+      display: flex; align-items: center; gap: 3px;
     }
     .facet-tab {
-      background: rgba(30, 41, 59, 0.65);
-      color: #94a3b8;
-      border: 1px solid rgba(148, 163, 184, 0.16);
+      background: transparent;
+      color: #64748b;
+      border: 1px solid transparent;
       border-radius: 5px;
       padding: 2px 6px;
       font-size: 9.5px;
-      font-weight: 600;
+      font-weight: 500;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 3px;
+      display: flex; align-items: center; gap: 3px;
     }
-    .facet-tab:hover { color: #f8fafc; border-color: rgba(56, 189, 248, 0.4); }
+    .facet-tab:hover { color: #cbd5e1; }
     .facet-tab.active {
-      background: rgba(56, 189, 248, 0.18);
+      background: rgba(56, 189, 248, 0.12);
       color: #38bdf8;
-      border-color: rgba(56, 189, 248, 0.5);
+      border-color: rgba(56, 189, 248, 0.28);
     }
     .facet-tab.cached::after {
       content: "•";
       color: #34d399;
-      margin-left: 2px;
+      margin-left: 1px;
     }
     .facet-meta-right {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-family: ui-monospace, monospace;
-      font-size: 9px;
-      color: #94a3b8;
-    }
-    .energy-pill {
-      padding: 1px 5px;
-      border-radius: 4px;
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: #6ee7b7;
-      cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
     }
     .tearoff-btn {
-      background: rgba(30, 41, 59, 0.8);
-      color: #cbd5e1;
-      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: transparent;
+      color: #64748b;
+      border: 1px solid transparent;
       border-radius: 4px;
       padding: 1px 5px;
       font-size: 9px;
       cursor: pointer;
     }
     .tearoff-btn:hover {
-      border-color: var(--accent-cyan);
-      color: #38bdf8;
-    }
-    /* Comparison Matrix Modal */
-    #compare-modal {
-      display: none;
-      position: fixed;
-      inset: 58px 24px 24px 24px;
-      z-index: 250;
-      background: rgba(9, 13, 24, 0.96);
-      border: 1px solid rgba(56, 189, 248, 0.45);
-      border-radius: 14px;
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.78);
-      backdrop-filter: blur(16px);
-      flex-direction: column;
-      overflow: hidden;
-    }
-    #compare-modal.open { display: flex; }
-    .compare-grid {
-      flex: 1;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 12px;
-      padding: 12px;
-      overflow: auto;
-    }
-    .compare-col {
-      display: flex;
-      flex-direction: column;
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      border-radius: 10px;
-      overflow: hidden;
+      border-color: rgba(148, 163, 184, 0.25);
+      color: #e2e8f0;
     }
 
-    /* Autonomous Idea Box Bar + Attention Broker Drawer + Shadow Badges */
-    .ideabox-wrap {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(9, 13, 24, 0.92);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      border-radius: 8px;
-      padding: 3px 6px;
-    }
-    .ideabox-input {
-      background: transparent;
-      border: none;
-      color: #f8fafc;
-      font-size: 11px;
-      width: 215px;
-      outline: none;
-    }
-    .ideabox-btn {
-      background: linear-gradient(135deg, #0284c7, #7c3aed);
-      color: #ffffff;
-      border: none;
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-size: 10.5px;
-      font-weight: 700;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .ideabox-btn:hover { opacity: 0.92; }
-
-    .shadow-badge-btn {
+    /* Worktree Bar (only on implement/code nodes when hovered or focused) */
+    .worktree-bar {
       display: none;
       align-items: center;
-      gap: 4px;
-      background: rgba(251, 191, 36, 0.2);
-      color: #fde68a;
-      border: 1px dashed rgba(251, 191, 36, 0.65);
-      border-radius: 5px;
-      padding: 2px 6px;
-      font-size: 9px;
-      font-weight: 700;
-      cursor: pointer;
-      animation: pulseShadow 2.2s infinite ease-in-out;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(6, 78, 59, 0.25);
+      border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 9.5px;
+      color: #6ee7b7;
     }
-    .shadow-badge-btn.has-shadow { display: inline-flex; }
-    @keyframes pulseShadow {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.25); }
-      50% { box-shadow: 0 0 10px 2px rgba(251, 191, 36, 0.45); }
-    }
-
-    #attention-drawer {
-      display: none;
-      position: fixed;
-      top: 64px;
-      right: 18px;
-      width: 430px;
-      max-height: calc(100vh - 115px);
-      z-index: 230;
-      background: rgba(9, 13, 24, 0.96);
-      border: 1px solid rgba(56, 189, 248, 0.45);
-      border-radius: 13px;
-      box-shadow: 0 22px 55px rgba(0, 0, 0, 0.78);
-      backdrop-filter: blur(16px);
-      flex-direction: column;
-      overflow: hidden;
-    }
-    #attention-drawer.open { display: flex; }
-    .attn-item {
-      background: rgba(15, 23, 42, 0.92);
-      border: 1px solid rgba(148, 163, 184, 0.22);
-      border-radius: 9px;
-      padding: 9px 11px;
-      margin-bottom: 8px;
-      font-size: 11px;
-    }
-    .attn-item.shadow-item {
-      border-color: rgba(251, 191, 36, 0.5);
-    }
-
-    /* Ambient Weather Bar for Standing Feature Tenders & Shadow Incubation */
-    #ambient-weather-bar {
-      position: fixed;
-      bottom: 14px;
-      right: 16px;
-      z-index: 120;
+    .canvas-node.stage-implement:hover .worktree-bar,
+    .canvas-node.stage-implement.is-focused .worktree-bar,
+    .canvas-node.role-artifact-harness:hover .worktree-bar,
+    .canvas-node.role-artifact-harness.is-focused .worktree-bar {
       display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 6px 12px;
-      border-radius: 99px;
-      background: rgba(15, 23, 42, 0.92);
-      border: 1px solid rgba(16, 185, 129, 0.35);
-      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
-      font-size: 11px;
-      color: #cbd5e1;
-      backdrop-filter: blur(12px);
     }
     .wt-meta {
       display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap;
@@ -483,8 +459,8 @@
     .wt-diff-stat {
       padding: 1px 5px; border-radius: 4px;
       background: rgba(15, 23, 42, 0.7);
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      font-size: 9.5px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      font-size: 9px;
     }
     .wt-diff-stat .ins { color: #34d399; }
     .wt-diff-stat .del { color: #f87171; }
@@ -492,20 +468,36 @@
       display: flex; align-items: center; gap: 4px; flex-shrink: 0;
     }
     .wt-btn {
-      background: rgba(15, 23, 42, 0.8);
+      background: rgba(15, 23, 42, 0.75);
       color: #a7f3d0;
-      border: 1px solid rgba(16, 185, 129, 0.4);
+      border: 1px solid rgba(16, 185, 129, 0.32);
       border-radius: 4px;
       padding: 2px 6px;
-      font-size: 9.5px;
+      font-size: 9px;
       font-family: ui-monospace, monospace;
       cursor: pointer;
     }
-    .wt-btn:hover { background: rgba(16, 185, 129, 0.25); color: #ffffff; }
+    .wt-btn:hover { background: rgba(16, 185, 129, 0.2); color: #ffffff; }
+
+    /* Shadow Badge */
+    .shadow-badge-btn {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      background: rgba(251, 191, 36, 0.15);
+      color: #fde68a;
+      border: 1px dashed rgba(251, 191, 36, 0.5);
+      border-radius: 5px;
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .shadow-badge-btn.has-shadow { display: inline-flex; }
 
     .node-body {
       flex: 1; position: relative; overflow: auto;
-      background: rgba(9, 13, 24, 0.7);
+      background: rgba(9, 13, 24, 0.55);
       user-select: text;
     }
     .node-iframe {
@@ -530,43 +522,122 @@
     .canvas-node.viewing-diff .node-iframe { display: none; }
     .canvas-node.viewing-diff .node-diff-inspector { display: block; }
 
-    /* Prompt / Co-Design Footer inside each Node */
+    /* Progressive-Disclosure Node Footer (Collapsed at Rest, Expands on Hover/Focus) */
     .node-footer {
       display: flex; align-items: center; gap: 5px;
-      padding: 6px 8px;
+      padding: 0 10px;
+      max-height: 0; opacity: 0; overflow: hidden; pointer-events: none;
       background: rgba(15, 23, 42, 0.95);
-      border-top: 1px solid rgba(148, 163, 184, 0.15);
+      border-top: 1px solid transparent;
+      transition: max-height 0.16s ease, opacity 0.14s ease, padding 0.16s ease, border-color 0.16s ease;
     }
-    .state-pill {
-      font-family: ui-monospace, monospace;
-      font-size: 9.5px;
-      padding: 2px 5px;
-      border-radius: 4px;
-      background: rgba(56, 189, 248, 0.12);
-      color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.25);
-      white-space: nowrap;
-      cursor: help;
+    .canvas-node:hover .node-footer,
+    .canvas-node.is-focused .node-footer,
+    .canvas-node:focus-within .node-footer {
+      max-height: 44px; opacity: 1; padding: 6px 10px;
+      pointer-events: auto;
+      border-top-color: rgba(148, 163, 184, 0.12);
     }
     .node-prompt-input {
-      flex: 1; background: rgba(30, 41, 59, 0.75);
-      border: 1px solid rgba(148, 163, 184, 0.22);
+      flex: 1; background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.2);
       color: #f8fafc; border-radius: 6px;
-      padding: 5px 8px; font-size: 11px; outline: none;
+      padding: 4px 8px; font-size: 11px; outline: none;
     }
     .node-prompt-input:focus { border-color: var(--accent-cyan); }
     .node-send-btn {
-      background: #0284c7; color: white; border: none;
-      border-radius: 6px; padding: 5px 9px;
-      font-size: 11px; font-weight: 600; cursor: pointer;
+      background: rgba(56, 189, 248, 0.18);
+      color: #e0f2fe;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 6px; padding: 4px 9px;
+      font-size: 10.5px; font-weight: 500; cursor: pointer;
     }
-    .node-send-btn:hover { background: #0369a1; }
+    .node-send-btn:hover { background: rgba(56, 189, 248, 0.3); }
 
-    /* Resize Handle */
+    /* Resize Handle (only visible on hover/focus) */
     .resize-handle {
       position: absolute; right: 0; bottom: 0;
-      width: 14px; height: 14px; cursor: nwse-resize;
-      background: linear-gradient(135deg, transparent 50%, rgba(148, 163, 184, 0.4) 50%);
+      width: 12px; height: 12px; cursor: nwse-resize;
+      background: linear-gradient(135deg, transparent 50%, rgba(148, 163, 184, 0.3) 50%);
+      opacity: 0; transition: opacity 0.15s ease;
+    }
+    .canvas-node:hover .resize-handle,
+    .canvas-node.is-focused .resize-handle {
+      opacity: 1;
+    }
+
+    /* Comparison Matrix Modal */
+    #compare-modal {
+      display: none;
+      position: fixed;
+      inset: 58px 24px 24px 24px;
+      z-index: 250;
+      background: rgba(9, 13, 24, 0.96);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 14px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(16px);
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #compare-modal.open { display: flex; }
+    .compare-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 12px;
+      padding: 12px;
+      overflow: auto;
+    }
+    .compare-col {
+      display: flex;
+      flex-direction: column;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    /* Attention Broker Drawer */
+    #attention-drawer {
+      display: none;
+      position: fixed;
+      top: 60px;
+      right: 18px;
+      width: 390px;
+      max-height: calc(100vh - 90px);
+      z-index: 230;
+      background: rgba(9, 13, 24, 0.96);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 12px;
+      box-shadow: 0 22px 55px rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(16px);
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #attention-drawer.open { display: flex; }
+    .attention-item {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 8px;
+      padding: 9px 11px;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+    .attention-item-top {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
+    }
+    .attention-item-title {
+      font-weight: 600; color: #f1f5f9; font-size: 11.5px;
+    }
+    .evoi-badge {
+      font-family: ui-monospace, monospace; font-size: 9.5px; color: #38bdf8;
+    }
+    .attention-item-meta {
+      display: flex; gap: 8px; align-items: center; color: #64748b; font-size: 10px; margin-bottom: 6px;
+    }
+    .attention-item-actions {
+      display: flex; gap: 6px;
     }
 
     /* Status Toast */
@@ -574,71 +645,90 @@
       position: fixed; bottom: 16px; left: 16px; z-index: 100;
       padding: 8px 14px; border-radius: 9px;
       background: rgba(15, 23, 42, 0.94);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      font-size: 12px; color: #bae6fd;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      font-size: 12px; color: #e2e8f0;
       display: none;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     }
   </style>
 </head>
 <body>
-  <div class="hud-topbar">
-    <div class="brand">
+  <header class="hud-topbar">
+    <div class="brand" title="Asterism • Feature Tender Healthy (0 drift) • Basal Floor 2.4k tok/tick">
       <span class="brand-star">✦</span>
-      <span>ASTERISM</span>
+      <span>Asterism</span>
+      <span class="brand-health-dot" id="brand-health-dot"></span>
     </div>
-    <div class="ideabox-wrap" title="Drop a 1-sentence seed thought: reifies into an Ideonomist (Δ) + Advocate (∃) + Red-Team Critic (∇) + Matchmaker (⋈) constellation in the Shadow Graph!">
-      <span style="font-size:12px;">💡</span>
-      <input id="ideabox-input" class="ideabox-input" type="text" placeholder="Drop a seed idea into the Idea Box..." />
-      <button class="ideabox-btn" onclick="submitIdeaBoxSeed()">Reify Seed</button>
+
+    <div class="ideabox-wrap" title="Drop a seed idea to generate 3 Ideonomy branches + 1 Matchmaker synthesis in the Shadow Graph">
+      <span style="font-size:11.5px;opacity:0.8;">🌱</span>
+      <input id="ideabox-input" class="ideabox-input" type="text" placeholder="Drop a seed idea... (Enter)" />
+      <button class="ideabox-btn" onclick="submitIdeaBoxSeed()">Seed</button>
     </div>
-    <button class="tool-btn active" id="mode-select" onclick="setMode('select')">↖ Pan</button>
-    <button class="tool-btn" id="mode-draw" onclick="setMode('draw')">✎ Sketch</button>
-    <button class="tool-btn" id="mode-connect" onclick="setMode('connect')">⤳ Wire</button>
-    <button class="tool-btn synth-btn" id="btn-synthesize" onclick="synthesizeSelectedOrKept()" title="Select 2+ panels to converge them into a unified hybrid surface">⊕ Synthesize</button>
-    <button class="tool-btn" onclick="openComparisonMatrix()" title="Project 2+ selected or speculative sibling forks into a single side-by-side Comparison Matrix Lens">⊞ Matrix Lens</button>
-    <button class="tool-btn" id="btn-attention-broker" onclick="toggleAttentionBroker()" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;font-weight:600;" title="Open EVOI Attention Broker Playlist & Shadow Incubation Queue">📡 Attention Queue (3)</button>
-    <button class="tool-btn" onclick="pulseBasalFreeEnergy()" title="Allocate excess 'effective free' Basal Metabolic Energy to exhausted or high-EVOI frontier directions">🔋 Basal Pulse</button>
-    <button class="tool-btn" onclick="pruneUnkeptForks()" title="Remove only speculative branches you haven't marked Keep">✂ Prune</button>
-    <button class="tool-btn" onclick="resetCanvas()">↺ Reset</button>
-    <span class="zoom-readout" id="zoom-label">84%</span>
-  </div>
+
+    <div class="mode-segmented" role="group" aria-label="Canvas Mode">
+      <button class="seg-btn active" id="mode-select" onclick="setMode('select')">Select</button>
+      <button class="seg-btn" id="mode-draw" onclick="setMode('draw')">Sketch</button>
+      <button class="seg-btn" id="mode-connect" onclick="setMode('connect')">Connect</button>
+    </div>
+
+    <div class="selection-context-bar" id="selection-context-bar" hidden>
+      <button class="tool-btn synth-btn" id="btn-synthesize" onclick="synthesizeSelectedOrKept()">⊕ Synthesize (2)</button>
+      <button class="tool-btn" onclick="openComparisonMatrix()">⊞ Compare</button>
+    </div>
+
+    <div class="topbar-right">
+      <button class="attn-pill-btn" id="btn-attention-broker" onclick="toggleAttentionBroker()" title="Open EVOI Attention Queue & Staged Shadow Branches">
+        <span class="attn-dot"></span>
+        <span id="attn-pill-label">Queue (3)</span>
+      </button>
+
+      <span class="zoom-readout" id="zoom-label" onclick="resetViewportZoom()" title="Click to reset zoom">88%</span>
+
+      <div class="workspace-menu-wrap">
+        <button class="icon-btn" id="btn-workspace-menu" onclick="toggleWorkspaceMenu(event)" title="Workspace Actions">⋯</button>
+        <div class="workspace-dropdown" id="workspace-dropdown" hidden>
+          <button onclick="createNewSurface(); closeWorkspaceMenu();">＋ New Blank Card</button>
+          <button onclick="openComparisonMatrix(); closeWorkspaceMenu();">⊞ Compare Forks Side-by-Side</button>
+          <button onclick="synthesizeSelectedOrKept(); closeWorkspaceMenu();">⊕ Synthesize Forks</button>
+          <hr />
+          <button onclick="pulseBasalFreeEnergy(); closeWorkspaceMenu();">🔋 Pulse Basal Energy</button>
+          <button onclick="pruneUnkeptForks(); closeWorkspaceMenu();">✂ Prune Unkept Forks</button>
+          <button onclick="clearSketches(); closeWorkspaceMenu();">🧹 Clear Sketch Strokes</button>
+          <hr />
+          <button class="danger" onclick="resetCanvas(); closeWorkspaceMenu();">↺ Reset Canvas</button>
+        </div>
+      </div>
+    </div>
+  </header>
 
   <div id="attention-drawer">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
       <div>
-        <strong style="color:#38bdf8;font-size:12.5px;">📡 Attention Broker &amp; Shadow Graph Queue</strong>
-        <div style="color:#94a3b8;font-size:10px;">Ranked by Expected Value of Information per Human Second (EVOI)</div>
+        <strong style="color:#f1f5f9;font-size:12px;">Attention Queue &amp; Shadow Graph</strong>
+        <div style="color:#64748b;font-size:10px;">Ranked by Expected Value of Information (EVOI)</div>
       </div>
       <div style="display:flex;gap:5px;">
-        <button class="mini-btn" onclick="unfoldAllShadowBranches()" style="color:#fde68a;border-color:rgba(251,191,36,0.5);">🌑 Unfold All Shadow</button>
+        <button class="mini-btn" onclick="unfoldAllShadowBranches()" style="color:#fde68a;border-color:rgba(251,191,36,0.4);">Unfold All</button>
         <button class="mini-btn" onclick="toggleAttentionBroker()">✕</button>
       </div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:rgba(30,41,59,0.7);border-bottom:1px solid rgba(148,163,184,0.14);font-size:10.5px;">
-      <span id="attn-summary-lbl" style="color:#cbd5e1;">⚡ 2 min Triage Playlist</span>
-      <button class="mini-btn" onclick="autoResolveTopAttentionItem()" style="background:rgba(16,185,129,0.18);color:#6ee7b7;border-color:rgba(16,185,129,0.45);font-weight:600;">💤 Let Agent Decide Top (AskDefault)</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:rgba(30,41,59,0.5);border-bottom:1px solid rgba(148,163,184,0.1);font-size:10.5px;">
+      <span id="attn-summary-lbl" style="color:#94a3b8;">Triage Playlist</span>
+      <button class="mini-btn" onclick="autoResolveTopAttentionItem()" style="background:rgba(16,185,129,0.14);color:#6ee7b7;border-color:rgba(16,185,129,0.35);">Auto-Resolve Top</button>
     </div>
     <div id="attention-list" style="padding:10px 12px;overflow-y:auto;flex:1;"></div>
   </div>
 
-  <div id="ambient-weather-bar">
-    <span style="color:#34d399;font-weight:700;">🌿 1 Feature Tender Healthy (SO-100 Arm • 0 drift)</span>
-    <span>•</span>
-    <span id="weather-shadow-lbl" style="color:#fde68a;cursor:pointer;" onclick="toggleAttentionBroker()">🌑 0 Shadow Branches Staged</span>
-    <span>•</span>
-    <span style="color:#38bdf8;cursor:pointer;" onclick="pulseBasalFreeEnergy()">🔋 Basal Floor: 2.4k tok/tick</span>
-  </div>
-
   <div id="compare-modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.95);border-bottom:1px solid rgba(148,163,184,0.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.95);border-bottom:1px solid rgba(148,163,184,0.16);">
       <div>
-        <strong style="color:#38bdf8;font-size:13px;">⊞ Crystallization Lens: Multi-Fork Comparison Matrix</strong>
-        <span id="compare-subtitle" style="color:#94a3b8;font-size:11.5px;margin-left:10px;">Side-by-side projection over sibling Speculative Thoughts</span>
+        <strong style="color:#f1f5f9;font-size:13px;">⊞ Multi-Fork Comparison Matrix</strong>
+        <span id="compare-subtitle" style="color:#94a3b8;font-size:11.5px;margin-left:10px;">Side-by-side projection over sibling thoughts</span>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="tool-btn synth-btn" onclick="synthesizeFromComparisonMatrix()">⊕ Synthesize Compared Forks</button>
-        <button class="tool-btn" onclick="closeComparisonMatrix()">✕ Close Matrix</button>
+        <button class="tool-btn synth-btn" onclick="synthesizeFromComparisonMatrix()">⊕ Synthesize Compared</button>
+        <button class="tool-btn" onclick="closeComparisonMatrix()">✕ Close</button>
       </div>
     </div>
     <div class="compare-grid" id="compare-grid"></div>
@@ -682,15 +772,8 @@
       { id: 'openai/gpt-5.3-codex', label: 'gpt-5.3-codex' },
     ];
 
-    const AVAILABLE_ROLES = [
-      { id: 'dialogue', label: '💬 Dialogue' },
-      { id: 'spec-diagram', label: '📐 Spec' },
-      { id: 'ui-prototype', label: '🎨 UI Sample' },
-      { id: 'artifact-harness', label: '⚙ Artifact' },
-    ];
-
     let state = {
-      viewport: { x: 65, y: 55, scale: 0.84 },
+      viewport: { x: 65, y: 55, scale: 0.88 },
       nodes: [],
       edges: [],
       strokes: []
@@ -701,6 +784,7 @@
     let panStart = { x: 0, y: 0 };
     let activeStroke = null;
     let connectSourceId = null;
+    let focusedNodeId = null;
     const selectedForSynth = new Set();
 
     const viewportEl = document.getElementById('canvas-viewport');
@@ -711,6 +795,7 @@
     const zoomLabel = document.getElementById('zoom-label');
     const toastEl = document.getElementById('status-toast');
     const synthBtnEl = document.getElementById('btn-synthesize');
+    const selectionContextBar = document.getElementById('selection-context-bar');
 
     function showToast(msg, ms = 3800) {
       toastEl.textContent = msg;
@@ -719,6 +804,22 @@
       if (ms > 0) {
         toastEl._timer = setTimeout(() => { toastEl.style.display = 'none'; }, ms);
       }
+    }
+
+    function toggleWorkspaceMenu(e) {
+      if (e) e.stopPropagation();
+      const dd = document.getElementById('workspace-dropdown');
+      if (dd) dd.hidden = !dd.hidden;
+    }
+
+    function closeWorkspaceMenu() {
+      const dd = document.getElementById('workspace-dropdown');
+      if (dd) dd.hidden = true;
+    }
+
+    function resetViewportZoom() {
+      state.viewport = { x: 65, y: 55, scale: 0.88 };
+      applyTransform();
     }
 
     function defaultRoleForStage(stage) {
@@ -730,10 +831,11 @@
 
     function updateSynthButtonLabel() {
       const count = selectedForSynth.size;
-      if (count >= 2) {
-        synthBtnEl.textContent = `⊕ Synthesize Selected (${count})`;
-      } else {
-        synthBtnEl.textContent = '⊕ Synthesize Panels';
+      if (selectionContextBar) {
+        selectionContextBar.hidden = count < 2;
+      }
+      if (synthBtnEl) {
+        synthBtnEl.textContent = count >= 2 ? `⊕ Synthesize (${count})` : '⊕ Synthesize';
       }
     }
 
@@ -745,12 +847,13 @@
       }
       updateSynthButtonLabel();
       renderNodes();
+      renderEdges();
     }
 
     function setMode(nextMode) {
       mode = nextMode;
       connectSourceId = null;
-      document.querySelectorAll('.hud-topbar .tool-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.mode-segmented .seg-btn').forEach(b => b.classList.remove('active'));
       const btn = document.getElementById('mode-' + nextMode);
       if (btn) btn.classList.add('active');
       viewportEl.className = nextMode === 'draw' ? 'mode-draw' : nextMode === 'connect' ? 'mode-connect' : '';
@@ -774,24 +877,41 @@
     function edgeStyleFor(edge, toNode) {
       const rel = edge.relation || edge.kind || 'advances';
       if (rel === 'cross-pollinates' || edge.kind === 'jump') {
-        return { stroke: 'rgba(251, 191, 36, 0.92)', marker: 'url(#arrow-synth)', textFill: '#fde68a', dash: '5 3' };
+        return { stroke: 'rgba(251, 191, 36, 0.85)', marker: 'url(#arrow-synth)', textFill: '#fde68a', dash: '5 3' };
       }
       if (rel === 'synthesizes' || rel === 'synthesis') {
-        return { stroke: 'rgba(251, 191, 36, 0.85)', marker: 'url(#arrow-synth)', textFill: '#fde68a', dash: '' };
+        return { stroke: 'rgba(251, 191, 36, 0.8)', marker: 'url(#arrow-synth)', textFill: '#fde68a', dash: '' };
       }
       if (rel === 'visualizes-ui') {
-        return { stroke: 'rgba(244, 114, 182, 0.82)', marker: 'url(#arrow-ui)', textFill: '#f9a8d4', dash: '' };
+        return { stroke: 'rgba(244, 114, 182, 0.72)', marker: 'url(#arrow-ui)', textFill: '#f9a8d4', dash: '' };
       }
       if (rel === 'specifies') {
-        return { stroke: 'rgba(192, 132, 252, 0.82)', marker: 'url(#arrow-spec)', textFill: '#d8b4fe', dash: '' };
+        return { stroke: 'rgba(192, 132, 252, 0.72)', marker: 'url(#arrow-spec)', textFill: '#d8b4fe', dash: '' };
       }
       if (rel === 'implements') {
-        return { stroke: 'rgba(52, 211, 153, 0.85)', marker: 'url(#arrow-impl)', textFill: '#6ee7b7', dash: '' };
+        return { stroke: 'rgba(52, 211, 153, 0.75)', marker: 'url(#arrow-impl)', textFill: '#6ee7b7', dash: '' };
       }
       if (rel === 'forks' || (toNode && toNode.kind === 'speculative' && toNode.status !== 'committed')) {
-        return { stroke: 'rgba(168, 85, 247, 0.6)', marker: 'url(#arrow-spec)', textFill: '#c084fc', dash: '6 4' };
+        return { stroke: 'rgba(168, 85, 247, 0.55)', marker: 'url(#arrow-spec)', textFill: '#c084fc', dash: '6 4' };
       }
-      return { stroke: 'rgba(56, 189, 248, 0.65)', marker: 'url(#arrow)', textFill: '#94a3b8', dash: '' };
+      return { stroke: 'rgba(56, 189, 248, 0.6)', marker: 'url(#arrow)', textFill: '#94a3b8', dash: '' };
+    }
+
+    function shortEdgeLabel(edge) {
+      const rel = edge.relation || edge.kind || '';
+      if (edge.label && edge.label.length <= 22) return edge.label;
+      const map = {
+        'specifies': '📐 specifies',
+        'visualizes-ui': '🎨 visualizes UI',
+        'implements': '⚙ implements',
+        'synthesizes': '⊕ synthesizes',
+        'cross-pollinates': '⋈ cross-pollinates',
+        'forks': '✨ forks',
+        'advances': '→ advances',
+        'annotates': '💬 critiques',
+        'revisions-from': '🌱 revision'
+      };
+      return map[rel] || (edge.label ? edge.label.slice(0, 22) : rel);
     }
 
     function renderEdges() {
@@ -807,28 +927,63 @@
         const x2 = to.x;
         const y2 = to.y + to.height / 2;
         const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
+        const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 
         const style = edgeStyleFor(edge, to);
+        const isConnectedActive =
+          focusedNodeId === edge.from ||
+          focusedNodeId === edge.to ||
+          selectedForSynth.has(edge.from) ||
+          selectedForSynth.has(edge.to);
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', `edge-item${isConnectedActive ? ' is-connected-active' : ''}`);
+
+        const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        hit.setAttribute('class', 'edge-hit');
+        hit.setAttribute('d', d);
+        g.appendChild(hit);
+
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
-        path.setAttribute('fill', 'none');
+        path.setAttribute('class', 'edge-line');
+        path.setAttribute('d', d);
         path.setAttribute('stroke', style.stroke);
-        path.setAttribute('stroke-width', '2.4');
         path.setAttribute('stroke-dasharray', style.dash);
         path.setAttribute('marker-end', style.marker);
-        edgesGroup.appendChild(path);
+        g.appendChild(path);
 
-        if (edge.label) {
+        const lblText = shortEdgeLabel(edge);
+        if (lblText) {
+          const mx = (x1 + x2) / 2;
+          const my = (y1 + y2) / 2 - 6;
+          const lblG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          lblG.setAttribute('class', 'edge-label-group');
+
+          const estWidth = Math.max(52, lblText.length * 6.2 + 14);
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', String(mx - estWidth / 2));
+          rect.setAttribute('y', String(my - 11));
+          rect.setAttribute('width', String(estWidth));
+          rect.setAttribute('height', '16');
+          rect.setAttribute('rx', '5');
+          rect.setAttribute('fill', 'rgba(15, 23, 42, 0.92)');
+          rect.setAttribute('stroke', style.stroke);
+          rect.setAttribute('stroke-width', '1');
+          lblG.appendChild(rect);
+
           const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          text.setAttribute('x', String((x1 + x2) / 2));
-          text.setAttribute('y', String((y1 + y2) / 2 - 7));
+          text.setAttribute('x', String(mx));
+          text.setAttribute('y', String(my));
           text.setAttribute('text-anchor', 'middle');
           text.setAttribute('fill', style.textFill);
-          text.setAttribute('font-size', '10.5');
+          text.setAttribute('font-size', '9.5');
           text.setAttribute('font-family', 'ui-monospace, monospace');
-          text.textContent = edge.label;
-          edgesGroup.appendChild(text);
+          text.textContent = lblText;
+          lblG.appendChild(text);
+
+          g.appendChild(lblG);
         }
+        edgesGroup.appendChild(g);
       }
     }
 
@@ -848,7 +1003,7 @@
     }
 
     /**
-     * Feature 3 + Multi-Panel Tools: Injects the bidirectional `window.asterism` SDK into every surface iframe!
+     * Injects the bidirectional `window.asterism` SDK into every surface iframe
      */
     function buildSrcDoc(node) {
       const initialStateJson = JSON.stringify(node.state || {}).replace(/</g, '\\u003c');
@@ -860,7 +1015,7 @@
       return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
         html, body { margin: 0; padding: 0; background: transparent; color: #e2e8f0; overflow-x: hidden; }
         ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); border-radius: 4px; }
       </style>
       <script>
         (function() {
@@ -1083,45 +1238,33 @@
           const modelOptionsHtml = AVAILABLE_MODELS.map(
             m => `<option value="${m.id}">${m.label}</option>`
           ).join('');
-          const roleOptionsHtml = AVAILABLE_ROLES.map(
-            r => `<option value="${r.id}">${r.label}</option>`
-          ).join('');
 
           card.innerHTML = `
             <div class="node-header">
               <div class="node-title-wrap">
-                <button class="synth-check-btn" title="Select panel for multi-parent ⊕ Synthesis">☐</button>
-                <select class="role-select" title="Panel Collaboration Role (Dialogue vs. Spec vs. UI Sample vs. Live Artifact)">${roleOptionsHtml}</select>
-                <span class="node-stage-pill"></span>
+                <button class="synth-check-btn" title="Select panel to compare or synthesize (Shift+Click)">☐</button>
                 <span class="node-title"></span>
               </div>
               <div class="node-actions">
-                <select class="model-select" title="Active Model / Provider Harness for this Panel">${modelOptionsHtml}</select>
-                <button class="mini-btn keep-btn" title="Mark this speculative fork as Kept (without deleting siblings)">✓ Keep</button>
-                <select class="spawn-rel-select" title="Spawn a linked companion panel with a typed relation">
-                  <option value="">＋ Companion...</option>
-                  <option value="visualizes-ui:ui-prototype">🎨 + UI Prototype</option>
-                  <option value="specifies:spec-diagram">📐 + Spec Contract</option>
-                  <option value="implements:artifact-harness">⚙ + Worktree Harness</option>
-                  <option value="annotates:dialogue">💬 + Critique / Markup</option>
-                </select>
-                <button class="mini-btn spec-btn" title="Arena Fork: Pit 3 Models & Harnesses in Parallel">⚔ Arena 3x</button>
-                <button class="mini-btn advance-btn" title="Advance to Next Innovation Train Stage">🚂 →</button>
-                <button class="mini-btn code-toggle-btn" title="Edit Live HTML">‹/›</button>
-                <button class="mini-btn del-btn" title="Delete Panel">✕</button>
+                <button class="shadow-badge-btn" title="Unfold staged background branches"></button>
+                <button class="mini-btn keep-btn" title="Keep this speculative branch">✓ Keep</button>
+                <span class="node-stage-pill"></span>
+                <div class="header-hover-actions">
+                  <select class="model-select" title="Model">${modelOptionsHtml}</select>
+                  <button class="mini-btn code-toggle-btn" title="View/Edit HTML">‹/›</button>
+                  <button class="mini-btn del-btn" title="Delete Panel">✕</button>
+                </div>
               </div>
             </div>
             <div class="facet-tab-bar">
               <div class="facet-tabs">
-                <button class="facet-tab" data-facet="dialogue" title="Crystallize as 💬 Steer / Dialogue Worksheet">💬 Steer</button>
-                <button class="facet-tab" data-facet="spec-diagram" title="Crystallize as 📐 Spec / Universal Contract">📐 Spec</button>
-                <button class="facet-tab" data-facet="ui-prototype" title="Crystallize as 🎨 UI Sample / Exhibit">🎨 UI</button>
-                <button class="facet-tab" data-facet="artifact-harness" title="Crystallize as ⚙ Live Worktree / Code">⚙ Code</button>
+                <button class="facet-tab" data-facet="dialogue" title="Conversation / Steer View">💬 Chat</button>
+                <button class="facet-tab" data-facet="spec-diagram" title="Technical Spec View">📐 Spec</button>
+                <button class="facet-tab" data-facet="ui-prototype" title="Interactive UI Sample">🎨 UI</button>
+                <button class="facet-tab" data-facet="artifact-harness" title="Code & Worktree View">⚙ Code</button>
               </div>
               <div class="facet-meta-right">
-                <button class="shadow-badge-btn" title="Background Ideonomy & Matchmaker branches staged in Shadow Graph — click to unfold onto canvas!"></button>
-                <span class="energy-pill" title="Metabolic Energy Envelope + Basal Free-Energy Floor (click to pulse Basal Energy)">🔋 3.6k</span>
-                <button class="tearoff-btn" title="Tear off active Facet into a side-by-side linked Lens Panel">⧉ Tear Off</button>
+                <button class="tearoff-btn" title="Tear off active view into a linked companion panel">↗ Tear Off</button>
               </div>
             </div>
             <div class="worktree-bar">
@@ -1131,8 +1274,8 @@
                 <span class="wt-test-badge"></span>
               </div>
               <div class="wt-actions">
-                <button class="wt-btn wt-diff-btn" title="Inspect Live Git Worktree Diff & Test Output">🔍 Diff</button>
-                <button class="wt-btn wt-run-btn" title="Run / Re-run Outbox Agent inside Isolated Worktree">▶ Run Agent</button>
+                <button class="wt-btn wt-diff-btn" title="Inspect Live Git Worktree Diff & Test Output">Diff</button>
+                <button class="wt-btn wt-run-btn" title="Run Outbox Agent inside Isolated Worktree">▶ Run</button>
                 <button class="wt-btn wt-commit-btn" title="Commit Implementation in Isolated Worktree Branch">✓ Commit</button>
               </div>
             </div>
@@ -1142,9 +1285,10 @@
               <div class="node-diff-inspector"></div>
             </div>
             <div class="node-footer">
-              <span class="state-pill" title="Persisted Interactive Widget State (window.asterism.state)">⚡ 0</span>
-              <input class="node-prompt-input" type="text" placeholder="Collaborate (auto-branches if downstream exists to minimize regret)..." />
-              <button class="node-send-btn">Collaborate</button>
+              <input class="node-prompt-input" type="text" placeholder="Ask agent to refine or branch..." />
+              <button class="node-send-btn" title="Collaborate with agent on this panel">Ask</button>
+              <button class="mini-btn spec-btn" title="Fork 3 parallel model variants">✨ 3x</button>
+              <button class="mini-btn advance-btn" title="Advance to next stage">Next →</button>
             </div>
             <div class="resize-handle"></div>
           `;
@@ -1153,6 +1297,7 @@
         }
 
         const isSelected = selectedForSynth.has(node.id);
+        const isFocused = focusedNodeId === node.id;
         const keepEditing = card.classList.contains('editing-html');
         const keepViewingDiff = card.classList.contains('viewing-diff');
         const resolvedRole = node.surfaceRole || defaultRoleForStage(node.stage);
@@ -1164,6 +1309,7 @@
           `stage-${node.stage || 'note'}`,
           `role-${resolvedRole}`,
           isSelected ? 'selected-for-synth' : '',
+          isFocused ? 'is-focused' : '',
           keepEditing ? 'editing-html' : '',
           keepViewingDiff ? 'viewing-diff' : ''
         ].filter(Boolean).join(' ');
@@ -1174,15 +1320,12 @@
         card.style.height = `${node.height}px`;
 
         const checkBtn = card.querySelector('.synth-check-btn');
-        checkBtn.textContent = isSelected ? '☑' : '☐';
-        checkBtn.classList.toggle('checked', isSelected);
-
-        const roleSelect = card.querySelector('.role-select');
-        if (roleSelect.value !== resolvedRole) {
-          roleSelect.value = resolvedRole;
+        if (checkBtn) {
+          checkBtn.textContent = isSelected ? '☑' : '☐';
+          checkBtn.classList.toggle('checked', isSelected);
         }
 
-        // Update Facet Tabs, Shadow Badge & Energy Pill
+        // Update Facet Tabs & Shadow Badge
         const facetsObj = node.facets || { [resolvedRole]: node.html };
         card.querySelectorAll('.facet-tab').forEach(tab => {
           const f = tab.dataset.facet;
@@ -1194,9 +1337,7 @@
         const shadowBadge = card.querySelector('.shadow-badge-btn');
         if (shadowBadge) {
           if (shadowChildren.length > 0) {
-            const synthCount = shadowChildren.filter(n => n.stance === 'matchmaker').length;
-            const branchCount = shadowChildren.length - synthCount;
-            shadowBadge.textContent = `🌑 +${branchCount} Branches${synthCount > 0 ? ` • ${synthCount} Synthesis` : ''} (Unfold)`;
+            shadowBadge.textContent = `🌑 +${shadowChildren.length}`;
             shadowBadge.classList.add('has-shadow');
           } else {
             shadowBadge.textContent = '';
@@ -1204,32 +1345,17 @@
           }
         }
 
-        const energyPill = card.querySelector('.energy-pill');
-        if (energyPill) {
-          const rem = node.energy?.remainingTokens ?? 3600;
-          const basal = node.energy?.basalRechargedTokens ?? 0;
-          energyPill.textContent = `🔋 ${(rem / 1000).toFixed(1)}k${basal > 0 ? '+' : ''}`;
-          energyPill.title = `Remaining Envelope: ${rem} tokens | Recharged from Basal Free-Energy Floor: +${basal} tokens`;
-        }
-
         const stageLabel = (node.stage || 'note').toUpperCase();
         card.querySelector('.node-stage-pill').textContent =
           node.status === 'committed' ? `✓ ${stageLabel}` : stageLabel;
         card.querySelector('.node-title').textContent = node.title;
+        card.querySelector('.node-title').title = node.title;
 
         const modelSelect = card.querySelector('.model-select');
         const activeModel = node.model || 'openai/gpt-6-luna';
-        if (modelSelect.value !== activeModel) {
+        if (modelSelect && modelSelect.value !== activeModel) {
           modelSelect.value = activeModel;
         }
-
-        // Update state-pill count
-        const stateKeys = Object.keys(node.state || {});
-        const statePill = card.querySelector('.state-pill');
-        statePill.textContent = `⚡ ${stateKeys.length}`;
-        statePill.title = stateKeys.length > 0
-          ? `window.asterism.state: ${JSON.stringify(node.state)}`
-          : 'window.asterism.state (interactive widget state)';
 
         // Update Worktree Bar if stage === 'implement' or role === 'artifact-harness'
         if (node.stage === 'implement' || resolvedRole === 'artifact-harness' || node.worktree || node.implementation) {
@@ -1275,10 +1401,8 @@
     function setupNodeInteractions(card, nodeId) {
       const header = card.querySelector('.node-header');
       const checkBtn = card.querySelector('.synth-check-btn');
-      const roleSelect = card.querySelector('.role-select');
       const modelSelect = card.querySelector('.model-select');
       const keepBtn = card.querySelector('.keep-btn');
-      const spawnRelSelect = card.querySelector('.spawn-rel-select');
       const resizeHandle = card.querySelector('.resize-handle');
       const codeBtn = card.querySelector('.code-toggle-btn');
       const specBtn = card.querySelector('.spec-btn');
@@ -1291,8 +1415,15 @@
       const promptInput = card.querySelector('.node-prompt-input');
       const sendBtn = card.querySelector('.node-send-btn');
       const tearOffBtn = card.querySelector('.tearoff-btn');
-      const energyPill = card.querySelector('.energy-pill');
       const shadowBadge = card.querySelector('.shadow-badge-btn');
+
+      card.addEventListener('pointerdown', () => {
+        if (focusedNodeId !== nodeId) {
+          focusedNodeId = nodeId;
+          renderNodes();
+          renderEdges();
+        }
+      });
 
       if (shadowBadge) {
         shadowBadge.addEventListener('click', (e) => {
@@ -1313,66 +1444,49 @@
           e.stopPropagation();
           const node = state.nodes.find(n => n.id === nodeId);
           const curRole = node?.surfaceRole || defaultRoleForStage(node?.stage);
-          const nextFacet = curRole === 'dialogue' ? 'spec-diagram' : curRole === 'spec-diagram' ? 'ui-prototype' : curRole;
+          const nextFacet = curRole === 'dialogue' ? 'spec-diagram' : curRole;
           switchOrTearOffFacet(nodeId, nextFacet, true);
         });
       }
 
-      if (energyPill) {
-        energyPill.addEventListener('click', (e) => {
+      if (checkBtn) {
+        checkBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          pulseBasalFreeEnergy();
+          toggleNodeSynthSelection(nodeId);
         });
       }
 
-      checkBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleNodeSynthSelection(nodeId);
-      });
-
-      roleSelect.addEventListener('change', async (e) => {
-        e.stopPropagation();
-        const surfaceRole = roleSelect.value;
-        await switchOrTearOffFacet(nodeId, surfaceRole, false);
-      });
-
-      modelSelect.addEventListener('change', async (e) => {
-        e.stopPropagation();
-        const model = modelSelect.value;
-        const node = state.nodes.find(n => n.id === nodeId);
-        if (node) node.model = model;
-        showToast(`Switched panel model to ${model.replace('openai/', '')}`);
-        await fetch('/api/nodes/state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodeId, model })
+      if (modelSelect) {
+        modelSelect.addEventListener('change', async (e) => {
+          e.stopPropagation();
+          const model = modelSelect.value;
+          const node = state.nodes.find(n => n.id === nodeId);
+          if (node) node.model = model;
+          showToast(`Switched panel model to ${model.replace('openai/', '')}`);
+          await fetch('/api/nodes/state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nodeId, model })
+          });
         });
-      });
+      }
 
-      keepBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        commitBranch(nodeId, false);
-      });
-
-      spawnRelSelect.addEventListener('change', async (e) => {
-        e.stopPropagation();
-        const val = spawnRelSelect.value;
-        spawnRelSelect.value = '';
-        if (!val) return;
-        const [relation, surfaceRole] = val.split(':');
-        const customPrompt = promptInput.value.trim();
-        promptInput.value = '';
-        await triggerSpawnRelated({
-          sourceNodeId: nodeId,
-          relation,
-          surfaceRole,
-          prompt: customPrompt || undefined
+      if (keepBtn) {
+        keepBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          commitBranch(nodeId, false);
         });
-      });
+      }
 
       header.addEventListener('pointerdown', (e) => {
         if (e.target.closest('button') || e.target.closest('select')) return;
         e.stopPropagation();
+
+        if (focusedNodeId !== nodeId) {
+          focusedNodeId = nodeId;
+          renderNodes();
+          renderEdges();
+        }
 
         if (e.shiftKey) {
           toggleNodeSynthSelection(nodeId);
@@ -1437,7 +1551,7 @@
 
         function onMove(ev) {
           node.width = Math.max(300, Math.round(origW + (ev.clientX - startX) / state.viewport.scale));
-          node.height = Math.max(210, Math.round(origH + (ev.clientY - startY) / state.viewport.scale));
+          node.height = Math.max(185, Math.round(origH + (ev.clientY - startY) / state.viewport.scale));
           card.style.width = `${node.width}px`;
           card.style.height = `${node.height}px`;
           renderEdges();
@@ -1518,6 +1632,7 @@
 
       delBtn.addEventListener('click', () => {
         selectedForSynth.delete(nodeId);
+        if (focusedNodeId === nodeId) focusedNodeId = null;
         updateSynthButtonLabel();
         state.nodes = state.nodes.filter(n => n.id !== nodeId);
         state.edges = state.edges.filter(e => e.from !== nodeId && e.to !== nodeId);
@@ -1543,8 +1658,8 @@
     async function switchOrTearOffFacet(nodeId, facetRole, tearOff = false) {
       showToast(
         tearOff
-          ? `⧉ Tearing off "${facetRole}" facet lens into a linked side-by-side panel...`
-          : `Switching Crystallization Facet to "${facetRole}"...`,
+          ? `↗ Tearing off "${facetRole}" lens into a companion panel...`
+          : `Switching view to "${facetRole}"...`,
         14000
       );
       const res = await fetch('/api/nodes/facet', {
@@ -1554,20 +1669,20 @@
       });
       const data = await res.json();
       if (data.tornOffLens) {
-        showToast(`⧉ Torn off "${data.tornOffLens.title}" as a linked side-by-side lens!`);
+        showToast(`↗ Torn off "${data.tornOffLens.title}" as a linked companion panel.`);
       } else {
-        showToast(`Switched facet to "${facetRole}".`);
+        showToast(`Switched view to "${facetRole}".`);
       }
     }
 
     async function pulseBasalFreeEnergy() {
-      showToast('🔋 Allocating excess Basal Free-Energy Floor across exhausted & high-EVOI frontier nodes...', 8000);
+      showToast('🔋 Allocating Basal Free-Energy across frontier nodes...', 8000);
       const res = await fetch('/api/energy/basal-tick', { method: 'POST' });
       const data = await res.json();
       if (data.totalGrantedTokens) {
         const top = data.attentionQueue?.[0];
         showToast(
-          `🔋 Basal Free-Energy Floor distributed +${data.totalGrantedTokens} tokens across ${data.allocations?.length || 0} nodes! Top EVOI: "${top?.title || 'root'}" (EVOI=${top?.evoiScore ?? 0})`
+          `🔋 Recharged +${data.totalGrantedTokens} tokens across ${data.allocations?.length || 0} nodes (Top EVOI: "${top?.title || 'root'}").`
         );
       }
     }
@@ -1583,7 +1698,7 @@
       comparedNodeIds = candidates.map(n => n.id);
       const grid = document.getElementById('compare-grid');
       const sub = document.getElementById('compare-subtitle');
-      sub.textContent = `Projecting ${candidates.length} sibling thoughts side-by-side (${candidates.map(c => c.title).join(' vs. ')})`;
+      sub.textContent = `Comparing ${candidates.length} sibling thoughts (${candidates.map(c => c.title).join(' vs. ')})`;
       grid.innerHTML = '';
       for (const n of candidates) {
         const col = document.createElement('div');
@@ -1591,7 +1706,7 @@
         const shortModel = (n.model || 'gpt-6-luna').replace('openai/', '');
         const pScore = typeof n.jevScore === 'number' ? `p=${n.jevScore}` : 'calibrated';
         col.innerHTML = `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(30,41,59,0.92);border-bottom:1px solid rgba(148,163,184,0.2);font-size:11px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(30,41,59,0.92);border-bottom:1px solid rgba(148,163,184,0.16);font-size:11px;">
             <div>
               <strong style="color:#f8fafc;">${n.title}</strong>
               <span style="margin-left:6px;color:#38bdf8;font-family:ui-monospace,monospace;font-size:10px;">${shortModel} • ${pScore}</span>
@@ -1620,7 +1735,7 @@
     }
 
     async function mutateNode(nodeId, instruction) {
-      showToast(`Collaborating with agent on "${nodeId}" (regret-minimizing)...`, 18000);
+      showToast(`Collaborating with agent on "${nodeId}"...`, 18000);
       const res = await fetch('/api/nodes/mutate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1628,16 +1743,16 @@
       });
       const data = await res.json();
       if (data.branchedNewFuture && data.branchedRevisionNode) {
-        showToast(`🌱 Regret-Free Branch: Created "${data.branchedRevisionNode.title}" while preserving the existing downstream timeline intact!`);
+        showToast(`🌱 Branched "${data.branchedRevisionNode.title}" while keeping existing downstream work intact.`);
       } else if (data.spawnedPanels && data.spawnedPanels.length > 0) {
-        showToast(`Agent updated panel AND spawned ${data.spawnedPanels.length} companion panel(s): ${data.spawnedPanels.map(p => p.title).join(', ')}!`);
+        showToast(`Updated panel and spawned ${data.spawnedPanels.length} companion panel(s).`);
       } else {
-        showToast('Panel updated!');
+        showToast('Panel updated.');
       }
     }
 
     async function triggerSpawnRelated({ sourceNodeId, relation = 'visualizes-ui', surfaceRole, title, prompt }) {
-      showToast(`Spawning companion "${surfaceRole || relation}" panel linked via "${relation}"...`, 18000);
+      showToast(`Spawning companion "${surfaceRole || relation}" panel...`, 18000);
       const res = await fetch('/api/nodes/spawn-related', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1645,12 +1760,12 @@
       });
       const data = await res.json();
       if (data.childNode) {
-        showToast(`✦ Spawned companion panel "${data.childNode.title}" (${data.childNode.surfaceRole})!`);
+        showToast(`✦ Spawned companion panel "${data.childNode.title}".`);
       }
     }
 
     async function triggerSpeculate(nodeId, prompt, options = {}) {
-      showToast('⚔ Arena Forking: Pitting gpt-6-luna, gpt-6.1-terra, and gpt-6.1-sol in parallel...', 20000);
+      showToast('✨ Forking 3 parallel model variants...', 20000);
       await fetch('/api/nodes/speculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1663,7 +1778,7 @@
           models: options.models
         })
       });
-      showToast('3 Arena branches ready! Use "✓ Keep" in the card header or "⊕ Synthesize Panels" to merge them.');
+      showToast('3 parallel branches ready.');
     }
 
     async function synthesizeSelectedOrKept(customParentIds, instruction, targetStage) {
@@ -1679,11 +1794,11 @@
       }
 
       if (parentIds.length < 2) {
-        showToast('Select at least 2 panels using their ☐ header checkboxes to synthesize!');
+        showToast('Select 2+ panels (Shift+Click or ☐ checkbox) to synthesize.');
         return;
       }
 
-      showToast(`⊕ Synthesizing ${parentIds.length} parent panels into a unified hybrid surface...`, 20000);
+      showToast(`⊕ Synthesizing ${parentIds.length} panels into a unified surface...`, 20000);
       const res = await fetch('/api/nodes/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1693,12 +1808,12 @@
       selectedForSynth.clear();
       updateSynthButtonLabel();
       if (data.synthNode) {
-        showToast(`⊕ Created "${data.synthNode.title}" (${data.synthNode.surfaceRole}) from ${parentIds.length} parents!`);
+        showToast(`⊕ Created "${data.synthNode.title}" from ${parentIds.length} parents.`);
       }
     }
 
     async function runImplementAgent(nodeId, instruction) {
-      showToast('⚙ Running Outbox Agent inside isolated Git worktree (generating module + running node --test)...', 15000);
+      showToast('⚙ Running Outbox Agent inside isolated Git worktree...', 15000);
       const res = await fetch('/api/nodes/implement/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1708,12 +1823,12 @@
       if (data.implementation) {
         const ins = data.implementation.diff?.insertions ?? 0;
         const passed = data.implementation.testPassed;
-        showToast(`⚙ Worktree implementation ${passed ? 'verified ✓' : 'completed'} (+${ins} lines). Click "🔍 Diff" on the card to inspect!`);
+        showToast(`⚙ Worktree implementation ${passed ? 'verified ✓' : 'completed'} (+${ins} lines).`);
       }
     }
 
     async function commitBranch(nodeId, pruneSiblings = false) {
-      showToast('✓ Marked fork as Kept! (Select 2+ panels and click "⊕ Synthesize Panels" to merge them.)');
+      showToast('✓ Marked branch as Kept.');
       await fetch('/api/nodes/commit-branch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1728,17 +1843,17 @@
         body: JSON.stringify({ parentId })
       });
       const data = await res.json();
-      showToast(`Pruned ${data.discarded?.length || 0} unkept speculative fork(s). Kept forks remain intact.`);
+      showToast(`Pruned ${data.discarded?.length || 0} unkept speculative fork(s).`);
     }
 
     async function advanceStage(nodeId, instruction, targetStage) {
-      showToast('🚂 Advancing branch to next Innovation Train stage...', 20000);
+      showToast('Advancing to next stage...', 20000);
       await fetch('/api/nodes/advance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId, instruction, targetStage })
       });
-      showToast('Next stage spawned on the Innovation Train!');
+      showToast('Next stage created.');
     }
 
     // Listen to messages from surface iframes (`window.asterism.*`)
@@ -1749,15 +1864,6 @@
         const node = state.nodes.find(n => n.id === msg.nodeId);
         if (node) {
           node.state = Object.assign({}, node.state || {}, msg.patch);
-          const card = nodesLayer.querySelector(`[data-id="${node.id}"]`);
-          if (card) {
-            const keys = Object.keys(node.state);
-            const pill = card.querySelector('.state-pill');
-            if (pill) {
-              pill.textContent = `⚡ ${keys.length}`;
-              pill.title = `window.asterism.state: ${JSON.stringify(node.state)}`;
-            }
-          }
         }
         await fetch('/api/nodes/state', {
           method: 'POST',
@@ -1802,27 +1908,25 @@
       if (inputEl && !customPrompt) inputEl.value = '';
 
       const center = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
-      showToast('🌱 Idea Box: Reifying seed thought, linking Matchmaker Jump edge, and staging 4 Ideonomy + Matchmaker branches in Shadow Graph...', 18000);
+      showToast('🌱 Seeding idea and staging 4 Ideonomy + Matchmaker branches in the Shadow Graph...', 18000);
       const res = await fetch('/api/ideabox/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           seedPrompt,
-          x: Math.round(center.x - 210),
-          y: Math.round(center.y - 160)
+          x: Math.round(center.x - 200),
+          y: Math.round(center.y - 140)
         })
       });
       const data = await res.json();
       if (data.seedNode) {
-        const matchInfo = data.matchedTargetNode
-          ? `⋈ Lateral Jump linked to "${data.matchedTargetNode.title}" (${Math.round((data.affinityScore || 0) * 100)}% affinity)`
-          : '4 shadow branches staged';
-        showToast(`🌱 Seed "${data.seedNode.title}" created! ${matchInfo}. Click its 🌑 Shadow Badge or open 🔔 EVOI Queue to unfold!`);
+        focusedNodeId = data.seedNode.id;
+        showToast(`🌱 Seed "${data.seedNode.title}" created with 4 staged branches. Click 🌑 +4 on the card to unfold.`);
       }
     }
 
     async function unfoldShadowForParent(parentNodeId) {
-      showToast('🌑 Promote on Receipt: Unfolding staged Shadow Graph branches onto the 2D canvas...', 10000);
+      showToast('🌑 Unfolding staged branches onto the canvas...', 10000);
       const res = await fetch('/api/shadow/unfold', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1830,7 +1934,7 @@
       });
       const data = await res.json();
       if (data.unfoldedNodeIds?.length > 0) {
-        showToast(`🌑 Unfolded ${data.unfoldedNodeIds.length} background branch(es) onto the active canvas!`);
+        showToast(`🌑 Unfolded ${data.unfoldedNodeIds.length} branch(es) onto the canvas.`);
       } else {
         showToast('No staged shadow branches found for this node.');
       }
@@ -1843,7 +1947,7 @@
         body: JSON.stringify({})
       });
       const data = await res.json();
-      showToast(`🌑 Unfolded ${data.unfoldedNodeIds?.length || 0} shadow branch(es) onto the active canvas!`);
+      showToast(`🌑 Unfolded ${data.unfoldedNodeIds?.length || 0} branch(es) onto the canvas.`);
     }
 
     function toggleAttentionBroker(forceOpen) {
@@ -1858,7 +1962,7 @@
     }
 
     async function autoResolveTopAttentionItem(nodeId) {
-      showToast('💤 Hydro.Workflow.Ask: Resolving via non-blocking askDefault so agents keep advancing...', 10000);
+      showToast('Auto-resolving top item via default action...', 10000);
       const res = await fetch('/api/attention/auto-resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1866,7 +1970,7 @@
       });
       const data = await res.json();
       if (data.resolvedNode) {
-        showToast(`💤 Auto-resolved "${data.resolvedNode.title}" via askDefault (${data.resolvedAction?.label || 'Keep & Promote'})!`);
+        showToast(`✓ Resolved "${data.resolvedNode.title}".`);
       }
     }
 
@@ -1882,10 +1986,7 @@
 
     function updateAttentionAndWeatherUI() {
       const shadowNodes = state.nodes.filter(n => n.shadowStaged);
-      const visibleNodes = state.nodes.filter(n => !n.shadowStaged);
-      const jumpEdges = state.edges.filter(e => e.relation === 'cross-pollinates' || e.kind === 'jump');
 
-      // Rank candidates by EVOI
       const ranked = state.nodes
         .filter(n => n.shadowStaged || n.kind === 'speculative' || n.askDefault || typeof n.jevScore === 'number')
         .map(n => ({
@@ -1895,50 +1996,42 @@
         }))
         .sort((a, b) => b.evoi - a.evoi);
 
-      const topEvoi = ranked[0]?.evoi ?? 0;
       const btnBroker = document.getElementById('btn-attention-broker');
-      if (btnBroker) {
-        btnBroker.textContent = shadowNodes.length > 0
-          ? `🔔 EVOI Queue (${ranked.length}) • 🌑 ${shadowNodes.length} Shadow`
-          : `🔔 EVOI Queue (${ranked.length})`;
+      const lblBroker = document.getElementById('attn-pill-label');
+      if (btnBroker && lblBroker) {
+        btnBroker.classList.toggle('has-shadow', shadowNodes.length > 0);
+        lblBroker.textContent = shadowNodes.length > 0
+          ? `Queue (${ranked.length}) · 🌑 ${shadowNodes.length}`
+          : `Queue (${ranked.length})`;
       }
-
-      const wShadow = document.getElementById('weather-shadow-count');
-      if (wShadow) wShadow.textContent = `${shadowNodes.length} staged`;
-      const wVisible = document.getElementById('weather-visible-count');
-      if (wVisible) wVisible.textContent = `${visibleNodes.length} visible`;
-      const wJumps = document.getElementById('weather-jumps-count');
-      if (wJumps) wJumps.textContent = `${jumpEdges.length} lateral`;
-      const wTopEvoi = document.getElementById('weather-top-evoi');
-      if (wTopEvoi) wTopEvoi.textContent = topEvoi.toFixed(2);
 
       const listEl = document.getElementById('attention-list');
       if (!listEl) return;
       if (ranked.length === 0) {
-        listEl.innerHTML = `<div style="color:#64748b;font-size:11.5px;padding:10px;">No pending high-EVOI forks or Shadow Graph nodes. Drop a seed thought in the 🌱 Idea Box above!</div>`;
+        listEl.innerHTML = `<div style="color:#64748b;font-size:11.5px;padding:10px;">No pending items. Drop a seed idea in the top bar to explore.</div>`;
         return;
       }
 
       listEl.innerHTML = ranked.slice(0, 8).map(({ node, evoi, p }) => {
         const stanceBadge = (node.stance || node.surfaceRole || 'agent').toUpperCase();
         const shadowTag = node.shadowStaged
-          ? `<span style="background:rgba(168,85,247,0.22);color:#d8b4fe;padding:1px 6px;border-radius:99px;font-size:9.5px;font-weight:700;">🌑 SHADOW STAGED</span>`
-          : `<span style="background:rgba(56,189,248,0.16);color:#38bdf8;padding:1px 6px;border-radius:99px;font-size:9.5px;font-weight:700;">VISIBLE</span>`;
-        const askLabel = node.askDefault?.label || 'Promote & Keep (Default)';
+          ? `<span style="background:rgba(251,191,36,0.16);color:#fde68a;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:600;">Staged</span>`
+          : `<span style="background:rgba(56,189,248,0.12);color:#38bdf8;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:600;">On Canvas</span>`;
+        const askLabel = node.askDefault?.label || 'Promote & Keep';
         return `
           <div class="attention-item">
             <div class="attention-item-top">
               <div class="attention-item-title">${node.title}</div>
-              <span class="evoi-badge">EVOI ${evoi.toFixed(2)} • p=${p}</span>
+              <span class="evoi-badge">EVOI ${evoi.toFixed(2)} · p=${p}</span>
             </div>
             <div class="attention-item-meta">
               ${shadowTag}
-              <span>Stance: <strong style="color:#cbd5e1;">${stanceBadge}</strong></span>
-              <span>Model: <strong style="color:#cbd5e1;">${(node.model || 'gpt-6-luna').replace('openai/', '')}</strong></span>
+              <span>${stanceBadge}</span>
+              <span>${(node.model || 'gpt-6-luna').replace('openai/', '')}</span>
             </div>
             <div class="attention-item-actions">
-              ${node.shadowStaged ? `<button class="mini-btn" style="background:rgba(168,85,247,0.22);color:#e9d5ff;border-color:rgba(168,85,247,0.45);" onclick="unfoldShadowForParent('${node.parentId || node.id}')">🌑 Unfold to Canvas</button>` : ''}
-              <button class="mini-btn" style="background:rgba(16,185,129,0.2);color:#6ee7b7;border-color:rgba(16,185,129,0.45);" onclick="autoResolveTopAttentionItem('${node.id}')">💤 ${askLabel}</button>
+              ${node.shadowStaged ? `<button class="mini-btn" style="color:#fde68a;border-color:rgba(251,191,36,0.35);" onclick="unfoldShadowForParent('${node.parentId || node.id}')">Unfold</button>` : ''}
+              <button class="mini-btn" style="color:#6ee7b7;border-color:rgba(16,185,129,0.35);" onclick="autoResolveTopAttentionItem('${node.id}')">✓ ${askLabel}</button>
             </div>
           </div>
         `;
@@ -1954,7 +2047,14 @@
 
     // Canvas panning & freehand sketching
     viewportEl.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.canvas-node') || e.target.closest('.hud-topbar') || e.target.closest('.attention-drawer')) return;
+      closeWorkspaceMenu();
+      if (e.target.closest('.canvas-node') || e.target.closest('.hud-topbar') || e.target.closest('#attention-drawer')) return;
+
+      if (focusedNodeId) {
+        focusedNodeId = null;
+        renderNodes();
+        renderEdges();
+      }
 
       if (mode === 'draw') {
         const pt = screenToWorld(e.clientX, e.clientY);
@@ -1993,7 +2093,7 @@
     });
 
     viewportEl.addEventListener('wheel', (e) => {
-      if (e.target.closest('.node-body') || e.target.closest('.attention-drawer')) return;
+      if (e.target.closest('.node-body') || e.target.closest('#attention-drawer')) return;
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
       const nextScale = Math.min(2.0, Math.max(0.3, state.viewport.scale * zoomFactor));
@@ -2010,35 +2110,27 @@
       const id = 'node-proposal-' + Date.now();
       state.nodes.push({
         id,
-        title: 'Feature Proposal / Dialogue',
+        title: 'New Feature Proposal',
         kind: 'surface',
         stage: 'note',
         surfaceRole: 'dialogue',
-        x: Math.round(center.x - 195),
-        y: Math.round(center.y - 145),
-        width: 395,
-        height: 295,
+        x: Math.round(center.x - 190),
+        y: Math.round(center.y - 115),
+        width: 375,
+        height: 225,
         model: 'openai/gpt-6-luna',
         status: 'ready',
         branchTag: 'dialogue',
         state: { priority: 80, scope: 'mvp' },
-        html: `<div style="font-family:system-ui,sans-serif;padding:15px;color:#e2e8f0;font-size:12px;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <span style="background:rgba(56,189,248,0.16);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">💬 DIALOGUE / PROPOSAL</span>
-    <span style="color:#94a3b8;font-size:10.5px;">Agent ↔ Dev Medium</span>
-  </div>
-  <h4 style="margin:0 0 6px;color:#f8fafc;font-size:13.5px;">New Feature Proposal</h4>
-  <p style="font-size:11.5px;color:#94a3b8;margin:0 0 10px;">Use this panel to align on decisions and trade-offs with the agent—or spawn a linked <strong>🎨 UI Prototype</strong> or <strong>📐 Spec Contract</strong> companion panel.</p>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:#cbd5e1;">
-    <span>Priority:</span>
+        html: `<div style="font-family:'Inter',system-ui,sans-serif;padding:14px 16px;color:#e2e8f0;font-size:12px;line-height:1.5;">
+  <p style="font-size:11.5px;color:#94a3b8;margin:0 0 12px;">Use the facet tabs above to view Spec, UI, or Code lenses—or ask the agent below to refine this thought.</p>
+  <div style="background:rgba(15,23,42,0.55);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:8px;font-size:11px;color:#cbd5e1;">
+    <span>Priority</span>
     <input type="range" min="1" max="100" value="80" data-state-key="priority" style="flex:1;accent-color:#38bdf8;" />
-  </div>
-  <div style="display:flex;gap:6px;">
-    <button onclick="window.asterism.spawnRelatedPanel({relation:'visualizes-ui', surfaceRole:'ui-prototype', prompt:'Build an interactive UI prototype for this proposal'})" style="flex:1;background:rgba(244,114,182,0.18);color:#f9a8d4;border:1px solid rgba(244,114,182,0.4);padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;cursor:pointer;">🎨 + UI Prototype</button>
-    <button onclick="window.asterism.spawnRelatedPanel({relation:'specifies', surfaceRole:'spec-diagram', prompt:'Create an architecture & contract spec for this proposal'})" style="flex:1;background:rgba(192,132,252,0.18);color:#d8b4fe;border:1px solid rgba(192,132,252,0.4);padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;cursor:pointer;">📐 + Spec Panel</button>
   </div>
 </div>`
       });
+      focusedNodeId = id;
       renderAll();
       persistState();
     }
@@ -2051,9 +2143,10 @@
 
     async function resetCanvas() {
       selectedForSynth.clear();
+      focusedNodeId = null;
       updateSynthButtonLabel();
       await fetch('/api/reset', { method: 'POST' });
-      showToast('Canvas reset to default Multi-Role Innovation Train state.');
+      showToast('Canvas reset to default state.');
     }
 
     async function persistState() {

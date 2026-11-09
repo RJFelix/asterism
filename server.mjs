@@ -1173,17 +1173,9 @@ export function createAsterismServer(options = {}) {
           const maxY = canvasState.nodes
             .filter((n) => !n.shadowStaged)
             .reduce((m, n) => Math.max(m, n.y + (n.height || 300)), 40);
-          const seedHtml = `<div style="font-family:system-ui,sans-serif;padding:13px;color:#e2e8f0;font-size:11.5px;line-height:1.45;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
-    <span style="background:rgba(56,189,248,0.18);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:9.5px;font-weight:700;">💡 IDEA BOX SEED • REIFIED THOUGHT</span>
-    <span style="color:#34d399;font-size:10px;font-family:monospace;">Ideonomy + Matchmaker Active</span>
-  </div>
-  <h4 style="margin:0 0 5px;color:#f8fafc;font-size:13px;">Seed: ${prompt.slice(0, 64)}</h4>
-  <p style="margin:0 0 8px;color:#94a3b8;font-size:11px;">Dropped into the Autonomous Idea Box. Background agents spawned <strong>3 Ideonomy Branches (Δ, ∃, ∇)</strong> and <strong>1 Lateral Matchmaker Synthesis (⋈)</strong> in the Shadow Graph badge above—click the badge or use the <strong>Attention Broker</strong> to unfold!</p>
-  <div style="display:flex;gap:6px;">
-    <button onclick="window.asterism.unfoldShadowChildren()" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid rgba(251,191,36,0.5);background:rgba(251,191,36,0.18);color:#fde68a;font-size:10.5px;font-weight:700;cursor:pointer;">🌑 Unfold Staged Shadow Branches</button>
-    <button onclick="window.asterism.openAttentionBroker()" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(56,189,248,0.45);background:rgba(56,189,248,0.15);color:#38bdf8;font-size:10.5px;font-weight:600;cursor:pointer;">📡 Attention Queue</button>
-  </div>
+          const seedHtml = `<div style="font-family:'Inter',system-ui,sans-serif;padding:14px 16px;color:#e2e8f0;font-size:12px;line-height:1.5;">
+  <p style="margin:0 0 12px;color:#94a3b8;font-size:11.5px;">${prompt.slice(0, 120)} — 4 background branches staged in the Shadow Graph.</p>
+  <button onclick="window.asterism.unfoldShadowChildren()" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid rgba(56,189,248,0.3);background:rgba(56,189,248,0.1);color:#e0f2fe;font-size:11px;font-weight:500;cursor:pointer;">Unfold Staged Branches</button>
   ${renderIdeonomyMachineryHtml({
     tuple: seedTuple,
     ideaTitle: `Seed: ${prompt.slice(0, 36)}`,

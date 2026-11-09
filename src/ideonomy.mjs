@@ -305,17 +305,23 @@ export function renderIdeonomyMachineryHtml({
     `  not surfaced:   ${notSurfaced}`,
   ].join("\n");
 
-  return `<div style="margin-top:8px;padding:7px 9px;background:rgba(15,23,42,0.88);border:1px solid rgba(56,189,248,0.28);border-radius:7px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.8px;color:#cbd5e1;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;color:#38bdf8;font-weight:700;">
-    <span>╭─ IDEONOMY TUPLE ─╮ ◆ OPS: ${opsStr}</span>
-    <span style="color:#fde68a;">◆ ORGANON: ${orgStr.toUpperCase()}</span>
+  return `<details style="margin-top:10px;border-top:1px solid rgba(148,163,184,0.12);padding-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:#64748b;">
+  <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;color:#94a3b8;font-size:10px;user-select:none;">
+    <span>◇ Ideonomy · ${opsStr} × ${orgStr}</span>
+    <span style="color:#64748b;font-size:9.5px;">★ ${pivotDim.id} ▾</span>
+  </summary>
+  <div style="margin-top:6px;padding:7px 9px;background:rgba(15,23,42,0.65);border:1px solid rgba(148,163,184,0.14);border-radius:6px;color:#94a3b8;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;color:#cbd5e1;font-weight:600;font-size:9.5px;">
+      <span>╭─ IDEONOMY TUPLE ─╮ ◆ OPS: ${opsStr}</span>
+      <span style="color:#94a3b8;">◆ ORGANON: ${orgStr.toUpperCase()}</span>
+    </div>
+    <div style="margin-bottom:4px;font-size:9px;">
+      ◆ DIMS: <strong style="color:#e2e8f0;">★ ${pivotDim.id}</strong>${dims.length > 1 ? " · " + dims.slice(1).map((d) => d.id).join(" · ") : ""}
+    </div>
+    <div style="padding:2px 6px;margin-bottom:5px;border-left:2px solid rgba(148,163,184,0.35);color:#cbd5e1;font-size:9px;">
+      ◆ ${(resolvedMoves[0]?.operator || "NEGATION").toUpperCase()} ◆ "${resolvedMoves[0]?.from || "baseline"}" → "${resolvedMoves[0]?.to || "orthogonal variant"}"
+    </div>
+    <pre style="margin:0;padding:5px 6px;background:rgba(2,6,23,0.6);border-radius:4px;color:#64748b;font-size:8.8px;line-height:1.35;white-space:pre-wrap;overflow-x:auto;">${trailLines.replace(/</g, "&lt;")}</pre>
   </div>
-  <div style="color:#94a3b8;margin-bottom:5px;font-size:9.3px;">
-    ◆ DIMS: <strong style="color:#f8fafc;">★ ${pivotDim.id}</strong>${dims.length > 1 ? " · " + dims.slice(1).map((d) => d.id).join(" · ") : ""}
-  </div>
-  <div style="padding:3px 6px;margin-bottom:5px;background:rgba(168,85,247,0.14);border-left:2px solid #c084fc;color:#e9d5ff;font-size:9.3px;">
-    ◆ ${(resolvedMoves[0]?.operator || "NEGATION").toUpperCase()} ◆ "${resolvedMoves[0]?.from || "baseline"}" → "${resolvedMoves[0]?.to || "orthogonal variant"}"
-  </div>
-  <pre style="margin:0;padding:5px 6px;background:rgba(2,6,23,0.85);border-radius:5px;color:#94a3b8;font-size:9px;line-height:1.35;white-space:pre-wrap;overflow-x:auto;">${trailLines.replace(/</g, "&lt;")}</pre>
-</div>`;
+</details>`;
 }
