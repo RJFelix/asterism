@@ -301,6 +301,41 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.equal(unfoldData.unfoldedNodeIds.length, 3, "Remaining 3 shadow branches for the seed node unfold on receipt");
     assert.equal(unfoldData.attentionBroker.shadowCount, 0, "All shadow branches are now unfolded");
 
+    // Verify T3-style Global Workspace Projects (`GET /api/projects` & `POST /api/projects`)
+    const projRes = await fetch(`${baseUrl}/api/projects`);
+    assert.equal(projRes.status, 200);
+    const projData = await projRes.json();
+    assert.equal(projData.activeProjectId, "proj-misc-attic", "Default project must be the 'anything goes' misc repo so development never blocks");
+    assert.equal(projData.activeProject.isDefaultMisc, true);
+    assert.ok(projData.projects.length >= 2);
+
+    const switchProjRes = await fetch(`${baseUrl}/api/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activeProjectId: "proj-asterism" }),
+    });
+    assert.equal(switchProjRes.status, 200);
+    const switchProjData = await switchProjRes.json();
+    assert.equal(switchProjData.activeProjectId, "proj-asterism");
+
+    // Verify TheBrain-style Plex Focus & Multi-View Projection (`POST /api/views/plex`)
+    const plexRes = await fetch(`${baseUrl}/api/views/plex`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        focusNodeId: "node-hydro",
+        viewProjection: "plex",
+        applyLayout: true,
+      }),
+    });
+    assert.equal(plexRes.status, 200);
+    const plexData = await plexRes.json();
+    assert.equal(plexData.viewProjection, "plex");
+    assert.equal(plexData.focusNodeId, "node-hydro");
+    assert.ok(plexData.parents.some((p) => p.id === "node-brief"), "Plex must identify node-brief as parent of node-hydro");
+    assert.ok(plexData.children.some((c) => c.id === "node-spec-a"), "Plex must identify node-spec-a as child of node-hydro");
+    assert.ok(plexData.lateral.some((l) => l.id === "node-robotics"), "Plex must identify node-robotics as lateral peer of node-hydro");
+
     // Reset back to clean default state
     await fetch(`${baseUrl}/api/reset`, { method: "POST" });
   } finally {

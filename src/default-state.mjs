@@ -71,8 +71,27 @@ const BRIEF_CODE_HTML = `<div style="font-family:'JetBrains Mono',ui-monospace,m
 
 export function getDefaultCanvasState() {
   return {
-    version: 4,
+    version: 5,
     updatedAt: new Date().toISOString(),
+    activeProjectId: "proj-misc-attic",
+    projects: [
+      {
+        id: "proj-misc-attic",
+        name: "agent-attic (misc)",
+        repoPath: "/home/exedev/agent-attic/repos/asterism",
+        isDefaultMisc: true,
+        description: "Default 'anything goes' misc repository — development never blocks waiting for a repo assignment.",
+      },
+      {
+        id: "proj-asterism",
+        name: "asterism",
+        repoPath: "/home/exedev/agent-attic/repos/asterism",
+        isDefaultMisc: false,
+        description: "Asterism spatial canvas & active knowledge engine.",
+      },
+    ],
+    viewProjection: "canvas",
+    plexFocusNodeId: "node-hydro",
     viewport: { x: 65, y: 55, scale: 0.88 },
     strokes: [],
     edges: [

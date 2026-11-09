@@ -605,11 +605,240 @@ export function createAsterismServer(options = {}) {
         if (Array.isArray(next.edges)) canvasState.edges = next.edges;
         if (Array.isArray(next.strokes)) canvasState.strokes = next.strokes;
         if (next.viewport) canvasState.viewport = next.viewport;
+        if (typeof next.activeProjectId === "string") {
+          canvasState.activeProjectId = next.activeProjectId;
+        }
+        if (Array.isArray(next.projects)) {
+          canvasState.projects = next.projects;
+        }
+        if (typeof next.viewProjection === "string") {
+          canvasState.viewProjection = next.viewProjection;
+        }
+        if (typeof next.plexFocusNodeId === "string") {
+          canvasState.plexFocusNodeId = next.plexFocusNodeId;
+        }
         saveState(canvasState);
         broadcastState();
         return sendJson(res, 200, canvasState);
       } catch (err) {
         return sendJson(res, 400, { error: err.message });
+      }
+    }
+
+    // T3-Style Global Workspace Projects (`GET /api/projects` & `POST /api/projects`)
+    // Defaults to an "anything goes" misc repo (`proj-misc-attic`) so development never blocks
+    // waiting to know which repo a card belongs to, while letting users switch or add projects.
+    if (
+      (req.method === "GET" || req.method === "POST") &&
+      url.pathname === "/api/projects"
+    ) {
+      try {
+        if (!Array.isArray(canvasState.projects) || canvasState.projects.length === 0) {
+          const def = getDefaultCanvasState();
+          canvasState.projects = def.projects;
+          canvasState.activeProjectId = def.activeProjectId;
+        }
+        if (req.method === "GET") {
+          const activeProject =
+            canvasState.projects.find((p) => p.id === canvasState.activeProjectId) ||
+            canvasState.projects[0];
+          return sendJson(res, 200, {
+            activeProjectId: activeProject.id,
+            activeProject,
+            projects: canvasState.projects,
+          });
+        }
+        const body = await readJsonBody(req);
+        if (body.name && body.repoPath) {
+          const newProj = {
+            id: body.id || `proj-${Date.now().toString(36)}`,
+            name: String(body.name).trim(),
+            repoPath: String(body.repoPath).trim(),
+            isDefaultMisc: Boolean(body.isDefaultMisc),
+            description:
+              body.description || `Project workspace at ${body.repoPath}`,
+          };
+          canvasState.projects = canvasState.projects.filter(
+            (p) => p.id !== newProj.id,
+          );
+          canvasState.projects.push(newProj);
+          canvasState.activeProjectId = newProj.id;
+        } else if (body.activeProjectId) {
+          const exists = canvasState.projects.find(
+            (p) => p.id === body.activeProjectId,
+          );
+          if (!exists) {
+            return sendJson(res, 404, { error: "Project not found" });
+          }
+          canvasState.activeProjectId = exists.id;
+        }
+        const activeProject =
+          canvasState.projects.find((p) => p.id === canvasState.activeProjectId) ||
+          canvasState.projects[0];
+        saveState(canvasState);
+        broadcastState();
+        return sendJson(res, 200, {
+          activeProjectId: activeProject.id,
+          activeProject,
+          projects: canvasState.projects,
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // TheBrain-Style Plex Focus & Multi-View Graph Projection (`GET /api/views/plex` & `POST /api/views/plex`)
+    // Computes the Focus-and-Context neighborhood around `focusNodeId` (`parents` above, `children` below,
+    // `lateral` Jump/Matchmaker/Lens peers to the left & right) and optionally applies a clean Plex layout.
+    if (
+      (req.method === "GET" || req.method === "POST") &&
+      url.pathname === "/api/views/plex"
+    ) {
+      try {
+        const body = req.method === "POST" ? await readJsonBody(req) : {};
+        const visibleNodes = (canvasState.nodes || []).filter((n) => !n.shadowStaged);
+        const requestedId =
+          url.searchParams.get("focusNodeId") ||
+          body.focusNodeId ||
+          canvasState.plexFocusNodeId ||
+          visibleNodes[0]?.id;
+        const focusNode =
+          visibleNodes.find((n) => n.id === requestedId) || visibleNodes[0];
+        if (!focusNode) {
+          return sendJson(res, 404, { error: "No visible focus node found" });
+        }
+
+        const byId = new Map(visibleNodes.map((n) => [n.id, n]));
+        const parents = [];
+        const children = [];
+        const lateral = [];
+        const seen = new Set([focusNode.id]);
+
+        const isLateralEdge = (e, peerNode) =>
+          e.kind === "jump" ||
+          e.relation === "cross-pollinates" ||
+          e.relation === "annotates" ||
+          e.relation === "synthesizes" ||
+          e.relation === "implements" ||
+          peerNode?.kind === "lens" ||
+          (focusNode.parentId && peerNode?.id !== focusNode.parentId && e.to === focusNode.id);
+
+        for (const edge of canvasState.edges || []) {
+          if (edge.shadowStaged) continue;
+          if (edge.to === focusNode.id && byId.has(edge.from) && !seen.has(edge.from)) {
+            seen.add(edge.from);
+            const node = byId.get(edge.from);
+            if (isLateralEdge(edge, node)) {
+              lateral.push({ node, edge, direction: "incoming-lateral" });
+            } else {
+              parents.push({ node, edge });
+            }
+          } else if (
+            edge.from === focusNode.id &&
+            byId.has(edge.to) &&
+            !seen.has(edge.to)
+          ) {
+            seen.add(edge.to);
+            const node = byId.get(edge.to);
+            if (isLateralEdge(edge, node)) {
+              lateral.push({ node, edge, direction: "outgoing-lateral" });
+            } else {
+              children.push({ node, edge });
+            }
+          }
+        }
+
+        // Also include sibling forks sharing the same parent as lateral peers if not already connected
+        if (focusNode.parentId) {
+          for (const n of visibleNodes) {
+            if (n.parentId === focusNode.parentId && !seen.has(n.id)) {
+              seen.add(n.id);
+              lateral.push({
+                node: n,
+                edge: {
+                  id: `sibling-${n.id}`,
+                  from: focusNode.parentId,
+                  to: n.id,
+                  relation: "sibling-fork",
+                  label: "sibling fork",
+                },
+                direction: "sibling",
+              });
+            }
+          }
+        }
+
+        if (req.method === "POST") {
+          canvasState.plexFocusNodeId = focusNode.id;
+          if (body.viewProjection) {
+            canvasState.viewProjection = body.viewProjection;
+          }
+          if (body.applyLayout) {
+            const centerX = 620;
+            const centerY = 340;
+            focusNode.x = centerX - Math.round((focusNode.width || 380) / 2);
+            focusNode.y = centerY - Math.round((focusNode.height || 250) / 2);
+
+            parents.forEach(({ node }, idx) => {
+              const offset = (idx - (parents.length - 1) / 2) * 430;
+              node.x = Math.round(centerX + offset - (node.width || 380) / 2);
+              node.y = Math.max(25, focusNode.y - (node.height || 250) - 90);
+            });
+
+            children.forEach(({ node }, idx) => {
+              const offset = (idx - (children.length - 1) / 2) * 410;
+              node.x = Math.round(centerX + offset - (node.width || 370) / 2);
+              node.y = focusNode.y + (focusNode.height || 250) + 95;
+            });
+
+            lateral.forEach(({ node }, idx) => {
+              const side = idx % 2 === 0 ? -1 : 1;
+              const row = Math.floor(idx / 2);
+              node.x =
+                side < 0
+                  ? Math.max(20, focusNode.x - (node.width || 370) - 95)
+                  : focusNode.x + (focusNode.width || 380) + 95;
+              node.y = focusNode.y + row * 240;
+            });
+          }
+          saveState(canvasState);
+          broadcastState();
+        }
+
+        return sendJson(res, 200, {
+          viewProjection: canvasState.viewProjection || "plex",
+          focusNodeId: focusNode.id,
+          focusNode,
+          parents: parents.map((p) => ({
+            id: p.node.id,
+            nodeId: p.node.id,
+            title: p.node.title,
+            stage: p.node.stage,
+            surfaceRole: p.node.surfaceRole,
+            relation: p.edge.relation || p.edge.kind || "advances",
+          })),
+          children: children.map((c) => ({
+            id: c.node.id,
+            nodeId: c.node.id,
+            title: c.node.title,
+            stage: c.node.stage,
+            surfaceRole: c.node.surfaceRole,
+            relation: c.edge.relation || c.edge.kind || "advances",
+          })),
+          lateral: lateral.map((l) => ({
+            id: l.node.id,
+            nodeId: l.node.id,
+            title: l.node.title,
+            stage: l.node.stage,
+            surfaceRole: l.node.surfaceRole,
+            relation: l.edge.relation || l.edge.kind || "jump",
+            direction: l.direction,
+          })),
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
       }
     }
 
@@ -1985,10 +2214,20 @@ export function createAsterismServer(options = {}) {
         if (model) node.model = model;
         if (provider) node.provider = provider;
 
+        const activeProject =
+          (canvasState.projects || []).find(
+            (p) => p.id === canvasState.activeProjectId,
+          ) || (canvasState.projects || [])[0];
+        const targetRepoRoot =
+          activeProject?.repoPath && fs.existsSync(activeProject.repoPath)
+            ? activeProject.repoPath
+            : __dirname;
+        node.projectId = activeProject?.id || "proj-misc-attic";
+
         if (!node.worktree?.worktreePath) {
           node.worktree = await Effect.runPromise(
             createIsolatedWorktree({
-              repoRoot: __dirname,
+              repoRoot: targetRepoRoot,
               worktreesDir,
               nodeId: node.id,
             }),

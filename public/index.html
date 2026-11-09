@@ -640,6 +640,83 @@
       display: flex; gap: 6px;
     }
 
+    /* Global Project Pill */
+    .project-pill-btn {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(30, 41, 59, 0.55);
+      color: #cbd5e1;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 7px; padding: 4px 8px;
+      font-size: 11px; font-weight: 500; cursor: pointer;
+      white-space: nowrap;
+    }
+    .project-pill-btn:hover { border-color: rgba(56, 189, 248, 0.4); color: #f8fafc; }
+
+    /* Plex Focus Mode Dimming & Focal Ring */
+    body.view-plex .canvas-node.plex-distant {
+      opacity: 0.22;
+      filter: saturate(0.4);
+      transform: scale(0.96);
+    }
+    body.view-plex .canvas-node.plex-focal {
+      border-color: rgba(56, 189, 248, 0.78) !important;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3), 0 24px 52px rgba(0, 0, 0, 0.72) !important;
+    }
+    #plex-hud-banner {
+      display: none;
+      position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+      z-index: 95; align-items: center; gap: 10px;
+      padding: 5px 12px; border-radius: 99px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      font-size: 11px; color: #cbd5e1;
+      backdrop-filter: blur(12px);
+    }
+    body.view-plex #plex-hud-banner { display: flex; }
+
+    /* Table & Timeline Projection Views */
+    .projection-overlay {
+      display: none;
+      position: fixed;
+      inset: 64px 20px 20px 20px;
+      z-index: 90;
+      background: rgba(9, 13, 24, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(16px);
+      flex-direction: column;
+      overflow: hidden;
+    }
+    body.view-table #table-view-overlay,
+    body.view-timeline #timeline-view-overlay {
+      display: flex;
+    }
+    body.view-table #canvas-viewport,
+    body.view-timeline #canvas-viewport {
+      opacity: 0.12;
+      pointer-events: none;
+    }
+    .proj-table {
+      width: 100%; border-collapse: collapse; font-size: 11.5px; color: #e2e8f0;
+    }
+    .proj-table th {
+      text-align: left; padding: 9px 12px;
+      background: rgba(15, 23, 42, 0.95);
+      color: #94a3b8; font-weight: 600; font-size: 10.5px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+      position: sticky; top: 0;
+    }
+    .proj-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.09);
+      vertical-align: middle;
+    }
+    .proj-table tr:hover td {
+      background: rgba(56, 189, 248, 0.06);
+    }
+
     /* Status Toast */
     #status-toast {
       position: fixed; bottom: 16px; left: 16px; z-index: 100;
@@ -660,13 +737,25 @@
       <span class="brand-health-dot" id="brand-health-dot"></span>
     </div>
 
+    <button class="project-pill-btn" id="btn-project-pill" onclick="cycleOrPromptProject()" title="Global Workspace Project (defaults to 'agent-attic (misc)' so development never blocks waiting for a repo)">
+      <span style="opacity:0.75;">📁</span>
+      <span id="project-pill-label">agent-attic (misc)</span>
+    </button>
+
     <div class="ideabox-wrap" title="Drop a seed idea to generate 3 Ideonomy branches + 1 Matchmaker synthesis in the Shadow Graph">
       <span style="font-size:11.5px;opacity:0.8;">🌱</span>
       <input id="ideabox-input" class="ideabox-input" type="text" placeholder="Drop a seed idea... (Enter)" />
       <button class="ideabox-btn" onclick="submitIdeaBoxSeed()">Seed</button>
     </div>
 
-    <div class="mode-segmented" role="group" aria-label="Canvas Mode">
+    <div class="mode-segmented" id="view-switcher" role="group" aria-label="Graph View Projection">
+      <button class="seg-btn active" id="view-canvas" onclick="setViewProjection('canvas')" title="Freeform 2D Spatial Canvas">Canvas</button>
+      <button class="seg-btn" id="view-plex" onclick="setViewProjection('plex')" title="TheBrain-Style Focus-and-Context Plex (Parents Up, Children Down, Lateral Links Left/Right)">Plex</button>
+      <button class="seg-btn" id="view-table" onclick="setViewProjection('table')" title="Structured Organon Table Projection">Table</button>
+      <button class="seg-btn" id="view-timeline" onclick="setViewProjection('timeline')" title="Chronological Lineage & Revision Timeline">Timeline</button>
+    </div>
+
+    <div class="mode-segmented" id="tool-switcher" role="group" aria-label="Canvas Tool">
       <button class="seg-btn active" id="mode-select" onclick="setMode('select')">Select</button>
       <button class="seg-btn" id="mode-draw" onclick="setMode('draw')">Sketch</button>
       <button class="seg-btn" id="mode-connect" onclick="setMode('connect')">Connect</button>
@@ -691,6 +780,7 @@
           <button onclick="createNewSurface(); closeWorkspaceMenu();">＋ New Blank Card</button>
           <button onclick="openComparisonMatrix(); closeWorkspaceMenu();">⊞ Compare Forks Side-by-Side</button>
           <button onclick="synthesizeSelectedOrKept(); closeWorkspaceMenu();">⊕ Synthesize Forks</button>
+          <button onclick="promptAddProject(); closeWorkspaceMenu();">📁 Switch / Add Project Repo...</button>
           <hr />
           <button onclick="pulseBasalFreeEnergy(); closeWorkspaceMenu();">🔋 Pulse Basal Energy</button>
           <button onclick="pruneUnkeptForks(); closeWorkspaceMenu();">✂ Prune Unkept Forks</button>
@@ -701,6 +791,55 @@
       </div>
     </div>
   </header>
+
+  <div id="plex-hud-banner">
+    <span>🕸 <strong>Plex Focus:</strong> <span id="plex-focus-title">Diamond Stratum &amp; Energy Spec</span></span>
+    <span style="color:#64748b;">·</span>
+    <span style="color:#94a3b8;font-size:10.5px;">Click any connected card to pivot the Plex around it</span>
+    <button class="mini-btn" onclick="setViewProjection('canvas')">Exit Plex</button>
+  </div>
+
+  <div id="table-view-overlay" class="projection-overlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
+      <div>
+        <strong style="color:#f1f5f9;font-size:13px;">⊞ Organon Table Projection</strong>
+        <span style="color:#64748b;font-size:11px;margin-left:8px;">All thoughts, warrants, energy envelopes, and Ideonomy tuples in one relational grid</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="table-filter-input" type="text" placeholder="Filter by title, stage, or operator..." oninput="renderProjectionViews()" style="background:rgba(30,41,59,0.8);border:1px solid rgba(148,163,184,0.22);border-radius:6px;padding:4px 9px;color:#f8fafc;font-size:11px;width:220px;outline:none;" />
+        <button class="tool-btn synth-btn" onclick="synthesizeSelectedOrKept()">⊕ Synthesize Checked</button>
+        <button class="tool-btn" onclick="setViewProjection('canvas')">Back to Canvas</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow:auto;">
+      <table class="proj-table">
+        <thead>
+          <tr>
+            <th style="width:34px;"></th>
+            <th>Thought / Title</th>
+            <th>Stage</th>
+            <th>Active Facet</th>
+            <th>Warrant (pass / abstain)</th>
+            <th>Energy</th>
+            <th>Ideonomy Tuple</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="table-view-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="timeline-view-overlay" class="projection-overlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
+      <div>
+        <strong style="color:#f1f5f9;font-size:13px;">⏱ Lineage &amp; Evergreen Revision Timeline</strong>
+        <span style="color:#64748b;font-size:11px;margin-left:8px;">Ordered by Innovation Train stage progression &amp; regret-free revision branches</span>
+      </div>
+      <button class="tool-btn" onclick="setViewProjection('canvas')">Back to Canvas</button>
+    </div>
+    <div id="timeline-view-body" style="flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
 
   <div id="attention-drawer">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
@@ -853,11 +992,87 @@
     function setMode(nextMode) {
       mode = nextMode;
       connectSourceId = null;
-      document.querySelectorAll('.mode-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#tool-switcher .seg-btn').forEach(b => b.classList.remove('active'));
       const btn = document.getElementById('mode-' + nextMode);
       if (btn) btn.classList.add('active');
       viewportEl.className = nextMode === 'draw' ? 'mode-draw' : nextMode === 'connect' ? 'mode-connect' : '';
       if (nextMode === 'connect') showToast('Click a source panel header, then click a target panel header to link them.');
+    }
+
+    async function setViewProjection(nextView, targetFocusNodeId) {
+      state.viewProjection = nextView;
+      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline');
+      document.body.classList.add('view-' + nextView);
+      document.querySelectorAll('#view-switcher .seg-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('view-' + nextView);
+      if (btn) btn.classList.add('active');
+
+      if (nextView === 'plex') {
+        const focusId = targetFocusNodeId || focusedNodeId || state.plexFocusNodeId || 'node-hydro';
+        await focusPlexNode(focusId);
+      } else {
+        renderAll();
+      }
+    }
+
+    async function focusPlexNode(nodeId) {
+      if (!nodeId) return;
+      focusedNodeId = nodeId;
+      state.plexFocusNodeId = nodeId;
+      const res = await fetch('/api/views/plex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          focusNodeId: nodeId,
+          viewProjection: 'plex',
+          applyLayout: true
+        })
+      });
+      const data = await res.json();
+      if (data.focusNode) {
+        const titleEl = document.getElementById('plex-focus-title');
+        if (titleEl) titleEl.textContent = data.focusNode.title;
+        state.viewport = { x: 65, y: 55, scale: 0.86 };
+        renderAll();
+        showToast(
+          `🕸 Plex centered on "${data.focusNode.title}" (${data.parents?.length || 0} parent, ${data.children?.length || 0} children, ${data.lateral?.length || 0} lateral).`
+        );
+      }
+    }
+
+    async function cycleOrPromptProject() {
+      const projects = state.projects || [];
+      if (projects.length >= 2) {
+        const idx = projects.findIndex(p => p.id === state.activeProjectId);
+        const nextProj = projects[(idx + 1) % projects.length];
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activeProjectId: nextProj.id })
+        });
+        const data = await res.json();
+        if (data.activeProject) {
+          showToast(`📁 Active project switched to "${data.activeProject.name}" (${data.activeProject.repoPath}).`);
+        }
+      } else {
+        await promptAddProject();
+      }
+    }
+
+    async function promptAddProject() {
+      const name = window.prompt('Project name (or leave blank to keep current):', 'agent-attic (misc)');
+      if (!name) return;
+      const repoPath = window.prompt('Local repository path for isolated worktrees:', '/home/exedev/agent-attic/repos/asterism');
+      if (!repoPath) return;
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, repoPath })
+      });
+      const data = await res.json();
+      if (data.activeProject) {
+        showToast(`📁 Active project set to "${data.activeProject.name}".`);
+      }
     }
 
     function applyTransform() {
@@ -1302,6 +1517,21 @@
         const keepViewingDiff = card.classList.contains('viewing-diff');
         const resolvedRole = node.surfaceRole || defaultRoleForStage(node.stage);
 
+        let plexClass = '';
+        if (state.viewProjection === 'plex') {
+          const plexId = state.plexFocusNodeId || focusedNodeId || 'node-hydro';
+          const plexNode = state.nodes.find(n => n.id === plexId);
+          const isDirectEdge = state.edges.some(
+            e => (e.from === plexId && e.to === node.id) || (e.to === plexId && e.from === node.id)
+          );
+          const isSibling = plexNode && plexNode.parentId && node.parentId === plexNode.parentId;
+          if (node.id === plexId) {
+            plexClass = 'plex-focal';
+          } else if (!isDirectEdge && !isSibling) {
+            plexClass = 'plex-distant';
+          }
+        }
+
         card.className = [
           'canvas-node',
           `kind-${node.kind || 'surface'}`,
@@ -1310,6 +1540,7 @@
           `role-${resolvedRole}`,
           isSelected ? 'selected-for-synth' : '',
           isFocused ? 'is-focused' : '',
+          plexClass,
           keepEditing ? 'editing-html' : '',
           keepViewingDiff ? 'viewing-diff' : ''
         ].filter(Boolean).join(' ');
@@ -1478,9 +1709,24 @@
         });
       }
 
+      header.addEventListener('dblclick', (e) => {
+        if (e.target.closest('button') || e.target.closest('select')) return;
+        e.stopPropagation();
+        if (state.viewProjection === 'plex') {
+          focusPlexNode(nodeId);
+        } else {
+          setViewProjection('plex', nodeId);
+        }
+      });
+
       header.addEventListener('pointerdown', (e) => {
         if (e.target.closest('button') || e.target.closest('select')) return;
         e.stopPropagation();
+
+        if (state.viewProjection === 'plex' && state.plexFocusNodeId !== nodeId && !e.shiftKey && mode === 'select') {
+          focusPlexNode(nodeId);
+          return;
+        }
 
         if (focusedNodeId !== nodeId) {
           focusedNodeId = nodeId;
@@ -2157,12 +2403,121 @@
       });
     }
 
+    function renderProjectionViews() {
+      // 1. Update Active Project Pill
+      const projLbl = document.getElementById('project-pill-label');
+      if (projLbl) {
+        const projects = state.projects || [];
+        const activeProj =
+          projects.find(p => p.id === state.activeProjectId) ||
+          projects.find(p => p.isDefaultMisc) ||
+          { name: 'agent-attic (misc)', repoPath: '/home/exedev/agent-attic/repos/asterism' };
+        projLbl.textContent = activeProj.name;
+      }
+
+      // 2. Sync View Switcher & Plex Focus Banner
+      const viewProj = state.viewProjection || 'canvas';
+      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline');
+      document.body.classList.add('view-' + viewProj);
+      document.querySelectorAll('#view-switcher .seg-btn').forEach(b => b.classList.remove('active'));
+      const activeViewBtn = document.getElementById('view-' + viewProj);
+      if (activeViewBtn) activeViewBtn.classList.add('active');
+
+      const plexTitleEl = document.getElementById('plex-focus-title');
+      if (plexTitleEl) {
+        const pFocus = state.nodes.find(n => n.id === (state.plexFocusNodeId || focusedNodeId || 'node-hydro'));
+        if (pFocus) plexTitleEl.textContent = pFocus.title;
+      }
+
+      // 3. Populate Table Projection
+      const tableBody = document.getElementById('table-view-body');
+      const tableSub = document.getElementById('table-view-subtitle');
+      if (tableBody) {
+        if (tableSub) {
+          tableSub.textContent = `${state.nodes.length} nodes (${state.nodes.filter(n => !n.shadowStaged).length} visible · ${state.nodes.filter(n => n.shadowStaged).length} staged in Shadow Graph)`;
+        }
+        tableBody.innerHTML = state.nodes.map(n => {
+          const isChecked = selectedForSynth.has(n.id);
+          const role = n.surfaceRole || defaultRoleForStage(n.stage);
+          const pScore = typeof n.jevScore === 'number' ? `p=${n.jevScore}` : 'p=0.72';
+          const verdict = n.warrant?.verdict || (n.status === 'committed' ? 'pass' : 'calibrated');
+          const tokens = n.energy?.remainingTokens ?? 180;
+          const tupleText = n.ideonomy?.tupleLabel || (n.branchTag || 'canonical');
+          return `
+            <tr style="${n.shadowStaged ? 'opacity:0.65;' : ''}">
+              <td>
+                <button class="mini-btn" onclick="toggleNodeSynthSelection('${n.id}')">${isChecked ? '☑' : '☐'}</button>
+              </td>
+              <td>
+                <div style="font-weight:600;color:#f8fafc;">${n.title}</div>
+                <div style="font-size:10.5px;color:#64748b;margin-top:2px;">${n.id}${n.shadowStaged ? ' · 🌑 Shadow Staged' : ''}</div>
+              </td>
+              <td><span class="node-stage-pill">${(n.stage || 'note').toUpperCase()}</span></td>
+              <td style="font-family:ui-monospace,monospace;font-size:11px;color:#cbd5e1;">${role}</td>
+              <td style="font-family:ui-monospace,monospace;font-size:11px;color:${verdict === 'pass' ? '#6ee7b7' : '#38bdf8'};">${verdict} · ${pScore}</td>
+              <td style="font-family:ui-monospace,monospace;font-size:11px;color:#94a3b8;">${tokens} tok</td>
+              <td style="font-family:ui-monospace,monospace;font-size:10.5px;color:#fde68a;">${tupleText}</td>
+              <td>
+                <div style="display:flex;gap:5px;">
+                  <button class="mini-btn" onclick="setViewProjection('plex', '${n.id}')">🕸 Focus in Plex</button>
+                  <button class="mini-btn" onclick="commitBranch('${n.id}', false)">✓ Keep</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // 4. Populate Timeline Projection
+      const timelineBody = document.getElementById('timeline-view-body');
+      if (timelineBody) {
+        const stagesOrder = ['note', 'brainstorm', 'refine', 'design', 'implement'];
+        const sortedNodes = [...state.nodes].sort((a, b) => {
+          const sa = stagesOrder.indexOf(a.stage || 'note');
+          const sb = stagesOrder.indexOf(b.stage || 'note');
+          if (sa !== sb) return sa - sb;
+          return String(a.id).localeCompare(String(b.id));
+        });
+        timelineBody.innerHTML = sortedNodes.map(n => {
+          const parent = state.nodes.find(p => p.id === n.parentId);
+          const revCount = Array.isArray(n.revisions) ? n.revisions.length : 0;
+          const tupleBadge = n.ideonomy?.tupleLabel
+            ? `<span style="color:#fde68a;font-family:ui-monospace,monospace;font-size:10.5px;">⧖ ${n.ideonomy.tupleLabel}</span>`
+            : '';
+          return `
+            <div class="timeline-entry">
+              <div class="timeline-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                  <div>
+                    <span class="node-stage-pill" style="margin-right:6px;">${(n.stage || 'note').toUpperCase()}</span>
+                    <strong style="color:#f8fafc;font-size:13px;">${n.title}</strong>
+                    ${n.shadowStaged ? '<span style="margin-left:6px;color:#fde68a;font-size:10.5px;">🌑 Shadow Staged</span>' : ''}
+                  </div>
+                  <div style="display:flex;gap:6px;align-items:center;">
+                    ${tupleBadge}
+                    <button class="mini-btn" onclick="setViewProjection('plex', '${n.id}')">🕸 Focus in Plex</button>
+                  </div>
+                </div>
+                <div style="font-size:11px;color:#94a3b8;display:flex;gap:14px;flex-wrap:wrap;">
+                  <span>Facet: <strong style="color:#cbd5e1;">${n.surfaceRole || defaultRoleForStage(n.stage)}</strong></span>
+                  ${parent ? `<span>Derived from: <strong style="color:#38bdf8;">${parent.title}</strong></span>` : '<span>Root Seed Node</span>'}
+                  <span>Revisions: <strong style="color:#cbd5e1;">v${revCount + 1}</strong></span>
+                  ${n.worktree?.branchName ? `<span>Branch: <code style="color:#6ee7b7;">${n.worktree.branchName}</code></span>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
     function renderAll() {
       applyTransform();
       renderNodes();
       renderEdges();
       renderStrokes();
       updateAttentionAndWeatherUI();
+      renderProjectionViews();
     }
 
     const evtSource = new EventSource('/api/events');
