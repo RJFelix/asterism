@@ -362,3 +362,134 @@ export function shouldBranchForRegretMinimization(input: {
   const hasDownstream = input.edges.some((e) => e.from === input.nodeId);
   return hasDownstream;
 }
+
+/**
+ * 7. Combinatorial Ideonomy Axes & Matchmaker Cross-Pollination (`Expand Δ` + `Couple ⋈`)
+ */
+export interface IdeonomyAxis {
+  readonly id: string;
+  readonly label: string;
+  readonly stance: "ideonomist" | "advocate" | "critic" | "matchmaker";
+  readonly operator: "expand" | "couple" | "verify" | "translate";
+  readonly promptTemplate: string;
+}
+
+export const DEFAULT_IDEONOMY_AXES: ReadonlyArray<IdeonomyAxis> = [
+  {
+    id: "inversion-zero-ui",
+    label: "Inversion × Ambient / Zero-Friction",
+    stance: "ideonomist",
+    operator: "expand",
+    promptTemplate:
+      "Invert the primary interaction assumption: make it ambient, proactive, and zero-friction",
+  },
+  {
+    id: "steelman-prototype",
+    label: "Advocate × Concrete Interactive Specimen",
+    stance: "advocate",
+    operator: "translate",
+    promptTemplate:
+      "Steelman the seed idea with a concrete, tactile UI prototype & interactive controls",
+  },
+  {
+    id: "redteam-invariant",
+    label: "Critic / Red-Teamer × Failure-Mode Stress Test",
+    stance: "critic",
+    operator: "verify",
+    promptTemplate:
+      "Probe failure modes, edge-case bottlenecks, and formal invariants that could break this idea",
+  },
+];
+
+/**
+ * Computes lexical + semantic-token Jaccard/overlap affinity between a seed thought and
+ * existing nodes in the Brain graph so the Matchmaker stance can discover distant Jump links
+ * and propose `⊕ Synthesis` hybrids.
+ */
+export function rankMatchmakerCandidates<
+  T extends {
+    readonly id: string;
+    readonly title?: string;
+    readonly branchTag?: string;
+    readonly stage?: string;
+    readonly surfaceRole?: string;
+    readonly state?: Record<string, unknown>;
+    readonly html?: string;
+  },
+>(
+  seedText: string,
+  existingNodes: ReadonlyArray<T>,
+  excludeIds: ReadonlySet<string> = new Set(),
+): ReadonlyArray<{
+  readonly node: T;
+  readonly affinityScore: number;
+  readonly sharedConcepts: ReadonlyArray<string>;
+}> {
+  const tokenize = (txt: string): Set<string> => {
+    const stop = new Set([
+      "the",
+      "and",
+      "for",
+      "with",
+      "that",
+      "this",
+      "from",
+      "into",
+      "panel",
+      "node",
+      "surface",
+      "style",
+      "div",
+      "span",
+      "class",
+      "rgba",
+      "font",
+      "color",
+    ]);
+    return new Set(
+      txt
+        .toLowerCase()
+        .replace(/<[^>]+>/g, " ")
+        .split(/[^a-z0-9]+/)
+        .filter((w) => w.length >= 3 && !stop.has(w)),
+    );
+  };
+
+  const seedTokens = tokenize(seedText);
+  return existingNodes
+    .filter((n) => !excludeIds.has(n.id))
+    .map((node) => {
+      const nodeCorpus = [
+        node.title || "",
+        node.branchTag || "",
+        node.stage || "",
+        node.surfaceRole || "",
+        JSON.stringify(node.state || {}),
+      ].join(" ");
+      const nodeTokens = tokenize(nodeCorpus);
+      const shared: string[] = [];
+      for (const tok of seedTokens) {
+        if (nodeTokens.has(tok)) shared.push(tok);
+      }
+      // Base structural diversity bonus (coupling an Intent/Dialogue with a World/Artifact or Spec)
+      const diversityBonus =
+        node.surfaceRole === "artifact-harness"
+          ? 0.28
+          : node.surfaceRole === "spec-diagram"
+            ? 0.24
+            : 0.18;
+      const overlap =
+        seedTokens.size > 0
+          ? shared.length / Math.sqrt(seedTokens.size * Math.max(1, nodeTokens.size))
+          : 0;
+      const affinityScore =
+        Math.round(Math.min(0.98, diversityBonus + overlap * 1.35) * 100) / 100;
+      return {
+        node,
+        affinityScore,
+        sharedConcepts: shared.slice(0, 5),
+      };
+    })
+    .sort((a, b) => b.affinityScore - a.affinityScore);
+}
+

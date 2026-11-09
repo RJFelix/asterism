@@ -378,6 +378,105 @@
       border-radius: 10px;
       overflow: hidden;
     }
+
+    /* Autonomous Idea Box Bar + Attention Broker Drawer + Shadow Badges */
+    .ideabox-wrap {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(9, 13, 24, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 8px;
+      padding: 3px 6px;
+    }
+    .ideabox-input {
+      background: transparent;
+      border: none;
+      color: #f8fafc;
+      font-size: 11px;
+      width: 215px;
+      outline: none;
+    }
+    .ideabox-btn {
+      background: linear-gradient(135deg, #0284c7, #7c3aed);
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 10.5px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .ideabox-btn:hover { opacity: 0.92; }
+
+    .shadow-badge-btn {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      background: rgba(251, 191, 36, 0.2);
+      color: #fde68a;
+      border: 1px dashed rgba(251, 191, 36, 0.65);
+      border-radius: 5px;
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: 700;
+      cursor: pointer;
+      animation: pulseShadow 2.2s infinite ease-in-out;
+    }
+    .shadow-badge-btn.has-shadow { display: inline-flex; }
+    @keyframes pulseShadow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.25); }
+      50% { box-shadow: 0 0 10px 2px rgba(251, 191, 36, 0.45); }
+    }
+
+    #attention-drawer {
+      display: none;
+      position: fixed;
+      top: 64px;
+      right: 18px;
+      width: 430px;
+      max-height: calc(100vh - 115px);
+      z-index: 230;
+      background: rgba(9, 13, 24, 0.96);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 13px;
+      box-shadow: 0 22px 55px rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(16px);
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #attention-drawer.open { display: flex; }
+    .attn-item {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 9px;
+      padding: 9px 11px;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+    .attn-item.shadow-item {
+      border-color: rgba(251, 191, 36, 0.5);
+    }
+
+    /* Ambient Weather Bar for Standing Feature Tenders & Shadow Incubation */
+    #ambient-weather-bar {
+      position: fixed;
+      bottom: 14px;
+      right: 16px;
+      z-index: 120;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border-radius: 99px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+      font-size: 11px;
+      color: #cbd5e1;
+      backdrop-filter: blur(12px);
+    }
     .wt-meta {
       display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap;
     }
@@ -488,17 +587,47 @@
       <span class="brand-star">✦</span>
       <span>ASTERISM</span>
     </div>
-    <button class="tool-btn active" id="mode-select" onclick="setMode('select')">↖ Pan / Interact</button>
+    <div class="ideabox-wrap" title="Drop a 1-sentence seed thought: reifies into an Ideonomist (Δ) + Advocate (∃) + Red-Team Critic (∇) + Matchmaker (⋈) constellation in the Shadow Graph!">
+      <span style="font-size:12px;">💡</span>
+      <input id="ideabox-input" class="ideabox-input" type="text" placeholder="Drop a seed idea into the Idea Box..." />
+      <button class="ideabox-btn" onclick="submitIdeaBoxSeed()">Reify Seed</button>
+    </div>
+    <button class="tool-btn active" id="mode-select" onclick="setMode('select')">↖ Pan</button>
     <button class="tool-btn" id="mode-draw" onclick="setMode('draw')">✎ Sketch</button>
-    <button class="tool-btn" id="mode-connect" onclick="setMode('connect')">⤳ Wire Panels</button>
-    <button class="tool-btn" onclick="createNewSurface()">＋ New Proposal</button>
-    <button class="tool-btn synth-btn" id="btn-synthesize" onclick="synthesizeSelectedOrKept()" title="Select 2+ panels (even a Spec + a UI Prototype!) to converge them into a unified hybrid surface">⊕ Synthesize Panels</button>
-    <button class="tool-btn" onclick="openComparisonMatrix()" title="Project 2+ selected or speculative sibling forks into a single side-by-side Comparison Matrix Lens">⊞ Compare Matrix Lens</button>
-    <button class="tool-btn" onclick="pulseBasalFreeEnergy()" title="Allocate excess 'effective free' Basal Metabolic Energy to exhausted or high-EVOI frontier directions">🔋 Basal Energy Pulse</button>
-    <button class="tool-btn" onclick="pruneUnkeptForks()" title="Remove only speculative branches you haven't marked Keep">✂ Prune Unkept</button>
-    <button class="tool-btn" onclick="clearSketches()">⌫ Clear Ink</button>
+    <button class="tool-btn" id="mode-connect" onclick="setMode('connect')">⤳ Wire</button>
+    <button class="tool-btn synth-btn" id="btn-synthesize" onclick="synthesizeSelectedOrKept()" title="Select 2+ panels to converge them into a unified hybrid surface">⊕ Synthesize</button>
+    <button class="tool-btn" onclick="openComparisonMatrix()" title="Project 2+ selected or speculative sibling forks into a single side-by-side Comparison Matrix Lens">⊞ Matrix Lens</button>
+    <button class="tool-btn" id="btn-attention-broker" onclick="toggleAttentionBroker()" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;font-weight:600;" title="Open EVOI Attention Broker Playlist & Shadow Incubation Queue">📡 Attention Queue (3)</button>
+    <button class="tool-btn" onclick="pulseBasalFreeEnergy()" title="Allocate excess 'effective free' Basal Metabolic Energy to exhausted or high-EVOI frontier directions">🔋 Basal Pulse</button>
+    <button class="tool-btn" onclick="pruneUnkeptForks()" title="Remove only speculative branches you haven't marked Keep">✂ Prune</button>
     <button class="tool-btn" onclick="resetCanvas()">↺ Reset</button>
     <span class="zoom-readout" id="zoom-label">84%</span>
+  </div>
+
+  <div id="attention-drawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.2);">
+      <div>
+        <strong style="color:#38bdf8;font-size:12.5px;">📡 Attention Broker &amp; Shadow Graph Queue</strong>
+        <div style="color:#94a3b8;font-size:10px;">Ranked by Expected Value of Information per Human Second (EVOI)</div>
+      </div>
+      <div style="display:flex;gap:5px;">
+        <button class="mini-btn" onclick="unfoldAllShadowBranches()" style="color:#fde68a;border-color:rgba(251,191,36,0.5);">🌑 Unfold All Shadow</button>
+        <button class="mini-btn" onclick="toggleAttentionBroker()">✕</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:rgba(30,41,59,0.7);border-bottom:1px solid rgba(148,163,184,0.14);font-size:10.5px;">
+      <span id="attn-summary-lbl" style="color:#cbd5e1;">⚡ 2 min Triage Playlist</span>
+      <button class="mini-btn" onclick="autoResolveTopAttentionItem()" style="background:rgba(16,185,129,0.18);color:#6ee7b7;border-color:rgba(16,185,129,0.45);font-weight:600;">💤 Let Agent Decide Top (AskDefault)</button>
+    </div>
+    <div id="attention-list" style="padding:10px 12px;overflow-y:auto;flex:1;"></div>
+  </div>
+
+  <div id="ambient-weather-bar">
+    <span style="color:#34d399;font-weight:700;">🌿 1 Feature Tender Healthy (SO-100 Arm • 0 drift)</span>
+    <span>•</span>
+    <span id="weather-shadow-lbl" style="color:#fde68a;cursor:pointer;" onclick="toggleAttentionBroker()">🌑 0 Shadow Branches Staged</span>
+    <span>•</span>
+    <span style="color:#38bdf8;cursor:pointer;" onclick="pulseBasalFreeEnergy()">🔋 Basal Floor: 2.4k tok/tick</span>
   </div>
 
   <div id="compare-modal">
@@ -644,6 +773,9 @@
 
     function edgeStyleFor(edge, toNode) {
       const rel = edge.relation || edge.kind || 'advances';
+      if (rel === 'cross-pollinates' || edge.kind === 'jump') {
+        return { stroke: 'rgba(251, 191, 36, 0.92)', marker: 'url(#arrow-synth)', textFill: '#fde68a', dash: '5 3' };
+      }
       if (rel === 'synthesizes' || rel === 'synthesis') {
         return { stroke: 'rgba(251, 191, 36, 0.85)', marker: 'url(#arrow-synth)', textFill: '#fde68a', dash: '' };
       }
@@ -665,9 +797,10 @@
     function renderEdges() {
       edgesGroup.innerHTML = '';
       for (const edge of state.edges) {
+        if (edge.shadowStaged) continue;
         const from = state.nodes.find(n => n.id === edge.from);
         const to = state.nodes.find(n => n.id === edge.to);
-        if (!from || !to) continue;
+        if (!from || !to || from.shadowStaged || to.shadowStaged) continue;
 
         const x1 = from.x + from.width;
         const y1 = from.y + from.height / 2;
@@ -843,6 +976,24 @@
                 nodeId: this.nodeId
               }, '*');
             },
+            unfoldShadowChildren() {
+              window.parent.postMessage({
+                type: 'asterism:unfold-shadow',
+                parentNodeId: this.nodeId
+              }, '*');
+            },
+            openAttentionBroker() {
+              window.parent.postMessage({
+                type: 'asterism:open-attention-broker',
+                nodeId: this.nodeId
+              }, '*');
+            },
+            submitIdeaBoxSeed(seedPrompt) {
+              window.parent.postMessage({
+                type: 'asterism:ideabox-seed',
+                seedPrompt: seedPrompt
+              }, '*');
+            },
             bindInputs(root) {
               const container = root || document;
               const els = container.querySelectorAll('input[data-state-key], select[data-state-key], textarea[data-state-key], input[name], select[name], textarea[name]');
@@ -918,12 +1069,13 @@
     }
 
     function renderNodes() {
-      const existingIds = new Set(state.nodes.map(n => n.id));
+      const visibleNodes = state.nodes.filter(n => !n.shadowStaged);
+      const visibleIds = new Set(visibleNodes.map(n => n.id));
       Array.from(nodesLayer.children).forEach(el => {
-        if (!existingIds.has(el.dataset.id)) el.remove();
+        if (!visibleIds.has(el.dataset.id)) el.remove();
       });
 
-      for (const node of state.nodes) {
+      for (const node of visibleNodes) {
         let card = nodesLayer.querySelector(`[data-id="${node.id}"]`);
         if (!card) {
           card = document.createElement('div');
@@ -967,6 +1119,7 @@
                 <button class="facet-tab" data-facet="artifact-harness" title="Crystallize as ⚙ Live Worktree / Code">⚙ Code</button>
               </div>
               <div class="facet-meta-right">
+                <button class="shadow-badge-btn" title="Background Ideonomy & Matchmaker branches staged in Shadow Graph — click to unfold onto canvas!"></button>
                 <span class="energy-pill" title="Metabolic Energy Envelope + Basal Free-Energy Floor (click to pulse Basal Energy)">🔋 3.6k</span>
                 <button class="tearoff-btn" title="Tear off active Facet into a side-by-side linked Lens Panel">⧉ Tear Off</button>
               </div>
@@ -1029,13 +1182,28 @@
           roleSelect.value = resolvedRole;
         }
 
-        // Update Facet Tabs & Energy Pill
+        // Update Facet Tabs, Shadow Badge & Energy Pill
         const facetsObj = node.facets || { [resolvedRole]: node.html };
         card.querySelectorAll('.facet-tab').forEach(tab => {
           const f = tab.dataset.facet;
           tab.classList.toggle('active', f === resolvedRole);
           tab.classList.toggle('cached', Boolean(facetsObj[f]));
         });
+
+        const shadowChildren = state.nodes.filter(n => n.shadowStaged && n.parentId === node.id);
+        const shadowBadge = card.querySelector('.shadow-badge-btn');
+        if (shadowBadge) {
+          if (shadowChildren.length > 0) {
+            const synthCount = shadowChildren.filter(n => n.stance === 'matchmaker').length;
+            const branchCount = shadowChildren.length - synthCount;
+            shadowBadge.textContent = `🌑 +${branchCount} Branches${synthCount > 0 ? ` • ${synthCount} Synthesis` : ''} (Unfold)`;
+            shadowBadge.classList.add('has-shadow');
+          } else {
+            shadowBadge.textContent = '';
+            shadowBadge.classList.remove('has-shadow');
+          }
+        }
+
         const energyPill = card.querySelector('.energy-pill');
         if (energyPill) {
           const rem = node.energy?.remainingTokens ?? 3600;
@@ -1124,6 +1292,14 @@
       const sendBtn = card.querySelector('.node-send-btn');
       const tearOffBtn = card.querySelector('.tearoff-btn');
       const energyPill = card.querySelector('.energy-pill');
+      const shadowBadge = card.querySelector('.shadow-badge-btn');
+
+      if (shadowBadge) {
+        shadowBadge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          unfoldShadowForParent(nodeId);
+        });
+      }
 
       card.querySelectorAll('.facet-tab').forEach(tab => {
         tab.addEventListener('click', (e) => {
@@ -1610,12 +1786,175 @@
         pulseBasalFreeEnergy();
       } else if (msg.type === 'asterism:open-compare-matrix') {
         openComparisonMatrix();
+      } else if (msg.type === 'asterism:unfold-shadow') {
+        unfoldShadowForParent(msg.parentNodeId);
+      } else if (msg.type === 'asterism:open-attention-broker') {
+        toggleAttentionBroker(true);
+      } else if (msg.type === 'asterism:ideabox-seed') {
+        submitIdeaBoxSeed(msg.seedPrompt);
       }
     });
 
+    async function submitIdeaBoxSeed(customPrompt) {
+      const inputEl = document.getElementById('ideabox-input');
+      const seedPrompt = (customPrompt || inputEl?.value || '').trim() ||
+        'Cross-pollinate epistemic confidence calibration with isolated Git worktree telemetry';
+      if (inputEl && !customPrompt) inputEl.value = '';
+
+      const center = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+      showToast('🌱 Idea Box: Reifying seed thought, linking Matchmaker Jump edge, and staging 4 Ideonomy + Matchmaker branches in Shadow Graph...', 18000);
+      const res = await fetch('/api/ideabox/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seedPrompt,
+          x: Math.round(center.x - 210),
+          y: Math.round(center.y - 160)
+        })
+      });
+      const data = await res.json();
+      if (data.seedNode) {
+        const matchInfo = data.matchedTargetNode
+          ? `⋈ Lateral Jump linked to "${data.matchedTargetNode.title}" (${Math.round((data.affinityScore || 0) * 100)}% affinity)`
+          : '4 shadow branches staged';
+        showToast(`🌱 Seed "${data.seedNode.title}" created! ${matchInfo}. Click its 🌑 Shadow Badge or open 🔔 EVOI Queue to unfold!`);
+      }
+    }
+
+    async function unfoldShadowForParent(parentNodeId) {
+      showToast('🌑 Promote on Receipt: Unfolding staged Shadow Graph branches onto the 2D canvas...', 10000);
+      const res = await fetch('/api/shadow/unfold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentNodeId })
+      });
+      const data = await res.json();
+      if (data.unfoldedNodeIds?.length > 0) {
+        showToast(`🌑 Unfolded ${data.unfoldedNodeIds.length} background branch(es) onto the active canvas!`);
+      } else {
+        showToast('No staged shadow branches found for this node.');
+      }
+    }
+
+    async function unfoldAllShadowBranches() {
+      const res = await fetch('/api/shadow/unfold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      showToast(`🌑 Unfolded ${data.unfoldedNodeIds?.length || 0} shadow branch(es) onto the active canvas!`);
+    }
+
+    function toggleAttentionBroker(forceOpen) {
+      const drawer = document.getElementById('attention-drawer');
+      if (!drawer) return;
+      if (typeof forceOpen === 'boolean') {
+        drawer.classList.toggle('open', forceOpen);
+      } else {
+        drawer.classList.toggle('open');
+      }
+      updateAttentionAndWeatherUI();
+    }
+
+    async function autoResolveTopAttentionItem(nodeId) {
+      showToast('💤 Hydro.Workflow.Ask: Resolving via non-blocking askDefault so agents keep advancing...', 10000);
+      const res = await fetch('/api/attention/auto-resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId })
+      });
+      const data = await res.json();
+      if (data.resolvedNode) {
+        showToast(`💤 Auto-resolved "${data.resolvedNode.title}" via askDefault (${data.resolvedAction?.label || 'Keep & Promote'})!`);
+      }
+    }
+
+    function computeClientEVOI(node) {
+      if (typeof node.evoiScore === 'number') return node.evoiScore;
+      const p = typeof node.jevScore === 'number' ? node.jevScore : 0.72;
+      const entropy = 4 * p * (1 - p);
+      const downstreamCount = state.edges.filter(e => e.from === node.id).length;
+      const impact = 1 + downstreamCount * 0.45 + (node.stage === 'implement' ? 0.5 : 0.25);
+      const unblock = node.shadowStaged ? 1.35 : node.status === 'ready' ? 1.15 : 0.75;
+      return Number((entropy * impact * unblock).toFixed(3));
+    }
+
+    function updateAttentionAndWeatherUI() {
+      const shadowNodes = state.nodes.filter(n => n.shadowStaged);
+      const visibleNodes = state.nodes.filter(n => !n.shadowStaged);
+      const jumpEdges = state.edges.filter(e => e.relation === 'cross-pollinates' || e.kind === 'jump');
+
+      // Rank candidates by EVOI
+      const ranked = state.nodes
+        .filter(n => n.shadowStaged || n.kind === 'speculative' || n.askDefault || typeof n.jevScore === 'number')
+        .map(n => ({
+          node: n,
+          evoi: computeClientEVOI(n),
+          p: typeof n.jevScore === 'number' ? n.jevScore : 0.72
+        }))
+        .sort((a, b) => b.evoi - a.evoi);
+
+      const topEvoi = ranked[0]?.evoi ?? 0;
+      const btnBroker = document.getElementById('btn-attention-broker');
+      if (btnBroker) {
+        btnBroker.textContent = shadowNodes.length > 0
+          ? `🔔 EVOI Queue (${ranked.length}) • 🌑 ${shadowNodes.length} Shadow`
+          : `🔔 EVOI Queue (${ranked.length})`;
+      }
+
+      const wShadow = document.getElementById('weather-shadow-count');
+      if (wShadow) wShadow.textContent = `${shadowNodes.length} staged`;
+      const wVisible = document.getElementById('weather-visible-count');
+      if (wVisible) wVisible.textContent = `${visibleNodes.length} visible`;
+      const wJumps = document.getElementById('weather-jumps-count');
+      if (wJumps) wJumps.textContent = `${jumpEdges.length} lateral`;
+      const wTopEvoi = document.getElementById('weather-top-evoi');
+      if (wTopEvoi) wTopEvoi.textContent = topEvoi.toFixed(2);
+
+      const listEl = document.getElementById('attention-list');
+      if (!listEl) return;
+      if (ranked.length === 0) {
+        listEl.innerHTML = `<div style="color:#64748b;font-size:11.5px;padding:10px;">No pending high-EVOI forks or Shadow Graph nodes. Drop a seed thought in the 🌱 Idea Box above!</div>`;
+        return;
+      }
+
+      listEl.innerHTML = ranked.slice(0, 8).map(({ node, evoi, p }) => {
+        const stanceBadge = (node.stance || node.surfaceRole || 'agent').toUpperCase();
+        const shadowTag = node.shadowStaged
+          ? `<span style="background:rgba(168,85,247,0.22);color:#d8b4fe;padding:1px 6px;border-radius:99px;font-size:9.5px;font-weight:700;">🌑 SHADOW STAGED</span>`
+          : `<span style="background:rgba(56,189,248,0.16);color:#38bdf8;padding:1px 6px;border-radius:99px;font-size:9.5px;font-weight:700;">VISIBLE</span>`;
+        const askLabel = node.askDefault?.label || 'Promote & Keep (Default)';
+        return `
+          <div class="attention-item">
+            <div class="attention-item-top">
+              <div class="attention-item-title">${node.title}</div>
+              <span class="evoi-badge">EVOI ${evoi.toFixed(2)} • p=${p}</span>
+            </div>
+            <div class="attention-item-meta">
+              ${shadowTag}
+              <span>Stance: <strong style="color:#cbd5e1;">${stanceBadge}</strong></span>
+              <span>Model: <strong style="color:#cbd5e1;">${(node.model || 'gpt-6-luna').replace('openai/', '')}</strong></span>
+            </div>
+            <div class="attention-item-actions">
+              ${node.shadowStaged ? `<button class="mini-btn" style="background:rgba(168,85,247,0.22);color:#e9d5ff;border-color:rgba(168,85,247,0.45);" onclick="unfoldShadowForParent('${node.parentId || node.id}')">🌑 Unfold to Canvas</button>` : ''}
+              <button class="mini-btn" style="background:rgba(16,185,129,0.2);color:#6ee7b7;border-color:rgba(16,185,129,0.45);" onclick="autoResolveTopAttentionItem('${node.id}')">💤 ${askLabel}</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    const ideaboxInputEl = document.getElementById('ideabox-input');
+    if (ideaboxInputEl) {
+      ideaboxInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitIdeaBoxSeed();
+      });
+    }
+
     // Canvas panning & freehand sketching
     viewportEl.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.canvas-node') || e.target.closest('.hud-topbar')) return;
+      if (e.target.closest('.canvas-node') || e.target.closest('.hud-topbar') || e.target.closest('.attention-drawer')) return;
 
       if (mode === 'draw') {
         const pt = screenToWorld(e.clientX, e.clientY);
@@ -1654,7 +1993,7 @@
     });
 
     viewportEl.addEventListener('wheel', (e) => {
-      if (e.target.closest('.node-body')) return;
+      if (e.target.closest('.node-body') || e.target.closest('.attention-drawer')) return;
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
       const nextScale = Math.min(2.0, Math.max(0.3, state.viewport.scale * zoomFactor));
@@ -1730,6 +2069,7 @@
       renderNodes();
       renderEdges();
       renderStrokes();
+      updateAttentionAndWeatherUI();
     }
 
     const evtSource = new EventSource('/api/events');

@@ -218,6 +218,7 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
         facetRole: "spec-diagram",
         tearOff: true,
         prompt: "Crystallize architecture contract lens",
+        model: "offline-fast-facet",
       }),
     });
     assert.equal(facetRes.status, 200);
@@ -236,6 +237,54 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.ok(energyData.attentionQueue.length >= 6);
     assert.ok(typeof energyData.attentionQueue[0].evoiScore === "number");
 
+    // Autonomous Idea Box + Shadow Graph + Matchmaker Lateral Jump + EVOI Attention Broker (`/api/ideabox/seed`)
+    const seedRes = await fetch(`${baseUrl}/api/ideabox/seed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        seedPrompt: "Cross-pollinate epistemic confidence calibration with isolated Git worktree telemetry",
+      }),
+    });
+    assert.equal(seedRes.status, 200);
+    const seedData = await seedRes.json();
+    assert.ok(seedData.seedNode.id.startsWith("node-seed-"));
+    assert.equal(seedData.seedNode.shadowStaged, false, "Seed node itself is visible on canvas");
+    assert.equal(seedData.shadowBranches.length, 4, "Pipeline must stage 3 Ideonomy branches + 1 Matchmaker hybrid in the Shadow Graph");
+    assert.ok(seedData.shadowBranches.every((b) => b.shadowStaged === true), "All 4 generated background branches must be shadowStaged: true initially");
+    assert.ok(seedData.matchedTargetNode, "Matchmaker must discover a distant existing node to cross-pollinate");
+    assert.ok(seedData.jumpEdge, "Matchmaker must create a lateral Jump link (cross-pollinates)");
+    assert.equal(seedData.jumpEdge.kind, "jump");
+
+    // Verify GET /api/attention/queue ranks items by EVOI and reports shadowCount
+    const attnRes = await fetch(`${baseUrl}/api/attention/queue`);
+    assert.equal(attnRes.status, 200);
+    const attnData = await attnRes.json();
+    assert.equal(attnData.shadowCount, 4);
+    assert.ok(attnData.queue.length >= 4);
+    assert.ok(attnData.queue[0].evoiScore >= attnData.queue[1].evoiScore, "Attention Broker queue must be sorted descending by EVOI");
+
+    // Verify POST /api/attention/auto-resolve (`Hydro.Workflow.Ask` askDefault) resolves & unfolds the top item without blocking
+    const autoRes = await fetch(`${baseUrl}/api/attention/auto-resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nodeId: seedData.shadowBranches[0].id }),
+    });
+    assert.equal(autoRes.status, 200);
+    const autoData = await autoRes.json();
+    assert.equal(autoData.resolvedNode.shadowStaged, false, "Auto-resolving via askDefault promotes the shadow branch onto the canvas");
+    assert.equal(autoData.resolvedNode.status, "committed");
+
+    // Verify POST /api/shadow/unfold (`Promote on Receipt`) unfolds remaining shadow children for the seed node
+    const unfoldRes = await fetch(`${baseUrl}/api/shadow/unfold`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentNodeId: seedData.seedNode.id }),
+    });
+    assert.equal(unfoldRes.status, 200);
+    const unfoldData = await unfoldRes.json();
+    assert.equal(unfoldData.unfoldedNodeIds.length, 3, "Remaining 3 shadow branches for the seed node unfold on receipt");
+    assert.equal(unfoldData.attentionBroker.shadowCount, 0, "All shadow branches are now unfolded");
+
     // Reset back to clean default state
     await fetch(`${baseUrl}/api/reset`, { method: "POST" });
   } finally {
@@ -251,4 +300,5 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
 

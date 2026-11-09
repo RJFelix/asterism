@@ -1049,3 +1049,211 @@ test("Malleable HTML surface artifact is present and non-empty", () => {
     },
   };
 }
+
+/**
+ * Autonomous Idea Box Pipeline (Ideonomist Δ + Matchmaker ⋈ + Calibrated Jev Verify ∇):
+ * Takes a 1-sentence seed thought (or existing node), spawns combinatorial Ideonomy forks,
+ * discovers a high-affinity lateral Jump link to an existing thought in the Brain graph,
+ * and stages the resulting branches in the Shadow Graph (`shadowStaged: true`) with EVOI Attention Bids!
+ */
+export async function runIdeonomyAndMatchmakerPipeline({
+  seedNode,
+  seedPrompt,
+  matchedTargetNode,
+  affinityScore = 0.78,
+  sharedConcepts = [],
+}) {
+  const ts = Date.now();
+  const baseX = seedNode.x + (seedNode.width || 400) + 120;
+  const baseY = seedNode.y - 60;
+
+  const ideonomySpecs = [
+    {
+      suffix: "ideo-invert",
+      stance: "ideonomist",
+      operator: "Δ Expand (Inversion)",
+      title: `Ideonomy Δ: Zero-UI Ambient ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 26)}`,
+      surfaceRole: "dialogue",
+      stage: "brainstorm",
+      stratum: "intent",
+      model: "openai/gpt-6-luna",
+      pass: 0.86,
+      abstain: 0.14,
+      yOffset: 0,
+      badge: "💡 IDEONOMIST (Δ INVERSION)",
+      accent: "#38bdf8",
+      summary: `Inverts manual user workflows into an ambient background daemon for "${seedPrompt}".`,
+      askDefaultLabel: "Adopt Ambient Daemon Strategy",
+    },
+    {
+      suffix: "ideo-advocate",
+      stance: "advocate",
+      operator: "↓ Translate (Steelman UI)",
+      title: `Advocate ∃: Interactive Specimen — ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 22)}`,
+      surfaceRole: "ui-prototype",
+      stage: "design",
+      stratum: "prototype",
+      model: "openai/gpt-6.1-terra",
+      pass: 0.88,
+      abstain: 0.12,
+      yOffset: 295,
+      badge: "🎨 ADVOCATE (∃ PROTOTYPE)",
+      accent: "#f472b6",
+      summary: `Steelmans "${seedPrompt}" with a direct-manipulation UI specimen & live parameter sliders.`,
+      askDefaultLabel: "Promote Prototype to Active Train",
+    },
+    {
+      suffix: "ideo-critic",
+      stance: "critic",
+      operator: "∇ Verify (Red-Team)",
+      title: `Critic ∇: Invariant & Edge-Case Stress Test`,
+      surfaceRole: "spec-diagram",
+      stage: "refine",
+      stratum: "spec",
+      model: "openai/gpt-6.1-sol",
+      pass: 0.54,
+      abstain: 0.38,
+      yOffset: 590,
+      badge: "🛡 RED-TEAM CRITIC (∇ VERIFY)",
+      accent: "#fbbf24",
+      summary: `Identifies latency, state-drift, and safety invariants for "${seedPrompt}" (high epistemic entropy → high EVOI for human Steer!).`,
+      askDefaultLabel: "Enforce Fail-Closed Invariant",
+    },
+  ];
+
+  const shadowBranches = ideonomySpecs.map((spec, idx) => {
+    const id = `node-${spec.suffix}-${ts}-${idx}`;
+    const html = `<div style="font-family:system-ui,sans-serif;padding:12px;color:#e2e8f0;font-size:11.5px;line-height:1.42;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+    <span style="background:rgba(56,189,248,0.16);color:${spec.accent};padding:2px 7px;border-radius:99px;font-size:9.5px;font-weight:700;">${spec.badge}</span>
+    <span style="color:#34d399;font-family:monospace;font-size:10px;">ANoul(p=${spec.pass}, u=${spec.abstain})</span>
+  </div>
+  <div style="background:#0b1120;border:1px solid rgba(148,163,184,0.25);border-radius:8px;padding:9px;margin-bottom:8px;">
+    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">${spec.title}</div>
+    <p style="margin:0 0 8px;color:#94a3b8;font-size:10.5px;">${spec.summary}</p>
+    <div style="display:flex;align-items:center;gap:8px;font-size:10.5px;color:#cbd5e1;">
+      <span>Confidence Threshold:</span>
+      <input type="range" min="50" max="99" value="${Math.round(spec.pass * 100)}" data-state-key="thresholdPct" style="flex:1;accent-color:${spec.accent};" />
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#94a3b8;background:rgba(15,23,42,0.8);padding:5px 8px;border-radius:6px;">
+    <span>AskDefault: <code>${spec.askDefaultLabel}</code></span>
+    <button onclick="window.asterism.keepFork(false)" style="background:rgba(16,185,129,0.18);color:#6ee7b7;border:1px solid rgba(16,185,129,0.45);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;">✓ Keep</button>
+  </div>
+</div>`;
+
+    return {
+      id,
+      title: spec.title,
+      kind: "speculative",
+      stage: spec.stage,
+      stratum: spec.stratum,
+      surfaceRole: spec.surfaceRole,
+      stance: spec.stance,
+      relationFromParent:
+        spec.surfaceRole === "ui-prototype"
+          ? "visualizes-ui"
+          : spec.surfaceRole === "spec-diagram"
+            ? "specifies"
+            : "forks",
+      commitment: "speculative",
+      shadowStaged: true,
+      askDefault: spec.askDefaultLabel,
+      warrant: {
+        _tag: "Judged",
+        pass: spec.pass,
+        abstain: spec.abstain,
+        statement: `${spec.stance.toUpperCase()} evaluation for "${seedPrompt}"`,
+      },
+      jevScore: spec.pass,
+      x: baseX,
+      y: baseY + spec.yOffset,
+      width: 395,
+      height: 265,
+      model: spec.model,
+      provider: "chatgpt-gateway",
+      status: "speculative",
+      branchTag: `${spec.stance}:${spec.model.replace("openai/", "")}`,
+      parentId: seedNode.id,
+      parentIds: [seedNode.id],
+      state: {
+        thresholdPct: Math.round(spec.pass * 100),
+        stance: spec.stance,
+        askDefault: spec.askDefaultLabel,
+      },
+      facets: { [spec.surfaceRole]: html },
+      html,
+    };
+  });
+
+  // Matchmaker Cross-Pollination Hybrid (`Couple ⋈` across Seed + Distant Graph Node)
+  let matchmakerHybrid = null;
+  if (matchedTargetNode) {
+    const hybridId = `node-matchmaker-${ts}`;
+    const hybridPass = 0.87;
+    const hybridAbstain = 0.11;
+    const sharedStr =
+      sharedConcepts.length > 0
+        ? sharedConcepts.join(", ")
+        : "reactive state & verification";
+    const hybridHtml = `<div style="font-family:system-ui,sans-serif;padding:12px;color:#e2e8f0;font-size:11.5px;line-height:1.42;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+    <span style="background:rgba(251,191,36,0.18);color:#fbbf24;padding:2px 7px;border-radius:99px;font-size:9.5px;font-weight:700;">🧲 MATCHMAKER (⋈ CROSS-POLLINATION)</span>
+    <span style="color:#fde68a;font-family:monospace;font-size:10px;">Affinity=${affinityScore} • p=${hybridPass}</span>
+  </div>
+  <div style="background:#0b1120;border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:9px;margin-bottom:8px;">
+    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">⊕ Lateral Jump Synthesis: "${seedNode.title.slice(0, 22)}" × "${matchedTargetNode.title.slice(0, 22)}"</div>
+    <p style="margin:0 0 6px;color:#94a3b8;font-size:10.5px;">The Matchmaker agent scanned the Brain graph and discovered a high-affinity lateral connection (<code>${sharedStr}</code>) with <strong>${matchedTargetNode.title}</strong>.</p>
+    <div style="font-size:10px;color:#fcd34d;">Couples seed intent with existing <code>${matchedTargetNode.surfaceRole || matchedTargetNode.stage}</code> state.</div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#94a3b8;background:rgba(15,23,42,0.8);padding:5px 8px;border-radius:6px;">
+    <span>AskDefault: <code>Merge Cross-Pollinated Hybrid</code></span>
+    <button onclick="window.asterism.keepFork(false)" style="background:rgba(251,191,36,0.2);color:#fde68a;border:1px solid rgba(251,191,36,0.5);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;">✓ Keep Hybrid</button>
+  </div>
+</div>`;
+
+    matchmakerHybrid = {
+      id: hybridId,
+      title: `⊕ Matchmaker ⋈: ${seedNode.title.replace(/^Seed:\s*/i, "").slice(0, 18)} × ${matchedTargetNode.title.slice(0, 18)}`,
+      kind: "speculative",
+      stage: "design",
+      stratum: "prototype",
+      surfaceRole: "ui-prototype",
+      stance: "matchmaker",
+      relationFromParent: "synthesizes",
+      commitment: "speculative",
+      shadowStaged: true,
+      askDefault: "Merge Cross-Pollinated Hybrid",
+      warrant: {
+        _tag: "Judged",
+        pass: hybridPass,
+        abstain: hybridAbstain,
+        statement: `Matchmaker lateral synthesis with ${matchedTargetNode.id} (affinity=${affinityScore})`,
+      },
+      jevScore: hybridPass,
+      x: baseX + 430,
+      y: baseY + 180,
+      width: 405,
+      height: 270,
+      model: "openai/gpt-6-astra",
+      provider: "chatgpt-gateway",
+      status: "speculative",
+      branchTag: "matchmaker-hybrid",
+      parentId: seedNode.id,
+      parentIds: [seedNode.id, matchedTargetNode.id],
+      state: {
+        ...(seedNode.state || {}),
+        ...(matchedTargetNode.state || {}),
+        affinityScore,
+      },
+      facets: { "ui-prototype": hybridHtml },
+      html: hybridHtml,
+    };
+  }
+
+  return {
+    shadowBranches,
+    matchmakerHybrid,
+  };
+}
+

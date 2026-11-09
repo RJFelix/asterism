@@ -19,6 +19,7 @@ import {
   synthesizeNodes,
   advanceNodeStage,
   generateWorktreeImplementationBundle,
+  runIdeonomyAndMatchmakerPipeline,
 } from "./src/llm.mjs";
 import {
   makeSqliteEventSink,
@@ -36,6 +37,7 @@ import {
   computeAttentionBid,
   allocateBasalFreeEnergy,
   shouldBranchForRegretMinimization,
+  rankMatchmakerCandidates,
 } from "@asterism/core";
 import { CodexProviderCapabilitiesV2 } from "@t3tools/provider-codex/server/adapter";
 import { ClaudeProviderCapabilitiesV2 } from "@t3tools/provider-claude/server/adapter";
@@ -844,6 +846,7 @@ export function createAsterismServer(options = {}) {
           facetRole = "spec-diagram",
           tearOff = false,
           prompt,
+          model,
           commandId,
         } = await readJsonBody(req);
         const node = canvasState.nodes.find((n) => n.id === nodeId);
@@ -875,7 +878,7 @@ export function createAsterismServer(options = {}) {
               `Crystallize the "${facetRole}" facet lens for thought "${node.title}"`,
             neighborhood,
             existingRelatedCount: 0,
-            model: node.model || DEFAULT_MODEL,
+            model: model || node.model || DEFAULT_MODEL,
           });
           node.facets[facetRole] = generated.html;
           node.status = "ready";
@@ -1009,6 +1012,369 @@ export function createAsterismServer(options = {}) {
           totalGrantedTokens: result.totalGrantedTokens,
           allocations: result.allocations,
           attentionQueue,
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Helper to compute EVOI Attention Broker Queue & Shadow Graph Summary
+    function computeAttentionBrokerSnapshot() {
+      for (const n of canvasState.nodes) {
+        if (!n.energy) n.energy = createDefaultEnergyEnvelope();
+        const w = normalizeWarrant(n);
+        n.warrant = w.warrant;
+        const downstreamCount = (canvasState.edges || []).filter(
+          (e) => e.from === n.id,
+        ).length;
+        n.attentionBid = computeAttentionBid({
+          warrant: n.warrant,
+          jevScore: n.jevScore,
+          downstreamCount,
+          opticMode:
+            n.surfaceRole === "ui-prototype"
+              ? "exhibit"
+              : n.surfaceRole === "dialogue"
+                ? "steer"
+                : "observe",
+        });
+        n.evoiScore = n.attentionBid.evoiScore;
+      }
+
+      const shadowNodes = canvasState.nodes.filter((n) => n.shadowStaged);
+      const shadowByParent = {};
+      for (const sn of shadowNodes) {
+        const pid = sn.parentId || "root";
+        if (!shadowByParent[pid]) {
+          shadowByParent[pid] = {
+            parentId: pid,
+            count: 0,
+            synthesisCount: 0,
+            nodeIds: [],
+          };
+        }
+        shadowByParent[pid].count += 1;
+        if (sn.stance === "matchmaker" || sn.relationFromParent === "synthesizes") {
+          shadowByParent[pid].synthesisCount += 1;
+        }
+        shadowByParent[pid].nodeIds.push(sn.id);
+      }
+
+      const queue = canvasState.nodes
+        .filter((n) => n.shadowStaged || n.commitment === "speculative")
+        .sort(
+          (a, b) =>
+            (b.attentionBid?.evoiScore || 0) - (a.attentionBid?.evoiScore || 0),
+        )
+        .map((n) => ({
+          nodeId: n.id,
+          parentId: n.parentId || null,
+          title: n.title,
+          stance: n.stance || "explorer",
+          surfaceRole: n.surfaceRole || defaultRoleForStage(n.stage),
+          shadowStaged: Boolean(n.shadowStaged),
+          askDefault: n.askDefault || "Keep & Promote to Active Canvas",
+          evoiScore: n.attentionBid?.evoiScore ?? 0,
+          epistemicEntropy: n.attentionBid?.epistemicEntropy ?? 0,
+          pass: n.attentionBid?.pass ?? 0.5,
+          abstain: n.attentionBid?.abstain ?? 0.2,
+          estimatedHumanSeconds: n.attentionBid?.estimatedHumanSeconds ?? 15,
+          remainingTokens: n.energy?.remainingTokens ?? 3600,
+        }));
+
+      return {
+        shadowCount: shadowNodes.length,
+        shadowByParent,
+        queue,
+      };
+    }
+
+    // Autonomous Idea Box & Ideonomy + Matchmaker + Jev Pipeline (`/api/ideabox/seed`)
+    // Drops a 1-sentence seed into the Idea Box (or runs on an existing node), spawns combinatorial
+    // Ideonomy branches (Ideonomist Δ, Advocate ∃, Red-Team Critic ∇) + a lateral Matchmaker Jump Synthesis (⋈),
+    // and stages all background branches in the Shadow Graph (`shadowStaged: true`) so the human's viewport is never disrupted!
+    if (req.method === "POST" && url.pathname === "/api/ideabox/seed") {
+      try {
+        const body = await readJsonBody(req);
+        const prompt =
+          body.seedPrompt ||
+          body.prompt ||
+          "Autonomous voice + gesture co-design surface with live worktree verification";
+        const {
+          sourceNodeId,
+          unfoldImmediately = false,
+          x,
+          y,
+          commandId,
+        } = body;
+
+        let seedNode = sourceNodeId
+          ? canvasState.nodes.find((n) => n.id === sourceNodeId)
+          : null;
+
+        if (!seedNode) {
+          const ts = Date.now();
+          const seedId = `node-seed-${ts}`;
+          const maxY = canvasState.nodes
+            .filter((n) => !n.shadowStaged)
+            .reduce((m, n) => Math.max(m, n.y + (n.height || 300)), 40);
+          const seedHtml = `<div style="font-family:system-ui,sans-serif;padding:13px;color:#e2e8f0;font-size:11.5px;line-height:1.45;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+    <span style="background:rgba(56,189,248,0.18);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:9.5px;font-weight:700;">💡 IDEA BOX SEED • REIFIED THOUGHT</span>
+    <span style="color:#34d399;font-size:10px;font-family:monospace;">Ideonomy + Matchmaker Active</span>
+  </div>
+  <h4 style="margin:0 0 5px;color:#f8fafc;font-size:13px;">Seed: ${prompt.slice(0, 64)}</h4>
+  <p style="margin:0 0 8px;color:#94a3b8;font-size:11px;">Dropped into the Autonomous Idea Box. Background agents spawned <strong>3 Ideonomy Branches (Δ, ∃, ∇)</strong> and <strong>1 Lateral Matchmaker Synthesis (⋈)</strong> in the Shadow Graph badge above—click the badge or use the <strong>Attention Broker</strong> to unfold!</p>
+  <div style="display:flex;gap:6px;">
+    <button onclick="window.asterism.unfoldShadowChildren()" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid rgba(251,191,36,0.5);background:rgba(251,191,36,0.18);color:#fde68a;font-size:10.5px;font-weight:700;cursor:pointer;">🌑 Unfold Staged Shadow Branches</button>
+    <button onclick="window.asterism.openAttentionBroker()" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(56,189,248,0.45);background:rgba(56,189,248,0.15);color:#38bdf8;font-size:10.5px;font-weight:600;cursor:pointer;">📡 Attention Queue</button>
+  </div>
+</div>`;
+          seedNode = {
+            id: seedId,
+            title: `Seed: ${prompt.slice(0, 44)}`,
+            kind: "surface",
+            stage: "note",
+            stratum: "intent",
+            surfaceRole: "dialogue",
+            commitment: "committed",
+            shadowStaged: false,
+            warrant: {
+              _tag: "Open",
+              pass: 0.75,
+              abstain: 0.25,
+            },
+            energy: createDefaultEnergyEnvelope({ remainingTokens: 3600 }),
+            x: typeof x === "number" ? x : 25,
+            y: typeof y === "number" ? y : maxY + 45,
+            width: 405,
+            height: 255,
+            model: DEFAULT_MODEL,
+            status: "ready",
+            branchTag: "idea-seed",
+            state: { seedPrompt: prompt },
+            facets: { dialogue: seedHtml },
+            html: seedHtml,
+          };
+          canvasState.nodes.push(seedNode);
+        } else {
+          seedNode.shadowStaged = false;
+        }
+
+        // Matchmaker Stance: search the rest of the Brain graph for the highest-affinity distant thought
+        const matchCandidates = rankMatchmakerCandidates(
+          prompt,
+          canvasState.nodes.filter((n) => !n.shadowStaged),
+          new Set([seedNode.id]),
+        );
+        const topMatch = matchCandidates[0] || null;
+
+        const { shadowBranches, matchmakerHybrid } =
+          await runIdeonomyAndMatchmakerPipeline({
+            seedNode,
+            seedPrompt: prompt,
+            matchedTargetNode: topMatch?.node || null,
+            affinityScore: topMatch?.affinityScore ?? 0.82,
+            sharedConcepts: topMatch?.sharedConcepts ?? [],
+          });
+
+        const childEnergy = attenuateEnergyForBranches(
+          seedNode.energy || createDefaultEnergyEnvelope(),
+          shadowBranches.length + (matchmakerHybrid ? 1 : 0),
+        );
+
+        const stagedNodes = [];
+        for (const sb of shadowBranches) {
+          sb.energy = childEnergy;
+          sb.shadowStaged = !unfoldImmediately;
+          canvasState.nodes.push(sb);
+          stagedNodes.push(sb);
+          canvasState.edges.push({
+            id: `edge-ideo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            from: seedNode.id,
+            to: sb.id,
+            relation: sb.relationFromParent,
+            kind: "ideonomy",
+            shadowStaged: !unfoldImmediately,
+            label: `${sb.stance} (${sb.warrant.pass})`,
+          });
+        }
+
+        let jumpEdge = null;
+        if (matchmakerHybrid && topMatch?.node) {
+          matchmakerHybrid.energy = childEnergy;
+          matchmakerHybrid.shadowStaged = !unfoldImmediately;
+          canvasState.nodes.push(matchmakerHybrid);
+          stagedNodes.push(matchmakerHybrid);
+
+          // Lateral Jump Link across the Plex + Synthesis edges
+          jumpEdge = {
+            id: `edge-jump-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            from: seedNode.id,
+            to: topMatch.node.id,
+            relation: "cross-pollinates",
+            kind: "jump",
+            label: `🧲 lateral jump (affinity=${topMatch.affinityScore})`,
+          };
+          canvasState.edges.push(jumpEdge);
+          canvasState.edges.push({
+            id: `edge-mm1-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            from: seedNode.id,
+            to: matchmakerHybrid.id,
+            relation: "synthesizes",
+            kind: "synthesis",
+            shadowStaged: !unfoldImmediately,
+            label: `⊕ matchmaker ⋈`,
+          });
+          canvasState.edges.push({
+            id: `edge-mm2-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            from: topMatch.node.id,
+            to: matchmakerHybrid.id,
+            relation: "synthesizes",
+            kind: "synthesis",
+            shadowStaged: !unfoldImmediately,
+            label: `⊕ cross-pollinates`,
+          });
+        }
+
+        const attentionBroker = computeAttentionBrokerSnapshot();
+        saveState(canvasState);
+        await recordDomainCommand(
+          "ideabox.seed",
+          seedNode.id,
+          "ideabox.constellation.staged",
+          {
+            seedNodeId: seedNode.id,
+            prompt,
+            stagedNodeIds: stagedNodes.map((n) => n.id),
+            matchedNodeId: topMatch?.node?.id || null,
+            affinityScore: topMatch?.affinityScore || null,
+          },
+          [],
+          commandId,
+        );
+        broadcastState();
+
+        return sendJson(res, 200, {
+          seedNode,
+          stagedNodes,
+          shadowBranches: stagedNodes,
+          matchedTargetNode: topMatch?.node || null,
+          affinityScore: topMatch?.affinityScore || null,
+          jumpEdge,
+          attentionBroker,
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Shadow Graph Unfold / Promote on Receipt (`/api/shadow/unfold`)
+    // Promotes background-staged Shadow Graph nodes onto the active 2D spatial canvas only when
+    // the human clicks the Shadow Badge on a parent card or accepts an item from the Attention Queue!
+    if (req.method === "POST" && url.pathname === "/api/shadow/unfold") {
+      try {
+        const { parentNodeId, nodeIds, commandId } = await readJsonBody(req);
+        const targetSet = Array.isArray(nodeIds) && nodeIds.length > 0
+          ? new Set(nodeIds)
+          : null;
+
+        const unfoldedIds = [];
+        for (const n of canvasState.nodes) {
+          if (!n.shadowStaged) continue;
+          const matchParent = parentNodeId ? n.parentId === parentNodeId : true;
+          const matchId = targetSet ? targetSet.has(n.id) : true;
+          if (matchParent && matchId) {
+            n.shadowStaged = false;
+            unfoldedIds.push(n.id);
+          }
+        }
+
+        const unfoldedSet = new Set(unfoldedIds);
+        for (const e of canvasState.edges) {
+          if (e.shadowStaged && (unfoldedSet.has(e.to) || unfoldedSet.has(e.from))) {
+            e.shadowStaged = false;
+          }
+        }
+
+        const attentionBroker = computeAttentionBrokerSnapshot();
+        saveState(canvasState);
+        await recordDomainCommand(
+          "shadow.unfold",
+          parentNodeId || "canvas-root",
+          "shadow.branches.unfolded",
+          { parentNodeId: parentNodeId || null, unfoldedIds },
+          [],
+          commandId,
+        );
+        broadcastState();
+
+        return sendJson(res, 200, {
+          unfoldedIds,
+          unfoldedNodeIds: unfoldedIds,
+          attentionBroker,
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Attention Broker Queue & Auto-Resolve via `AskDefault` (`/api/attention/queue` & `/api/attention/auto-resolve`)
+    if (req.method === "GET" && url.pathname === "/api/attention/queue") {
+      const attentionBroker = computeAttentionBrokerSnapshot();
+      return sendJson(res, 200, attentionBroker);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/attention/auto-resolve") {
+      try {
+        const { nodeId, commandId } = await readJsonBody(req);
+        const attentionBrokerBefore = computeAttentionBrokerSnapshot();
+        const targetId = nodeId || attentionBrokerBefore.queue[0]?.nodeId;
+        const targetNode = canvasState.nodes.find((n) => n.id === targetId);
+        if (!targetNode) {
+          return sendJson(res, 404, { error: "No pending attention item found" });
+        }
+
+        // Apply `Hydro.Workflow.Ask` default (`askDefault`) so the human is never a bottleneck!
+        targetNode.shadowStaged = false;
+        targetNode.commitment = "committed";
+        targetNode.status = "committed";
+        targetNode.kind = "surface";
+        targetNode.state = {
+          ...(targetNode.state || {}),
+          autoResolvedViaAskDefault:
+            targetNode.askDefault || "Keep & Promote to Active Canvas",
+          resolvedAt: new Date().toISOString(),
+        };
+
+        for (const e of canvasState.edges) {
+          if (e.to === targetNode.id || e.from === targetNode.id) {
+            e.shadowStaged = false;
+          }
+        }
+
+        const attentionBroker = computeAttentionBrokerSnapshot();
+        saveState(canvasState);
+        await recordDomainCommand(
+          "attention.auto_resolve",
+          targetNode.id,
+          "attention.ask_default.applied",
+          {
+            nodeId: targetNode.id,
+            appliedDecision: targetNode.state.autoResolvedViaAskDefault,
+          },
+          [],
+          commandId,
+        );
+        broadcastState();
+
+        return sendJson(res, 200, {
+          resolvedNode: targetNode,
+          appliedDecision: targetNode.state.autoResolvedViaAskDefault,
+          attentionBroker,
           state: canvasState,
         });
       } catch (err) {
