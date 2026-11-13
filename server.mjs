@@ -48,6 +48,7 @@ import {
   evaluatePowerSetPolicy,
   recordAutonomousActionOnUserModel,
   scoreSealedPrediction,
+  recordBehavioralObservation,
   computeEmpiricalCalibrationFactor,
 } from "@asterism/core";
 import { CodexProviderCapabilitiesV2 } from "@t3tools/provider-codex/server/adapter";
@@ -148,26 +149,79 @@ export const EXTRACTED_PROVIDER_CATALOG = [
   },
 ];
 
-export function loadState() {
-  try {
-    if (fs.existsSync(STATE_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
-      if (!parsed.userModel) {
-        parsed.userModel = createDefaultUserModel();
-      }
-      return parsed;
-    }
-  } catch {
-    // Fall back to default state
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const isAssociation = e => ["jump", "association", "lens"].includes(e.kind) || ["cross-pollinates", "association", "annotates"].includes(e.relation);
+
+function restoreCanvasLayout(state) {
+  for (const n of state.nodes) {
+    if (Number.isFinite(n.canvasX) && Number.isFinite(n.canvasY)) { n.x = n.canvasX; n.y = n.canvasY; }
+    delete n.canvasX; delete n.canvasY;
   }
-  const initial = getDefaultCanvasState();
-  saveState(initial);
+}
+
+export function normalizeCanvasState(raw) {
+  const state = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+  for (const key of ["nodes", "edges", "strokes", "projects"]) {
+    state[key] = [...new Map((Array.isArray(state[key]) ? state[key] : []).filter(n => n && typeof n === "object" && !Array.isArray(n) && typeof n.id === "string").map(n => [n.id, { ...n }])).values()];
+  }
+  const ids = new Set(state.nodes.map(n => n.id));
+  const seen = new Set();
+  state.edges = state.edges.filter(e => {
+    const key = JSON.stringify([e.from, e.to, e.relation]);
+    if (!ids.has(e.from) || !ids.has(e.to) || seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+  for (const n of state.nodes) {
+    if (!ids.has(n.parentId)) delete n.parentId;
+    if (Array.isArray(n.parentIds)) n.parentIds = [...new Set(n.parentIds.filter(id => ids.has(id)))];
+  }
+  const v = state.viewport || {};
+  state.viewport = { x: Number.isFinite(v.x) ? v.x : 65, y: Number.isFinite(v.y) ? v.y : 55, scale: Number.isFinite(v.scale) ? Math.max(0.15, Math.min(3, v.scale)) : 0.88 };
+  const defaults = createDefaultUserModel(), model = state.userModel || {};
+  state.userModel = { ...defaults, ...model, hypotheses: Array.isArray(model.hypotheses) ? model.hypotheses : defaults.hypotheses, economicProfiles: model.economicProfiles && typeof model.economicProfiles === "object" && !Array.isArray(model.economicProfiles) ? { ...defaults.economicProfiles, ...model.economicProfiles } : defaults.economicProfiles, sealedPredictions: Array.isArray(model.sealedPredictions) ? model.sealedPredictions : defaults.sealedPredictions };
+  for (const [id, profile] of Object.entries(state.userModel.economicProfiles)) {
+    state.userModel.economicProfiles[id] = {
+      ...(defaults.economicProfiles[id] || defaults.economicProfiles["proj-misc-attic"]),
+      ...(profile && typeof profile === "object" && !Array.isArray(profile) ? profile : {}),
+      projectId: id,
+    };
+  }
+  if (!state.nodes.some(n => n.id === state.plexFocusNodeId && !n.shadowStaged)) state.plexFocusNodeId = state.nodes.find(n => !n.shadowStaged)?.id;
+  return state;
+}
+
+export function loadState(targetFile = STATE_FILE) {
+  if (fs.existsSync(targetFile)) {
+    try { return normalizeCanvasState(JSON.parse(fs.readFileSync(targetFile, "utf8"))); }
+    catch { fs.renameSync(targetFile, `${targetFile}.corrupt-${Date.now()}`); }
+  }
+  const initial = normalizeCanvasState(getDefaultCanvasState());
+  saveState(initial, targetFile);
   return initial;
 }
 
-export function saveState(state) {
+export function saveState(state, targetFile = STATE_FILE) {
   state.updatedAt = new Date().toISOString();
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), "utf8");
+  fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+  const temporary = `${targetFile}.tmp-${process.pid}-${Date.now()}`;
+  try { fs.writeFileSync(temporary, JSON.stringify(state, null, 2), "utf8"); fs.renameSync(temporary, targetFile); }
+  finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+}
+
+export function resolveOpenCanvasPosition(nodes, desiredX, desiredY, width = 400, height = 260, gap = 28, excludeIds = new Set()) {
+  const originX = Number.isFinite(desiredX) ? desiredX : 25;
+  const originY = Number.isFinite(desiredY) ? desiredY : 25;
+  const visible = nodes.filter(n => !n.shadowStaged && !excludeIds.has(n.id));
+  const free = (x, y) => !visible.some(n => x < n.x + (n.width || 400) + gap && x + width + gap > n.x && y < n.y + (n.height || 260) + gap && y + height + gap > n.y);
+  const x = Math.max(25, Math.round(originX)), y = Math.max(25, Math.round(originY));
+  if (free(x, y)) return { x, y };
+  for (let radius = 1; ; radius++) {
+    const points = [];
+    for (let dx = -radius; dx <= radius; dx++) for (const dy of [-radius, radius]) points.push([x + dx * 80, y + dy * 80]);
+    for (let dy = -radius + 1; dy < radius; dy++) for (const dx of [-radius, radius]) points.push([x + dx * 80, y + dy * 80]);
+    points.sort((a, b) => (a[0]-x)**2 + (a[1]-y)**2 - (b[0]-x)**2 - (b[1]-y)**2);
+    for (const [px, py] of points) if (px >= 25 && py >= 25 && free(px, py)) return { x: px, y: py };
+  }
 }
 
 /**
@@ -190,7 +244,7 @@ export function collectLineageNodes(canvasState, targetNodeId) {
       for (const pid of node.parentIds) parentIds.add(pid);
     }
     for (const edge of canvasState.edges || []) {
-      if (edge.to === nodeId && edge.from) parentIds.add(edge.from);
+      if (!isAssociation(edge) && edge.to === nodeId && edge.from) parentIds.add(edge.from);
     }
 
     for (const pid of parentIds) {
@@ -240,20 +294,27 @@ export function collectNeighborhoodNodes(canvasState, nodeId) {
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
-    let body = "";
-    req.on("data", (chunk) => {
+    let body = "", size = 0;
+    req.on("data", chunk => {
+      size += chunk.length;
+      if (size > 2 * 1024 * 1024) { reject(Object.assign(new Error("Payload too large"), { statusCode: 413 })); req.destroy(); return; }
       body += chunk;
-      if (body.length > 2_000_000) reject(new Error("Payload too large"));
     });
     req.on("end", () => {
       try {
-        resolve(body ? JSON.parse(body) : {});
-      } catch (err) {
-        reject(err);
-      }
+        const parsed = JSON.parse(body);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+        resolve(parsed);
+      } catch { reject(Object.assign(new Error("Invalid JSON object body"), { statusCode: 400 })); }
     });
     req.on("error", reject);
   });
+}
+
+function requestErrorStatus(err) {
+  if (err.statusCode) return err.statusCode;
+  if (["INVALID_CHOICE", "INFEASIBLE_SUBSET"].includes(err.code) || err.message === "chosenOptionIds must be an array") return 400;
+  return err.code === "ALREADY_RESOLVED" ? 409 : 500;
 }
 
 function sendJson(res, status, data, extraHeaders = {}) {
@@ -267,12 +328,13 @@ function sendJson(res, status, data, extraHeaders = {}) {
 
 export function createAsterismServer(options = {}) {
   const dbPath = options.dbPath || SQLITE_FILE;
+  const stateFile = options.stateFile || (options.dbPath ? path.join(path.dirname(options.dbPath), "canvas-state.json") : STATE_FILE);
   const worktreesDir = options.worktreesDir || WORKTREES_DIR;
   const eventSink = Effect.runSync(makeSqliteEventSink(dbPath));
   const peerFederation = Effect.runSync(makePeerFederation());
   Effect.runSync(eventSink.reconcileAfterProcessLoss);
 
-  let canvasState = loadState();
+  let canvasState = loadState(stateFile);
   const sseClients = new Set();
   const mcpSessions = new Map();
   const workerId = `asterism-outbox-worker-${crypto.randomUUID().slice(0, 8)}`;
@@ -373,7 +435,7 @@ export function createAsterismServer(options = {}) {
                 lineageCount: lineageNodes.length,
                 updatedAt: new Date().toISOString(),
               };
-              saveState(canvasState);
+              saveState(canvasState, stateFile);
               broadcastState();
             }
           }
@@ -395,7 +457,9 @@ export function createAsterismServer(options = {}) {
     }
   }
 
+  setImmediate(() => { drainOutbox().catch(() => {}); });
   return http.createServer(async (req, res) => {
+    try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
     // 1. Environment Descriptor
@@ -540,6 +604,7 @@ export function createAsterismServer(options = {}) {
             const relMeta =
               PANEL_RELATIONS[childNode.relationFromParent] ||
               PANEL_RELATIONS["visualizes-ui"];
+            if (!childNode.shadowStaged) Object.assign(childNode, resolveOpenCanvasPosition(canvasState.nodes, childNode.x, childNode.y, childNode.width, childNode.height));
             canvasState.nodes.push(childNode);
             canvasState.edges.push({
               id: `edge-rel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -549,7 +614,7 @@ export function createAsterismServer(options = {}) {
               kind: childNode.relationFromParent,
               label: relMeta.label,
             });
-            saveState(canvasState);
+            saveState(canvasState, stateFile);
             broadcastState();
             return sendJson(res, 200, {
               jsonrpc: "2.0",
@@ -580,7 +645,7 @@ export function createAsterismServer(options = {}) {
 
         return sendJson(res, 400, { error: "Unsupported JSON-RPC method" });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -602,7 +667,7 @@ export function createAsterismServer(options = {}) {
 
     if (req.method === "POST" && url.pathname === "/api/reset") {
       canvasState = getDefaultCanvasState();
-      saveState(canvasState);
+      saveState(canvasState, stateFile);
       await recordDomainCommand("canvas.reset", "canvas-root", "canvas.reset", {
         nodeCount: canvasState.nodes.length,
       });
@@ -610,30 +675,68 @@ export function createAsterismServer(options = {}) {
       return sendJson(res, 200, canvasState);
     }
 
+    if (req.method === "GET" && ["/api/views/table", "/api/views/timeline"].includes(url.pathname)) {
+      const nodes = [...canvasState.nodes].sort(url.pathname.endsWith("timeline")
+        ? (a, b) => String(a.createdAt || a.updatedAt || "").localeCompare(String(b.createdAt || b.updatedAt || "")) || a.id.localeCompare(b.id)
+        : (a, b) => String(a.title || "").localeCompare(String(b.title || "")) || a.id.localeCompare(b.id));
+      return sendJson(res, 200, { nodes, edges: canvasState.edges });
+    }
+    if (req.method === "POST" && ["/api/nodes/move", "/api/nodes/create", "/api/nodes/delete", "/api/edges"].includes(url.pathname)) {
+      const body = await readJsonBody(req);
+      let result = {};
+      if (url.pathname === "/api/nodes/create") {
+        if (!body.node || typeof body.node !== "object" || Array.isArray(body.node)) return sendJson(res, 400, { error: "node must be an object" });
+        const node = { width: 400, height: 260, ...body.node, id: body.node.id || "node-" + crypto.randomUUID() };
+        if (typeof node.id !== "string" || canvasState.nodes.some(n => n.id === node.id)) return sendJson(res, 400, { error: "Invalid or duplicate node id" });
+        for (const key of ["width", "height"]) if (!Number.isFinite(node[key]) || node[key] <= 0) node[key] = key === "width" ? 400 : 260;
+        Object.assign(node, resolveOpenCanvasPosition(canvasState.nodes, node.x, node.y, node.width, node.height));
+        canvasState.nodes.push(node);
+        result = { node };
+      } else if (url.pathname === "/api/edges") {
+        if (body.action === "delete") {
+          if (!canvasState.edges.some(e => e.id === body.edgeId)) return sendJson(res, 404, { error: "Edge not found" });
+          canvasState.edges = canvasState.edges.filter(e => e.id !== body.edgeId);
+        } else if (body.action === "create") {
+          const edge = body.edge;
+          if (!edge || !canvasState.nodes.some(n => n.id === edge.from) || !canvasState.nodes.some(n => n.id === edge.to)) return sendJson(res, 400, { error: "Invalid edge endpoints" });
+          if (!canvasState.edges.some(e => e.from === edge.from && e.to === edge.to && e.relation === edge.relation)) {
+            const id = edge.id || "edge-" + crypto.randomUUID();
+            if (typeof id !== "string" || canvasState.edges.some(e => e.id === id)) return sendJson(res, 400, { error: "Invalid or duplicate edge id" });
+            canvasState.edges.push({ ...edge, id });
+          }
+        } else return sendJson(res, 400, { error: "Invalid edge action" });
+      } else {
+        const node = canvasState.nodes.find(n => n.id === body.nodeId);
+        if (!node) return sendJson(res, 404, { error: "Node not found" });
+        if (url.pathname === "/api/nodes/delete") {
+          if (node.kind === "speculative" || node.commitment === "speculative") canvasState.userModel = recordBehavioralObservation(canvasState.userModel, { type: "branch-pruned", projectId: canvasState.activeProjectId, nodeId: node.id }).updatedUserModel;
+          canvasState.nodes = canvasState.nodes.filter(n => n.id !== node.id);
+          canvasState = normalizeCanvasState(canvasState);
+          result = { deletedId: node.id };
+        } else {
+          for (const key of ["x", "y", "width", "height"]) if (Number.isFinite(body[key])) node[key] = body[key];
+          if (canvasState.viewProjection !== "plex") {
+            if (Number.isFinite(body.x)) node.canvasX = node.x;
+            if (Number.isFinite(body.y)) node.canvasY = node.y;
+          }
+          result = { node };
+        }
+      }
+      saveState(canvasState, stateFile); broadcastState();
+      return sendJson(res, 200, { ...result, state: canvasState });
+    }
+
     if (req.method === "POST" && url.pathname === "/api/state") {
       try {
         const next = await readJsonBody(req);
-        if (Array.isArray(next.nodes)) canvasState.nodes = next.nodes;
-        if (Array.isArray(next.edges)) canvasState.edges = next.edges;
-        if (Array.isArray(next.strokes)) canvasState.strokes = next.strokes;
-        if (next.viewport) canvasState.viewport = next.viewport;
-        if (typeof next.activeProjectId === "string") {
-          canvasState.activeProjectId = next.activeProjectId;
-        }
-        if (Array.isArray(next.projects)) {
-          canvasState.projects = next.projects;
-        }
-        if (typeof next.viewProjection === "string") {
-          canvasState.viewProjection = next.viewProjection;
-        }
-        if (typeof next.plexFocusNodeId === "string") {
-          canvasState.plexFocusNodeId = next.plexFocusNodeId;
-        }
-        saveState(canvasState);
+        canvasState = normalizeCanvasState({ ...canvasState, ...next });
+        if (next.viewProjection === "canvas") restoreCanvasLayout(canvasState);
+
+        saveState(canvasState, stateFile);
         broadcastState();
         return sendJson(res, 200, canvasState);
       } catch (err) {
-        return sendJson(res, 400, { error: err.message });
+        return sendJson(res, err.statusCode || 400, { error: err.message });
       }
     }
 
@@ -687,7 +790,7 @@ export function createAsterismServer(options = {}) {
         const activeProject =
           canvasState.projects.find((p) => p.id === canvasState.activeProjectId) ||
           canvasState.projects[0];
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         broadcastState();
         return sendJson(res, 200, {
           activeProjectId: activeProject.id,
@@ -696,7 +799,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -709,17 +812,24 @@ export function createAsterismServer(options = {}) {
     ) {
       try {
         const body = req.method === "POST" ? await readJsonBody(req) : {};
-        const visibleNodes = (canvasState.nodes || []).filter((n) => !n.shadowStaged);
-        const requestedId =
-          url.searchParams.get("focusNodeId") ||
-          body.focusNodeId ||
-          canvasState.plexFocusNodeId ||
-          visibleNodes[0]?.id;
-        const focusNode =
-          visibleNodes.find((n) => n.id === requestedId) || visibleNodes[0];
-        if (!focusNode) {
-          return sendJson(res, 404, { error: "No visible focus node found" });
+        if (req.method === "POST" && (body.restoreCanvasLayout || body.viewProjection === "canvas")) {
+          restoreCanvasLayout(canvasState);
+          canvasState.viewProjection = "canvas";
+          saveState(canvasState, stateFile); broadcastState();
+          return sendJson(res, 200, { state: canvasState, viewProjection: "canvas" });
         }
+        const explicitId = url.searchParams.get("focusNodeId") || body.focusNodeId;
+        const target = canvasState.nodes.find(n => n.id === explicitId);
+        if (target?.shadowStaged && req.method === "POST") {
+          Object.assign(target, resolveOpenCanvasPosition(canvasState.nodes, target.x, target.y, target.width, target.height, 28, new Set([target.id])));
+          target.shadowStaged = false;
+          for (const edge of canvasState.edges) if (edge.from === target.id || edge.to === target.id) edge.shadowStaged = false;
+        }
+        const visibleNodes = canvasState.nodes.filter(n => !n.shadowStaged);
+        if (explicitId && !visibleNodes.some(n => n.id === explicitId)) return sendJson(res, 404, { error: "Focus node not found" });
+        const requestedId = explicitId || canvasState.plexFocusNodeId || visibleNodes[0]?.id;
+        const focusNode = visibleNodes.find(n => n.id === requestedId) || visibleNodes[0];
+        if (!focusNode) return sendJson(res, 404, { error: "No visible focus node found" });
 
         const byId = new Map(visibleNodes.map((n) => [n.id, n]));
         const parents = [];
@@ -728,7 +838,7 @@ export function createAsterismServer(options = {}) {
         const seen = new Set([focusNode.id]);
 
         const isLateralEdge = (e, peerNode) =>
-          e.kind === "jump" ||
+          e.kind === "jump" || e.kind === "association" || e.kind === "lens" || e.relation === "association" ||
           e.relation === "cross-pollinates" ||
           e.relation === "annotates" ||
           e.relation === "synthesizes" ||
@@ -787,34 +897,24 @@ export function createAsterismServer(options = {}) {
             canvasState.viewProjection = body.viewProjection;
           }
           if (body.applyLayout) {
-            const centerX = 620;
-            const centerY = 340;
-            focusNode.x = centerX - Math.round((focusNode.width || 380) / 2);
-            focusNode.y = centerY - Math.round((focusNode.height || 250) / 2);
-
-            parents.forEach(({ node }, idx) => {
-              const offset = (idx - (parents.length - 1) / 2) * 430;
-              node.x = Math.round(centerX + offset - (node.width || 380) / 2);
-              node.y = Math.max(25, focusNode.y - (node.height || 250) - 90);
-            });
-
-            children.forEach(({ node }, idx) => {
-              const offset = (idx - (children.length - 1) / 2) * 410;
-              node.x = Math.round(centerX + offset - (node.width || 370) / 2);
-              node.y = focusNode.y + (focusNode.height || 250) + 95;
-            });
-
+            for (const n of canvasState.nodes) if (typeof n.canvasX !== "number") { n.canvasX = n.x; n.canvasY = n.y; }
+            const placed = [];
+            const place = (node, x, y) => {
+              Object.assign(node, resolveOpenCanvasPosition(placed, x, y, node.width || 400, node.height || 265));
+              placed.push(node);
+            };
+            const centerX = Math.max(900, parents.reduce((sum, p) => sum + (p.node.width || 400) + 28, 0) / 2 + 50);
+            place(focusNode, centerX - (focusNode.width || 400) / 2, parents.length > 0 ? 370 : 220);
+            let parentX = 40;
+            for (const { node } of parents) { place(node, parentX, 40); parentX = node.x + (node.width || 400) + 28; }
+            let childX = 40;
+            for (const { node } of children) { place(node, childX, focusNode.y + (focusNode.height || 265) + 85); childX = node.x + (node.width || 400) + 28; }
             lateral.forEach(({ node }, idx) => {
-              const side = idx % 2 === 0 ? -1 : 1;
-              const row = Math.floor(idx / 2);
-              node.x =
-                side < 0
-                  ? Math.max(20, focusNode.x - (node.width || 370) - 95)
-                  : focusNode.x + (focusNode.width || 380) + 95;
-              node.y = focusNode.y + row * 240;
+              place(node, idx % 2 === 0 ? focusNode.x - (node.width || 400) - 85 : focusNode.x + (focusNode.width || 400) + 85, focusNode.y + Math.floor(idx / 2) * ((node.height || 265) + 28));
             });
+            for (const node of visibleNodes) if (!placed.includes(node)) place(node, node.x, node.y);
           }
-          saveState(canvasState);
+          saveState(canvasState, stateFile);
           broadcastState();
         }
 
@@ -850,8 +950,90 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/views/briefing") {
+      const model = canvasState.userModel;
+      const predictions = model.sealedPredictions || [];
+      return sendJson(res, 200, {
+        generatedAt: new Date().toISOString(), activeProject: canvasState.projects.find(p => p.id === canvasState.activeProjectId),
+        needsYourCall: canvasState.nodes.filter(n => (n.kind === "decision" && !n.decisionMeta?.resolved) || n.shadowStaged).map(n => ({ nodeId: n.id, title: n.title, kind: n.kind, prompt: n.decisionMeta?.prompt || n.state?.seedPrompt || n.title, regime: n.decisionMeta?.regime || "shadow-staged", predictionId: n.decisionMeta?.predictionId || null, candidates: n.decisionMeta?.candidates || [], x: n.x, y: n.y })),
+        autonomousAndBasalMoves: canvasState.nodes.filter(n => !n.shadowStaged && n.kind !== "decision" && (n.autonomousReceipt || n.id.startsWith("node-synth-") || (n.energy?.basalRechargedTokens || 0) > 0)).map(n => ({ nodeId: n.id, title: n.title, stage: n.stage, surfaceRole: n.surfaceRole || defaultRoleForStage(n.stage), regime: n.autonomousReceipt?.regime || "basal-explore", reachability: n.autonomousReceipt?.reachability || "ergodic", predictionId: n.autonomousReceipt?.predictionId || null, canSwapCounterfactual: Boolean(n.autonomousReceipt?.predictionId), candidates: n.autonomousReceipt?.candidates || [], chosenOptionIds: n.autonomousReceipt?.chosenOptionIds || [], basalRechargedTokens: n.energy?.basalRechargedTokens || 0, x: n.x, y: n.y })),
+        modelShifts: { calibration: computeEmpiricalCalibrationFactor(model.hypotheses), totalPredictions: predictions.length, resolvedCount: predictions.filter(p => p.resolvedAt).length, accurateCount: predictions.filter(p => p.resolvedAt && p.accurate).length, inferredHypotheses: model.hypotheses.filter(h => h.source === "inferred" && h.status === "active"), staleHypotheses: model.hypotheses.filter(h => h.status === "active" && h.usesSinceLastProbe >= 3), recentReceipts: predictions.filter(p => p.resolvedAt).slice(0, 6) },
+      });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/canvas/tidy") {
+      try {
+        const body = await readJsonBody(req);
+        const placed = []; let movedCount = 0;
+        for (const node of canvasState.nodes.filter(n => !n.shadowStaged).sort((a, b) => a.y - b.y || a.x - b.x)) {
+          // Restrict the search below the previous row to retain reading order.
+          const pos = resolveOpenCanvasPosition(placed, node.x, Math.max(node.y, placed.at(-1)?.y || 25), node.width || 400, node.height || 260);
+          if (placed.length && (pos.y < placed.at(-1).y || (pos.y === placed.at(-1).y && pos.x < placed.at(-1).x))) Object.assign(pos, resolveOpenCanvasPosition(placed, node.x, placed.at(-1).y + (placed.at(-1).height || 260) + 28, node.width || 400, node.height || 260));
+          if (pos.x !== node.x || pos.y !== node.y) movedCount++;
+          Object.assign(node, pos); placed.push(node);
+        }
+        saveState(canvasState, stateFile);
+        await recordDomainCommand("canvas.tidy", "canvas-root", "canvas.tidied", { movedCount }, [], body.commandId);
+        broadcastState(); return sendJson(res, 200, { movedCount, nodes: canvasState.nodes, state: canvasState });
+      } catch (err) { return sendJson(res, requestErrorStatus(err), { error: err.message }); }
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/user-model/observe") {
+      try {
+        const body = await readJsonBody(req);
+        if (!["counterfactual-override", "co-fork-upgrade", "branch-pruned", "tearoff-promoted"].includes(body.type)) return sendJson(res, 400, { error: "Invalid behavioral event type" });
+        const result = recordBehavioralObservation(canvasState.userModel, body);
+        canvasState.userModel = result.updatedUserModel; saveState(canvasState, stateFile); broadcastState();
+        return sendJson(res, 200, { affectedHypothesis: result.affectedHypothesis, userModel: canvasState.userModel, calibration: computeEmpiricalCalibrationFactor(canvasState.userModel.hypotheses), state: canvasState });
+      } catch (err) { return sendJson(res, requestErrorStatus(err), { error: err.message }); }
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/decisions/counterfactual") {
+      try {
+        const { nodeId, predictionId, action = "swap", targetOptionIds, commandId } = await readJsonBody(req);
+        if (!["swap", "keep-both", "neither"].includes(action)) return sendJson(res, 400, { error: "Invalid counterfactual action" });
+        const node = nodeId ? canvasState.nodes.find(n => n.id === nodeId) : canvasState.nodes.find(n => n.autonomousReceipt?.predictionId === predictionId);
+        const pred = canvasState.userModel.sealedPredictions.find(p => p.id === (predictionId || node?.autonomousReceipt?.predictionId));
+        if (!pred || (node && node.autonomousReceipt?.predictionId !== pred.id)) return sendJson(res, 404, { error: "Autonomous prediction not found" });
+        const candidates = node?.autonomousReceipt?.candidates || [];
+        const prompt = node?.autonomousReceipt?.prompt || pred.prompt || "";
+        const effectiveOptionIds = action === "neither" ? [] : action === "keep-both" ? candidates.map(c => c.id) : Array.isArray(targetOptionIds) && targetOptionIds.length ? targetOptionIds : candidates.filter(c => c.id !== node?.autonomousReceipt?.candidateId).map(c => c.id).slice(0, 1);
+        if (action !== "neither" && (!node || !effectiveOptionIds.length || (action === "swap" && effectiveOptionIds.length !== 1) || effectiveOptionIds.some(id => !candidates.some(c => c.id === id)))) return sendJson(res, 400, { error: "Invalid counterfactual target" });
+        // Validate and score before mutating the canvas.
+        const scored = scoreSealedPrediction({ userModel: canvasState.userModel, predictionId: pred.id, chosenOptionIds: effectiveOptionIds, allowOverride: true });
+        const materializedNodes = [], removedNodeIds = [];
+        const render = (n, cand, regimeLabel) => {
+          n.title = cand.label;
+          n.autonomousReceipt = { ...n.autonomousReceipt, candidateId: cand.id, chosenOptionIds: effectiveOptionIds, regime: action === "swap" ? "counterfactual-swap" : "co-fork", reachability: cand.reachability };
+          n.html = renderAutonomousBranchHtml({ candidate: cand, prompt, ideonomyTuple: n.ideonomyTuple, regimeLabel, nodeId: n.id, predictionId: pred.id, candidates, chosenOptionIds: effectiveOptionIds });
+          n.facets = { ...n.facets, "ui-prototype": n.html }; materializedNodes.push(n);
+        };
+        if (action === "neither") {
+          for (const n of canvasState.nodes) if (n.autonomousReceipt?.predictionId === pred.id || n.id === nodeId) removedNodeIds.push(n.id);
+          const ids = new Set(removedNodeIds);
+          canvasState.nodes = canvasState.nodes.filter(n => !ids.has(n.id)); canvasState.edges = canvasState.edges.filter(e => !ids.has(e.from) && !ids.has(e.to));
+        } else if (action === "swap") {
+          render(node, candidates.find(c => c.id === effectiveOptionIds[0]), "↺ Counterfactual Swap");
+        } else {
+          candidates.forEach((cand, i) => {
+            let sibling = canvasState.nodes.find(n => n.autonomousReceipt?.predictionId === pred.id && n.autonomousReceipt?.candidateId === cand.id);
+            if (!sibling) {
+              sibling = { ...node, id: `node-auto-${crypto.randomUUID()}`, ...resolveOpenCanvasPosition(canvasState.nodes, node.x + 425, node.y, 395, 260), width: 395, height: 260 };
+              canvasState.nodes.push(sibling);
+              if (node.parentId) canvasState.edges.push({ id: `edge-auto-${crypto.randomUUID()}`, from: node.parentId, to: sibling.id, relation: "forks", kind: "forks" });
+            }
+            render(sibling, cand, `✦ Co-Forked (${i + 1}/${candidates.length})`);
+          });
+        }
+        canvasState.userModel = recordBehavioralObservation(scored.updatedUserModel, { type: action === "keep-both" ? "co-fork-upgrade" : action === "neither" ? "branch-pruned" : "counterfactual-override", projectId: pred.projectId || canvasState.activeProjectId, nodeId: node?.id }).updatedUserModel;
+        saveState(canvasState, stateFile);
+        await recordDomainCommand("decision.counterfactual", nodeId || pred.id, "decision.overridden", { action, predictionId: pred.id, effectiveOptionIds }, [], commandId);
+        broadcastState(); return sendJson(res, 200, { action, resolvedPrediction: scored.resolvedPrediction, materializedNodes, removedNodeIds, userModel: canvasState.userModel, calibration: computeEmpiricalCalibrationFactor(canvasState.userModel.hypotheses), state: canvasState });
+      } catch (err) { return sendJson(res, ["INVALID_CHOICE", "INFEASIBLE_SUBSET"].includes(err.code) ? 400 : requestErrorStatus(err), { error: err.message }); }
     }
 
     // Testable Implicit User Model (`GET /api/user-model` & `POST /api/user-model/hypotheses`)
@@ -873,6 +1055,7 @@ export function createAsterismServer(options = {}) {
         const now = new Date().toISOString();
         let hypotheses = [...canvasState.userModel.hypotheses];
 
+        if (body.hypothesisId && !hypotheses.some(h => h.id === body.hypothesisId)) return sendJson(res, 404, { error: "Hypothesis not found" });
         if (body.hypothesisId) {
           hypotheses = hypotheses.map((h) => {
             if (h.id !== body.hypothesisId) return h;
@@ -881,18 +1064,23 @@ export function createAsterismServer(options = {}) {
               ...(typeof body.statement === "string" ? { statement: body.statement.trim() } : {}),
               ...(body.status === "active" || body.status === "refuted" ? { status: body.status } : {}),
               ...(body.polarity === "positive" || body.polarity === "negative" ? { polarity: body.polarity } : {}),
-              ...(typeof body.weight === "number" ? { weight: body.weight } : {}),
+              ...(Number.isFinite(body.weight) ? { weight: Math.max(-1, Math.min(1, body.weight)) } : {}),
+              ...(Number.isFinite(body.confidence) ? { confidence: Math.max(0, Math.min(1, body.confidence)) } : {}),
+              ...(typeof body.pinned === "boolean" ? { pinned: body.pinned } : {}),
+              ...(body.action === "pin" ? { pinned: true, status: "active", confidence: Number(Math.max(h.confidence, 0.85).toFixed(3)) } : {}),
+              ...(body.action === "dismiss" ? { status: "refuted", pinned: false } : {}),
               updatedAt: now,
             };
           });
         } else if (typeof body.statement === "string" && body.statement.trim()) {
           hypotheses.unshift({
+            source: "explicit", pinned: true,
             id: `hyp-${Date.now().toString(36)}`,
             statement: body.statement.trim(),
             scopeProjectId: body.scopeProjectId || "global",
             polarity: body.polarity === "negative" ? "negative" : "positive",
-            weight: typeof body.weight === "number" ? body.weight : 0.75,
-            confidence: 0.65,
+            weight: Number.isFinite(body.weight) ? Math.max(-1, Math.min(1, body.weight)) : 0.75,
+            confidence: Number.isFinite(body.confidence) ? Math.max(0, Math.min(1, body.confidence)) : 0.65,
             empiricalHits: 0,
             empiricalTrials: 0,
             brierSum: 0,
@@ -906,7 +1094,7 @@ export function createAsterismServer(options = {}) {
           ...canvasState.userModel,
           hypotheses,
         };
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         broadcastState();
         return sendJson(res, 200, {
           userModel: canvasState.userModel,
@@ -914,7 +1102,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -926,6 +1114,7 @@ export function createAsterismServer(options = {}) {
       try {
         canvasState.userModel = canvasState.userModel || createDefaultUserModel();
         const body = await readJsonBody(req);
+        if (body.parentNodeId && !canvasState.nodes.some(n => n.id === body.parentNodeId)) return sendJson(res, 404, { error: "Parent node not found" });
         const prompt =
           String(body.prompt || "").trim() ||
           "Explore two complementary directions for ambient zero-chrome UI";
@@ -935,8 +1124,8 @@ export function createAsterismServer(options = {}) {
           typeof body.attentionalAltitudeScale === "number"
             ? body.attentionalAltitudeScale
             : canvasState.viewport?.scale || 0.88;
-        const baseX = typeof body.x === "number" ? body.x : 520;
-        const baseY = typeof body.y === "number" ? body.y : 380;
+        const baseX = Number.isFinite(body.x) ? body.x : 520;
+        const baseY = Number.isFinite(body.y) ? body.y : 380;
 
         const compiled = await compileDecisionTreeOnTheFly({
           prompt,
@@ -1010,6 +1199,7 @@ export function createAsterismServer(options = {}) {
             html,
             energy: createDefaultEnergyEnvelope(),
           };
+          if (!decisionNode.shadowStaged) Object.assign(decisionNode, resolveOpenCanvasPosition(canvasState.nodes, decisionNode.x, decisionNode.y, decisionNode.width, decisionNode.height));
           canvasState.nodes.push(decisionNode);
           if (body.parentNodeId) {
             canvasState.edges.push({
@@ -1044,7 +1234,7 @@ export function createAsterismServer(options = {}) {
               candidate: cand,
               prompt,
               ideonomyTuple: compiled.ideonomyTuple,
-              regimeLabel,
+              regimeLabel, nodeId: branchId, predictionId: sealedPrediction.id, candidates: compiled.candidates, chosenOptionIds: policy.bestSubset.optionIds,
             });
             const branchNode = {
               id: branchId,
@@ -1067,7 +1257,7 @@ export function createAsterismServer(options = {}) {
                 tupleLabel: compiled.ideonomyTuple.tupleLabel,
               },
               autonomousReceipt: {
-                predictionId: sealedPrediction.id,
+                predictionId: sealedPrediction.id, candidateId: cand.id, candidates: compiled.candidates, chosenOptionIds: policy.bestSubset.optionIds, prompt,
                 regime: effectiveRegime,
                 reachability: cand.reachability,
               },
@@ -1075,6 +1265,7 @@ export function createAsterismServer(options = {}) {
               html,
               energy: createDefaultEnergyEnvelope(),
             };
+            if (!branchNode.shadowStaged) Object.assign(branchNode, resolveOpenCanvasPosition(canvasState.nodes, branchNode.x, branchNode.y, branchNode.width, branchNode.height));
             canvasState.nodes.push(branchNode);
             materializedNodes.push(branchNode);
             if (body.parentNodeId) {
@@ -1095,7 +1286,7 @@ export function createAsterismServer(options = {}) {
           );
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "decision.compile",
           decisionNode?.id || materializedNodes[0]?.id || "canvas-root",
@@ -1122,7 +1313,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -1139,6 +1330,12 @@ export function createAsterismServer(options = {}) {
           commandId,
         } = await readJsonBody(req);
 
+        const pred = canvasState.userModel.sealedPredictions.find(p => p.id === predictionId);
+        if (!pred) return sendJson(res, 404, { error: "Prediction not found" });
+        const decNode = canvasState.nodes.find(n => n.id === nodeId);
+        if (nodeId && !decNode) return sendJson(res, 404, { error: "Decision node not found" });
+        if (nodeId && decNode.decisionMeta?.predictionId !== predictionId) return sendJson(res, 400, { error: "Prediction does not match decision node" });
+        if (pred.resolvedAt || decNode?.decisionMeta?.resolved) return sendJson(res, 409, { error: "Decision already resolved", resolvedPrediction: pred });
         const scored = scoreSealedPrediction({
           userModel: canvasState.userModel,
           predictionId,
@@ -1146,7 +1343,6 @@ export function createAsterismServer(options = {}) {
         });
         canvasState.userModel = scored.updatedUserModel;
 
-        const decNode = canvasState.nodes.find((n) => n.id === nodeId);
         const spawnedNodes = [];
 
         if (decNode && decNode.decisionMeta) {
@@ -1165,7 +1361,7 @@ export function createAsterismServer(options = {}) {
           decNode.facets = { ...(decNode.facets || {}), dialogue: updatedHtml };
           decNode.height = 195;
 
-          const chosenSet = new Set(chosenOptionIds);
+          const chosenSet = new Set(scored.resolvedPrediction.chosenOptionIds);
           const chosenCandidates = (decNode.decisionMeta.candidates || []).filter(
             (c) => chosenSet.has(c.id),
           );
@@ -1200,6 +1396,7 @@ export function createAsterismServer(options = {}) {
               html: childHtml,
               energy: createDefaultEnergyEnvelope(),
             };
+            if (!childNode.shadowStaged) Object.assign(childNode, resolveOpenCanvasPosition(canvasState.nodes, childNode.x, childNode.y, childNode.width, childNode.height));
             canvasState.nodes.push(childNode);
             spawnedNodes.push(childNode);
             canvasState.edges.push({
@@ -1213,7 +1410,7 @@ export function createAsterismServer(options = {}) {
           });
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "decision.resolve",
           nodeId || predictionId,
@@ -1240,7 +1437,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -1265,7 +1462,7 @@ export function createAsterismServer(options = {}) {
           node.surfaceRole = surfaceRole;
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "node.state.patch",
           node.id,
@@ -1283,7 +1480,7 @@ export function createAsterismServer(options = {}) {
         broadcastState();
         return sendJson(res, 200, { node, state: canvasState });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -1306,19 +1503,23 @@ export function createAsterismServer(options = {}) {
           touchCooldown: seed === undefined,
         });
         return sendJson(res, 200, {
+          mode,
+          pivotDimension: tuple.pivotDimension,
+          pivotDimensionId: tuple.pivotDimension,
           tuple: {
-            mode: tuple.mode,
+            mode,
             operatorIds: tuple.operatorIds,
             organonIds: tuple.organonIds,
             dimensionIds: tuple.dimensionIds,
-            pivotDimensionId: tuple.pivotDimensionId,
+            pivotDimension: tuple.pivotDimension,
+            pivotDimensionId: tuple.pivotDimension,
             tupleLabel: tuple.tupleLabel,
             promptBlock: tuple.promptBlock,
           },
           catalog: getIdeonomyCatalogSummary(),
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -1428,6 +1629,7 @@ export function createAsterismServer(options = {}) {
             },
             energy: createDefaultEnergyEnvelope(node.energy),
           };
+          if (!branchedRevisionNode.shadowStaged) Object.assign(branchedRevisionNode, resolveOpenCanvasPosition(canvasState.nodes, branchedRevisionNode.x, branchedRevisionNode.y, branchedRevisionNode.width, branchedRevisionNode.height));
           canvasState.nodes.push(branchedRevisionNode);
           canvasState.edges.push({
             id: `edge-rev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -1475,6 +1677,7 @@ export function createAsterismServer(options = {}) {
           const relMeta =
             PANEL_RELATIONS[sp.relationFromParent] ||
             PANEL_RELATIONS["visualizes-ui"];
+          if (!sp.shadowStaged) Object.assign(sp, resolveOpenCanvasPosition(canvasState.nodes, sp.x, sp.y, sp.width, sp.height));
           canvasState.nodes.push(sp);
           canvasState.edges.push({
             id: `edge-rel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -1486,7 +1689,7 @@ export function createAsterismServer(options = {}) {
           });
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
 
         await recordDomainCommand(
           "node.mutate",
@@ -1516,7 +1719,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -1590,6 +1793,8 @@ export function createAsterismServer(options = {}) {
             html: node.facets[facetRole],
             energy: createDefaultEnergyEnvelope(node.energy),
           };
+          if (!tornOffLens.shadowStaged) Object.assign(tornOffLens, resolveOpenCanvasPosition(canvasState.nodes, tornOffLens.x, tornOffLens.y, tornOffLens.width, tornOffLens.height));
+          canvasState.userModel = recordBehavioralObservation(canvasState.userModel, { type: "tearoff-promoted", projectId: canvasState.activeProjectId, nodeId: node.id }).updatedUserModel;
           canvasState.nodes.push(tornOffLens);
           canvasState.edges.push({
             id: `edge-lens-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1599,7 +1804,7 @@ export function createAsterismServer(options = {}) {
             kind: "lens",
             label: `🔭 lens (${facetRole})`,
           });
-          saveState(canvasState);
+          saveState(canvasState, stateFile);
           await recordDomainCommand(
             "node.facet.tearoff",
             node.id,
@@ -1619,7 +1824,7 @@ export function createAsterismServer(options = {}) {
 
         node.surfaceRole = facetRole;
         node.html = node.facets[facetRole];
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "node.facet.switch",
           node.id,
@@ -1631,7 +1836,7 @@ export function createAsterismServer(options = {}) {
         broadcastState();
         return sendJson(res, 200, { node, facetRole, state: canvasState });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -1690,7 +1895,7 @@ export function createAsterismServer(options = {}) {
             basalRechargedTokens: n.energy?.basalRechargedTokens ?? 0,
           }));
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         broadcastState();
         return sendJson(res, 200, {
           totalGrantedTokens: result.totalGrantedTokens,
@@ -1699,7 +1904,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -1758,7 +1963,8 @@ export function createAsterismServer(options = {}) {
           stance: n.stance || "explorer",
           surfaceRole: n.surfaceRole || defaultRoleForStage(n.stage),
           shadowStaged: Boolean(n.shadowStaged),
-          askDefault: n.askDefault || "Keep & Promote to Active Canvas",
+          askDefault: n.kind === "decision" ? null : n.askDefault || "Keep & Promote to Active Canvas",
+          requiresExplicitResolution: n.kind === "decision",
           evoiScore: n.attentionBid?.evoiScore ?? 0,
           epistemicEntropy: n.attentionBid?.epistemicEntropy ?? 0,
           pass: n.attentionBid?.pass ?? 0.5,
@@ -1797,6 +2003,7 @@ export function createAsterismServer(options = {}) {
           ? canvasState.nodes.find((n) => n.id === sourceNodeId)
           : null;
 
+        if (sourceNodeId && !seedNode) return sendJson(res, 404, { error: "Source node not found" });
         const seedTuple = pickIdeonomyTuple({ mode: "rich" });
         if (!seedNode) {
           const ts = Date.now();
@@ -1805,7 +2012,7 @@ export function createAsterismServer(options = {}) {
             .filter((n) => !n.shadowStaged)
             .reduce((m, n) => Math.max(m, n.y + (n.height || 300)), 40);
           const seedHtml = `<div style="font-family:'Inter',system-ui,sans-serif;padding:14px 16px;color:#e2e8f0;font-size:12px;line-height:1.5;">
-  <p style="margin:0 0 12px;color:#94a3b8;font-size:11.5px;">${prompt.slice(0, 120)} — 4 background branches staged in the Shadow Graph.</p>
+  <p style="margin:0 0 12px;color:#94a3b8;font-size:11.5px;">${escapeHtml(String(prompt).slice(0, 120))} — 4 background branches staged in the Shadow Graph.</p>
   <button onclick="window.asterism.unfoldShadowChildren()" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid rgba(56,189,248,0.3);background:rgba(56,189,248,0.1);color:#e0f2fe;font-size:11px;font-weight:500;cursor:pointer;">Unfold Staged Branches</button>
   ${renderIdeonomyMachineryHtml({
     tuple: seedTuple,
@@ -1844,6 +2051,7 @@ export function createAsterismServer(options = {}) {
             facets: { dialogue: seedHtml },
             html: seedHtml,
           };
+          if (!seedNode.shadowStaged) Object.assign(seedNode, resolveOpenCanvasPosition(canvasState.nodes, seedNode.x, seedNode.y, seedNode.width, seedNode.height));
           canvasState.nodes.push(seedNode);
         } else {
           seedNode.shadowStaged = false;
@@ -1883,6 +2091,7 @@ export function createAsterismServer(options = {}) {
         for (const sb of shadowBranches) {
           sb.energy = childEnergy;
           sb.shadowStaged = !unfoldImmediately;
+          if (!sb.shadowStaged) Object.assign(sb, resolveOpenCanvasPosition(canvasState.nodes, sb.x, sb.y, sb.width, sb.height));
           canvasState.nodes.push(sb);
           stagedNodes.push(sb);
           canvasState.edges.push({
@@ -1900,6 +2109,7 @@ export function createAsterismServer(options = {}) {
         if (matchmakerHybrid && topMatch?.node) {
           matchmakerHybrid.energy = childEnergy;
           matchmakerHybrid.shadowStaged = !unfoldImmediately;
+          if (!matchmakerHybrid.shadowStaged) Object.assign(matchmakerHybrid, resolveOpenCanvasPosition(canvasState.nodes, matchmakerHybrid.x, matchmakerHybrid.y, matchmakerHybrid.width, matchmakerHybrid.height));
           canvasState.nodes.push(matchmakerHybrid);
           stagedNodes.push(matchmakerHybrid);
 
@@ -1934,7 +2144,7 @@ export function createAsterismServer(options = {}) {
         }
 
         const attentionBroker = computeAttentionBrokerSnapshot();
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "ideabox.seed",
           seedNode.id,
@@ -1962,7 +2172,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -1982,6 +2192,7 @@ export function createAsterismServer(options = {}) {
           const matchParent = parentNodeId ? n.parentId === parentNodeId : true;
           const matchId = targetSet ? targetSet.has(n.id) : true;
           if (matchParent && matchId) {
+            Object.assign(n, resolveOpenCanvasPosition(canvasState.nodes, n.x, n.y, n.width, n.height, 28, new Set([n.id])));
             n.shadowStaged = false;
             unfoldedIds.push(n.id);
           }
@@ -1995,7 +2206,7 @@ export function createAsterismServer(options = {}) {
         }
 
         const attentionBroker = computeAttentionBrokerSnapshot();
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "shadow.unfold",
           parentNodeId || "canvas-root",
@@ -2013,7 +2224,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2027,11 +2238,13 @@ export function createAsterismServer(options = {}) {
       try {
         const { nodeId, commandId } = await readJsonBody(req);
         const attentionBrokerBefore = computeAttentionBrokerSnapshot();
-        const targetId = nodeId || attentionBrokerBefore.queue[0]?.nodeId;
+        const targetId = nodeId || attentionBrokerBefore.queue.find(item => canvasState.nodes.find(n => n.id === item.nodeId)?.kind !== "decision")?.nodeId;
         const targetNode = canvasState.nodes.find((n) => n.id === targetId);
         if (!targetNode) {
           return sendJson(res, 404, { error: "No pending attention item found" });
         }
+
+        if (targetNode.kind === "decision") return sendJson(res, 400, { error: "Decision cards require explicit resolution via /api/decisions/resolve" });
 
         // Apply `Hydro.Workflow.Ask` default (`askDefault`) so the human is never a bottleneck!
         targetNode.shadowStaged = false;
@@ -2052,7 +2265,7 @@ export function createAsterismServer(options = {}) {
         }
 
         const attentionBroker = computeAttentionBrokerSnapshot();
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "attention.auto_resolve",
           targetNode.id,
@@ -2073,7 +2286,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2118,6 +2331,8 @@ export function createAsterismServer(options = {}) {
         const relMeta =
           PANEL_RELATIONS[childNode.relationFromParent] ||
           PANEL_RELATIONS["visualizes-ui"];
+
+        if (!childNode.shadowStaged) Object.assign(childNode, resolveOpenCanvasPosition(canvasState.nodes, childNode.x, childNode.y, childNode.width, childNode.height));
 
         canvasState.nodes.push(childNode);
         canvasState.edges.push({
@@ -2169,7 +2384,7 @@ export function createAsterismServer(options = {}) {
           }
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "panel.spawn-related",
           sourceNode.id,
@@ -2189,7 +2404,7 @@ export function createAsterismServer(options = {}) {
 
         return sendJson(res, 200, { childNode, state: canvasState });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2243,6 +2458,7 @@ export function createAsterismServer(options = {}) {
           b.warrant = normalizeWarrant(b).warrant;
           b.energy = childEnergy;
           b.facets = { [b.surfaceRole || defaultRoleForStage(b.stage)]: b.html };
+          if (!b.shadowStaged) Object.assign(b, resolveOpenCanvasPosition(canvasState.nodes, b.x, b.y, b.width, b.height));
           canvasState.nodes.push(b);
           const shortModel = (b.model || "").replace(/^openai\//, "");
           canvasState.edges.push({
@@ -2257,7 +2473,7 @@ export function createAsterismServer(options = {}) {
           });
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "node.speculate",
           sourceNode.id,
@@ -2283,7 +2499,7 @@ export function createAsterismServer(options = {}) {
         broadcastState();
         return sendJson(res, 200, { branches, state: canvasState });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2329,6 +2545,8 @@ export function createAsterismServer(options = {}) {
             synthNode.html,
         };
 
+        if (!synthNode.shadowStaged) Object.assign(synthNode, resolveOpenCanvasPosition(canvasState.nodes, synthNode.x, synthNode.y, synthNode.width, synthNode.height));
+
         canvasState.nodes.push(synthNode);
         for (const p of parentNodes) {
           canvasState.edges.push({
@@ -2341,7 +2559,7 @@ export function createAsterismServer(options = {}) {
           });
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "node.synthesize",
           synthNode.id,
@@ -2368,7 +2586,7 @@ export function createAsterismServer(options = {}) {
         broadcastState();
         return sendJson(res, 200, { synthNode, state: canvasState });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2381,6 +2599,7 @@ export function createAsterismServer(options = {}) {
           return sendJson(res, 404, { error: "Branch node not found" });
 
         winner.status = "committed";
+        winner.commitment = "committed";
         winner.kind = "surface";
 
         let discarded = [];
@@ -2404,7 +2623,7 @@ export function createAsterismServer(options = {}) {
           );
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "branch.keep",
           winner.id,
@@ -2416,7 +2635,7 @@ export function createAsterismServer(options = {}) {
         broadcastState();
         return sendJson(res, 200, { winner, discarded, state: canvasState });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2433,13 +2652,14 @@ export function createAsterismServer(options = {}) {
             )
             .map((n) => n.id),
         );
+        if (unkeptIds.size > 0) canvasState.userModel = recordBehavioralObservation(canvasState.userModel, { type: "branch-pruned", projectId: canvasState.activeProjectId }).updatedUserModel;
         canvasState.nodes = canvasState.nodes.filter(
           (n) => !unkeptIds.has(n.id),
         );
         canvasState.edges = canvasState.edges.filter(
           (e) => !unkeptIds.has(e.from) && !unkeptIds.has(e.to),
         );
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "branch.prune-unkept",
           parentId || "canvas-root",
@@ -2454,7 +2674,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2491,6 +2711,7 @@ export function createAsterismServer(options = {}) {
         const relMeta =
           PANEL_RELATIONS[childNode.relationFromParent] ||
           PANEL_RELATIONS.advances;
+        if (!childNode.shadowStaged) Object.assign(childNode, resolveOpenCanvasPosition(canvasState.nodes, childNode.x, childNode.y, childNode.width, childNode.height));
         canvasState.nodes.push(childNode);
         canvasState.edges.push({
           id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -2540,7 +2761,7 @@ export function createAsterismServer(options = {}) {
           }
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "train.advance",
           sourceNode.id,
@@ -2566,7 +2787,7 @@ export function createAsterismServer(options = {}) {
           peerFederationReady: Boolean(peerFederation),
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2599,7 +2820,7 @@ export function createAsterismServer(options = {}) {
           implementation: node.implementation || null,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2669,7 +2890,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2702,7 +2923,7 @@ export function createAsterismServer(options = {}) {
           );
         }
 
-        saveState(canvasState);
+        saveState(canvasState, stateFile);
         await recordDomainCommand(
           "implement.commit",
           node.id,
@@ -2732,7 +2953,7 @@ export function createAsterismServer(options = {}) {
           state: canvasState,
         });
       } catch (err) {
-        return sendJson(res, 500, { error: err.message });
+        return sendJson(res, requestErrorStatus(err), { error: err.message });
       }
     }
 
@@ -2741,7 +2962,7 @@ export function createAsterismServer(options = {}) {
       url.pathname === "/" ? "index.html" : url.pathname.replace(/^\/+/, "");
     const filePath = path.join(PUBLIC_DIR, relPath);
     if (
-      filePath.startsWith(PUBLIC_DIR) &&
+      (filePath.startsWith(PUBLIC_DIR + path.sep) || filePath === path.join(PUBLIC_DIR, "index.html")) &&
       fs.existsSync(filePath) &&
       fs.statSync(filePath).isFile()
     ) {
@@ -2754,12 +2975,13 @@ export function createAsterismServer(options = {}) {
             : ext === ".css"
               ? "text/css; charset=utf-8"
               : "application/octet-stream";
-      res.writeHead(200, { "Content-Type": mime, "Cache-Control": "no-cache" });
+      res.writeHead(200, { "Content-Type": mime, "Cache-Control": "no-cache", "X-Frame-Options": "SAMEORIGIN", "Content-Security-Policy": "frame-ancestors 'self'" });
       fs.createReadStream(filePath).pipe(res);
       return;
     }
 
     sendJson(res, 404, { error: "Not found" });
+    } catch (err) { if (!res.headersSent) sendJson(res, err.statusCode || 500, { error: err.message || "Internal server error" }); }
   });
 }
 

@@ -110,7 +110,7 @@
       background: transparent; border: none; color: #f8fafc;
       font-size: 11.5px; width: 210px; outline: none;
     }
-    .ideabox-input::placeholder { color: #64748b; }
+    .ideabox-input::placeholder { color: #8b9bb4; }
     .ideabox-btn {
       background: rgba(56, 189, 248, 0.15);
       color: #bae6fd;
@@ -195,7 +195,7 @@
 
     .zoom-readout {
       font-family: ui-monospace, monospace; font-size: 11px;
-      color: #64748b; min-width: 38px; text-align: center; cursor: pointer;
+      color: #8b9bb4; min-width: 38px; text-align: center; cursor: pointer;
     }
     .zoom-readout:hover { color: var(--text-main); }
 
@@ -364,6 +364,9 @@
       font-weight: 500;
     }
     .canvas-node.kind-speculative .mini-btn.keep-btn {
+      display: none;
+    }
+    .canvas-node.kind-speculative:hover .mini-btn.keep-btn, .canvas-node.kind-speculative.is-focused .mini-btn.keep-btn, body.zoom-deep .canvas-node.kind-speculative .mini-btn.keep-btn {
       display: inline-block;
     }
 
@@ -386,7 +389,7 @@
     }
     .facet-tab {
       background: transparent;
-      color: #64748b;
+      color: #8b9bb4;
       border: 1px solid transparent;
       border-radius: 5px;
       padding: 2px 6px;
@@ -411,7 +414,7 @@
     }
     .tearoff-btn {
       background: transparent;
-      color: #64748b;
+      color: #8b9bb4;
       border: 1px solid transparent;
       border-radius: 4px;
       padding: 1px 5px;
@@ -621,7 +624,7 @@
       font-family: ui-monospace, monospace; font-size: 9.5px; color: #38bdf8;
     }
     .attention-item-meta {
-      display: flex; gap: 8px; align-items: center; color: #64748b; font-size: 10px; margin-bottom: 6px;
+      display: flex; gap: 8px; align-items: center; color: #8b9bb4; font-size: 10px; margin-bottom: 6px;
     }
     .attention-item-actions {
       display: flex; gap: 6px;
@@ -716,6 +719,116 @@
       display: none;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     }
+    body.is-dragging-card .node-iframe { pointer-events: none !important; }
+    .canvas-node.is-connect-source {
+      border-color: rgba(251, 191, 36, 0.85) !important;
+      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35), 0 18px 40px rgba(0, 0, 0, 0.6) !important;
+    }
+    .connect-temp-line { stroke: rgba(251, 191, 36, 0.9); stroke-width: 2px; stroke-dasharray: 6 4; fill: none; pointer-events: none; }
+    .projection-overlay, #attention-drawer, #compare-modal { user-select: text; }
+    .timeline-entry { display: flex; flex-direction: column; }
+    .timeline-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-left: 3px solid rgba(56, 189, 248, 0.55);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 11px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+
+    /* Semantic Zoom: Constellation Altitude (scale < 0.60) */
+    .constellation-dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      flex-shrink: 0; opacity: 0.55; background: #38bdf8;
+    }
+    .constellation-dot.dot-decision { background: #fbbf24; }
+    .constellation-dot.dot-autonomous { background: #34d399; }
+    .constellation-dot.dot-speculative { background: #c084fc; }
+    .constellation-dot.dot-surface { background: #38bdf8; }
+    @keyframes constellation-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55); }
+      50% { box-shadow: 0 0 0 5px rgba(251, 191, 36, 0); }
+    }
+    body.zoom-constellation .canvas-node {
+      height: 52px !important; min-height: 0 !important; border-radius: 999px; padding: 0 6px; display: flex; justify-content: center; background: rgba(15, 23, 42, 0.95); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    }
+    body.zoom-constellation .node-body, body.zoom-constellation .node-footer, body.zoom-constellation .facet-tab-bar, body.zoom-constellation .worktree-bar, body.zoom-constellation .resize-handle, body.zoom-constellation .header-hover-actions { display: none !important; }
+    body.zoom-constellation .node-header {
+      border-bottom: none; background: transparent; padding: 10px 16px;
+      width: 100%; align-self: center;
+    }
+    body.zoom-constellation .node-title {
+      font-size: 15px; font-weight: 600; letter-spacing: 0.01em; color: #f8fafc;
+    }
+    body.zoom-constellation .constellation-dot {
+      width: 9px; height: 9px; opacity: 1;
+      box-shadow: 0 0 8px currentColor;
+    }
+    body.zoom-constellation .constellation-dot.dot-decision {
+      color: #fbbf24; animation: constellation-pulse 2s ease-in-out infinite;
+    }
+    body.zoom-constellation .constellation-dot.dot-autonomous { color: #34d399; }
+    body.zoom-constellation .constellation-dot.dot-speculative { color: #c084fc; }
+    body.zoom-constellation .constellation-dot.dot-surface { color: #38bdf8; }
+    body.zoom-constellation .edge-line { stroke-width: 2.4px; opacity: 0.65; }
+    @media (prefers-reduced-motion: reduce) {
+      body.zoom-constellation .constellation-dot.dot-decision { animation: none; }
+    }
+
+    /* Morning Coffee Brief Lens */
+    body.view-brief #brief-view-overlay { display: flex; }
+    body.view-brief #canvas-viewport { opacity: 0.12; pointer-events: none; }
+    .brief-grid {
+      flex: 1; overflow: auto; padding: 16px 20px;
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-content: start;
+    }
+    .brief-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .brief-col-title { color: #e2e8f0; font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+    .brief-item {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 9px; padding: 10px 12px; font-size: 11.5px; color: #cbd5e1;
+    }
+    .brief-item-title { color: #f8fafc; font-weight: 600; font-size: 12px; line-height: 1.4; }
+    .brief-item-meta { color: #94a3b8; font-size: 10.5px; margin-top: 4px; line-height: 1.5; }
+    .brief-item-actions { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+    .brief-empty { color: #64748b; font-size: 11.5px; padding: 10px; background: rgba(15, 23, 42, 0.5); border-radius: 8px; }
+
+    /* Spatial Spotlight (Cmd-K) */
+    #spotlight-modal {
+      display: none; position: fixed; inset: 0; z-index: 300;
+      background: rgba(4, 8, 18, 0.55);
+      align-items: flex-start; justify-content: center; padding-top: 14vh;
+    }
+    #spotlight-modal.open { display: flex; }
+    .spotlight-panel {
+      width: min(620px, 92vw); max-height: 64vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      background: rgba(12, 19, 34, 0.97);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 14px; box-shadow: 0 28px 70px rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(18px);
+    }
+    #spotlight-input {
+      background: transparent; border: none; outline: none;
+      color: #f8fafc; font-size: 14px; padding: 15px 18px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    #spotlight-input::placeholder { color: #8b9bb4; }
+    #spotlight-list { overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .spotlight-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      background: transparent; border: 1px solid transparent; border-radius: 8px;
+      color: #cbd5e1; text-align: left; padding: 8px 11px;
+      font-size: 12.5px; cursor: pointer; width: 100%;
+    }
+    .spotlight-item .spotlight-hint { color: #64748b; font-size: 10.5px; white-space: nowrap; }
+    .spotlight-item.active {
+      background: rgba(56, 189, 248, 0.13); color: #f8fafc;
+      border-color: rgba(56, 189, 248, 0.32);
+    }
+    .spotlight-empty { color: #64748b; font-size: 12px; padding: 12px; }
   </style>
 </head>
 <body>
@@ -743,6 +856,7 @@
       <button class="seg-btn" id="view-table" onclick="setViewProjection('table')" title="Structured Organon Table Projection">Table</button>
       <button class="seg-btn" id="view-timeline" onclick="setViewProjection('timeline')" title="Chronological Lineage & Revision Timeline">Timeline</button>
       <button class="seg-btn" id="view-model" onclick="setViewProjection('model')" title="Testable Implicit User Model, Brier Calibration & Sealed Predictions">Model</button>
+      <button class="seg-btn" id="view-brief" onclick="setViewProjection('brief')" title="Morning Coffee Ambient Digest (6)">☀ Brief</button>
     </div>
 
     <div class="mode-segmented" id="tool-switcher" role="group" aria-label="Canvas Tool">
@@ -757,6 +871,7 @@
     </div>
 
     <div class="topbar-right">
+      <button class="attn-pill-btn" onclick="openSpatialSpotlight()" title="Spatial Spotlight Command Bar (⌘K / Ctrl+K)">⌘K</button>
       <button class="attn-pill-btn" id="btn-attention-broker" onclick="toggleAttentionBroker()" title="Open EVOI Attention Queue & Staged Shadow Branches">
         <span class="attn-dot"></span>
         <span id="attn-pill-label">Queue</span>
@@ -775,6 +890,7 @@
           <button onclick="synthesizeSelectedOrKept(); closeWorkspaceMenu();">⊕ Synthesize Forks</button>
           <button onclick="promptAddProject(); closeWorkspaceMenu();">📁 Switch / Add Project Repo...</button>
           <hr />
+          <button onclick="tidyCanvasLayout(); closeWorkspaceMenu();">✨ Tidy Overlapping Cards</button>
           <button onclick="pulseBasalFreeEnergy(); closeWorkspaceMenu();">🔋 Pulse Basal Energy</button>
           <button onclick="pruneUnkeptForks(); closeWorkspaceMenu();">✂ Prune Unkept Forks</button>
           <button onclick="clearSketches(); closeWorkspaceMenu();">🧹 Clear Sketch Strokes</button>
@@ -863,6 +979,34 @@
     </div>
   </div>
 
+  <div id="brief-view-overlay" class="projection-overlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
+      <div>
+        <strong style="color:#f1f5f9;font-size:13px;">☀ Morning Coffee Brief</strong>
+        <span id="brief-summary" style="color:#64748b;font-size:11px;margin-left:8px;">What needs you, what moved on its own, and how the model shifted</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="tool-btn" onclick="tidyCanvasLayout()" title="Nudge overlapping cards clear">✨ Tidy</button>
+        <button class="tool-btn" onclick="setViewProjection('canvas')">Back to Canvas</button>
+      </div>
+    </div>
+    <div class="brief-grid">
+      <div class="brief-col">
+        <div class="brief-col-title">Needs Your Call</div>
+        <div id="brief-needs-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+      <div class="brief-col">
+        <div class="brief-col-title">Autonomous &amp; Basal Moves</div>
+        <div id="brief-autonomous-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+      <div class="brief-col">
+        <div class="brief-col-title">Model Shifts</div>
+        <div id="brief-model-summary"></div>
+        <div id="brief-model-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="attention-drawer">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
       <div>
@@ -922,9 +1066,22 @@
     </div>
   </div>
 
-  <div id="status-toast"></div>
+  <div id="spotlight-modal" role="dialog" aria-modal="true" aria-label="Spatial Spotlight">
+    <div class="spotlight-panel">
+      <input id="spotlight-input" type="text" placeholder="Jump to card, switch lens (1-6), tidy canvas, or type an intent to compile..." autocomplete="off" />
+      <div id="spotlight-list" role="listbox"></div>
+    </div>
+  </div>
+
+  <div id="status-toast" role="status" aria-live="polite"></div>
 
   <script>
+    function escHtml(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function escAttr(s) {
+      return escHtml(s);
+    }
     const AVAILABLE_MODELS = [
       { id: 'openai/gpt-6-luna', label: 'gpt-6-luna' },
       { id: 'openai/gpt-6.1-terra', label: 'gpt-6.1-terra' },
@@ -946,7 +1103,18 @@
     let activeStroke = null;
     let connectSourceId = null;
     let focusedNodeId = null;
+    let draggingNodeId = null;
+    let resizingNodeId = null;
+    let lastDeletedCard = null;
+    const resolvingDecisionInFlight = new Set();
+    const counterfactualInFlight = new Set();
     const selectedForSynth = new Set();
+    let spotlightItems = [];
+    let spotlightIndex = 0;
+    let briefingInFlight = false;
+    let briefingLastFetchAt = 0;
+    let lastBriefingData = null;
+    let tidyInFlight = false;
 
     const viewportEl = document.getElementById('canvas-viewport');
     const worldEl = document.getElementById('canvas-world');
@@ -964,6 +1132,100 @@
       clearTimeout(toastEl._timer);
       if (ms > 0) {
         toastEl._timer = setTimeout(() => { toastEl.style.display = 'none'; }, ms);
+      }
+    }
+
+    function showUndoToast(msg) {
+      toastEl.innerHTML = '';
+      const span = document.createElement('span');
+      span.textContent = msg + ' ';
+      const btn = document.createElement('button');
+      btn.className = 'mini-btn';
+      btn.textContent = 'Undo Delete';
+      btn.style.marginLeft = '8px';
+      btn.addEventListener('click', () => undoDeleteCard());
+      toastEl.appendChild(span);
+      toastEl.appendChild(btn);
+      toastEl.style.display = 'block';
+      clearTimeout(toastEl._timer);
+      toastEl._timer = setTimeout(() => { toastEl.style.display = 'none'; lastDeletedCard = null; }, 6000);
+    }
+
+    function undoDeleteCard() {
+      if (!lastDeletedCard || !lastDeletedCard.node) return;
+      const { node, edges } = lastDeletedCard;
+      if (!state.nodes.some(n => n.id === node.id)) state.nodes.push(node);
+      for (const e of (edges || [])) {
+        if (!state.edges.some(x => x.id === e.id)) state.edges.push(e);
+      }
+      lastDeletedCard = null;
+      toastEl.style.display = 'none';
+      renderAll();
+      persistState();
+      showToast('Restored deleted card.');
+    }
+
+    async function persistNodeMove(node) {
+      if (!node) return;
+      try {
+        const res = await fetch('/api/nodes/move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId: node.id, x: node.x, y: node.y, width: node.width, height: node.height })
+        });
+        if (res.status === 404) await persistState();
+      } catch {
+        try { await persistState(); } catch {}
+      }
+    }
+
+    function updateFocusClasses() {
+      nodesLayer.querySelectorAll('.canvas-node').forEach(c => {
+        c.classList.toggle('is-focused', c.dataset.id === focusedNodeId);
+      });
+      document.querySelectorAll('.edge-item').forEach(g => {
+        const active = focusedNodeId && (g.dataset.from === focusedNodeId || g.dataset.to === focusedNodeId);
+        g.classList.toggle('is-connected-active', Boolean(active));
+        g.classList.toggle('is-focused', Boolean(active));
+      });
+      if (!document.querySelector('.edge-item')) renderEdges();
+    }
+
+    function focusDecisionNode(nodeId) {
+      const node = state.nodes.find(n => n.id === nodeId);
+      if (!node) return;
+      focusedNodeId = nodeId;
+      const drawer = document.getElementById('attention-drawer');
+      if (drawer) drawer.classList.remove('open');
+      if (state.viewProjection && state.viewProjection !== 'canvas' && state.viewProjection !== 'plex') {
+        setViewProjection('canvas');
+      }
+      const scale = state.viewport?.scale || 0.88;
+      state.viewport.x = Math.round(window.innerWidth / 2 - (node.x + (node.width || 360) / 2) * scale);
+      state.viewport.y = Math.round(window.innerHeight / 2 - (node.y + (node.height || 220) / 2) * scale);
+      applyTransform();
+      updateFocusClasses();
+      renderEdges();
+    }
+
+    async function createCrossPollinateEdge(fromId, toId, relation = 'cross-pollinates', kind = 'association') {
+      if (!fromId || !toId || fromId === toId) return;
+      if (state.edges.some(e => e.from === fromId && e.to === toId && (e.relation === relation || e.kind === kind || e.relation === 'cross-pollinates'))) {
+        showToast('Link already exists.');
+        return;
+      }
+      const edge = { id: 'edge-' + Date.now(), from: fromId, to: toId, relation, kind, label: relation };
+      state.edges.push(edge);
+      renderEdges();
+      try {
+        const res = await fetch('/api/edges', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(edge)
+        });
+        if (!res.ok) await persistState();
+      } catch {
+        try { await persistState(); } catch {}
       }
     }
 
@@ -1014,6 +1276,7 @@
     function setMode(nextMode) {
       mode = nextMode;
       connectSourceId = null;
+      document.querySelectorAll('.canvas-node.is-connect-source').forEach(c => c.classList.remove('is-connect-source'));
       document.querySelectorAll('#tool-switcher .seg-btn').forEach(b => b.classList.remove('active'));
       const btn = document.getElementById('mode-' + nextMode);
       if (btn) btn.classList.add('active');
@@ -1022,8 +1285,26 @@
     }
 
     async function setViewProjection(nextView, targetFocusNodeId) {
+      const prevView = state.viewProjection || 'canvas';
+      if (prevView === 'plex' && nextView === 'canvas') {
+        for (const n of state.nodes) {
+          if (typeof n.canvasX === 'number') n.x = n.canvasX;
+          if (typeof n.canvasY === 'number') n.y = n.canvasY;
+        }
+        try {
+          await fetch('/api/views/plex', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ restoreCanvasLayout: true, viewProjection: 'canvas' }) });
+        } catch {}
+      }
+      if (targetFocusNodeId) {
+        const targetNode = state.nodes.find(n => n.id === targetFocusNodeId);
+        if (targetNode && targetNode.shadowStaged) {
+          targetNode.shadowStaged = false;
+          try { await unfoldShadowForParent(targetNode.parentId || targetNode.id); } catch {}
+        }
+      }
       state.viewProjection = nextView;
-      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline', 'view-model');
+      if (nextView === 'brief') briefingLastFetchAt = 0;
+      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline', 'view-model', 'view-brief');
       document.body.classList.add('view-' + nextView);
       document.querySelectorAll('#view-switcher .seg-btn').forEach(b => b.classList.remove('active'));
       const btn = document.getElementById('view-' + nextView);
@@ -1039,6 +1320,15 @@
 
     async function focusPlexNode(nodeId) {
       if (!nodeId) return;
+      const focusNodeLocal = state.nodes.find(n => n.id === nodeId);
+      if (focusNodeLocal && focusNodeLocal.shadowStaged) {
+        focusNodeLocal.shadowStaged = false;
+        try { await unfoldShadowForParent(focusNodeLocal.parentId || focusNodeLocal.id); } catch {}
+      }
+      for (const n of state.nodes) {
+        if (typeof n.canvasX !== 'number') n.canvasX = n.x;
+        if (typeof n.canvasY !== 'number') n.canvasY = n.y;
+      }
       focusedNodeId = nodeId;
       state.plexFocusNodeId = nodeId;
       const res = await fetch('/api/views/plex', {
@@ -1102,6 +1392,7 @@
       worldEl.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
       zoomLabel.textContent = `${Math.round(scale * 100)}%`;
       document.body.classList.toggle('zoom-deep', scale >= 1.12);
+      document.body.classList.toggle('zoom-constellation', scale < 0.60);
     }
 
     function screenToWorld(clientX, clientY) {
@@ -1160,12 +1451,28 @@
         const to = state.nodes.find(n => n.id === edge.to);
         if (!from || !to || from.shadowStaged || to.shadowStaged) continue;
 
-        const x1 = from.x + from.width;
-        const y1 = from.y + from.height / 2;
-        const x2 = to.x;
-        const y2 = to.y + to.height / 2;
-        const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
-        const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+        let x1, y1, x2, y2, d;
+        if (to.y >= from.y + from.height - 20) {
+          x1 = from.x + from.width / 2; y1 = from.y + from.height;
+          x2 = to.x + to.width / 2; y2 = to.y;
+          const dy = Math.max(50, Math.abs(y2 - y1) * 0.45);
+          d = `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
+        } else if (to.y + to.height <= from.y + 20) {
+          x1 = from.x + from.width / 2; y1 = from.y;
+          x2 = to.x + to.width / 2; y2 = to.y + to.height;
+          const dy = Math.max(50, Math.abs(y2 - y1) * 0.45);
+          d = `M ${x1} ${y1} C ${x1} ${y1 - dy}, ${x2} ${y2 + dy}, ${x2} ${y2}`;
+        } else if (to.x >= from.x) {
+          x1 = from.x + from.width; y1 = from.y + from.height / 2;
+          x2 = to.x; y2 = to.y + to.height / 2;
+          const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
+          d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+        } else {
+          x1 = from.x; y1 = from.y + from.height / 2;
+          x2 = to.x + to.width; y2 = to.y + to.height / 2;
+          const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
+          d = `M ${x1} ${y1} C ${x1 - dx} ${y1}, ${x2 + dx} ${y2}, ${x2} ${y2}`;
+        }
 
         const style = edgeStyleFor(edge, to);
         const isConnectedActive =
@@ -1175,7 +1482,9 @@
           selectedForSynth.has(edge.to);
 
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.setAttribute('class', `edge-item${isConnectedActive ? ' is-connected-active' : ''}`);
+        g.setAttribute('class', `edge-item${isConnectedActive ? ' is-connected-active is-focused' : ''}`);
+        g.dataset.from = edge.from;
+        g.dataset.to = edge.to;
 
         const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         hit.setAttribute('class', 'edge-hit');
@@ -1243,12 +1552,13 @@
     /**
      * Injects the bidirectional `window.asterism` SDK into every surface iframe
      */
-    function buildSrcDoc(node) {
+    function buildSrcDoc(node, options = {}) {
       const initialStateJson = JSON.stringify(node.state || {}).replace(/</g, '\\u003c');
       const nodeIdJson = JSON.stringify(node.id);
       const stageJson = JSON.stringify(node.stage || 'note');
       const roleJson = JSON.stringify(node.surfaceRole || defaultRoleForStage(node.stage));
       const modelJson = JSON.stringify(node.model || 'openai/gpt-6-luna');
+      const readOnlyJson = JSON.stringify(Boolean(options.readOnly));
 
       return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
         html, body { margin: 0; padding: 0; background: transparent; color: #e2e8f0; overflow-x: hidden; }
@@ -1258,27 +1568,36 @@
       <script>
         (function() {
           const _state = ${initialStateJson};
+          const _readOnly = ${readOnlyJson};
           window.asterism = {
             nodeId: ${nodeIdJson},
             stage: ${stageJson},
             surfaceRole: ${roleJson},
             model: ${modelJson},
+            readOnly: _readOnly,
             state: _state,
             getState() {
               return Object.assign({}, _state);
             },
             setState(patch) {
+              if (_readOnly) return _state;
               if (!patch || typeof patch !== 'object') return _state;
-              Object.assign(_state, patch);
+              const cleanPatch = {};
+              for (const k of Object.keys(patch)) {
+                if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+                cleanPatch[k] = patch[k];
+              }
+              Object.assign(_state, cleanPatch);
               window.parent.postMessage({
                 type: 'asterism:set-state',
                 nodeId: this.nodeId,
-                patch: patch
+                patch: cleanPatch
               }, '*');
               window.dispatchEvent(new CustomEvent('asterism:statechange', { detail: this.getState() }));
               return this.getState();
             },
             mutate(instruction) {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:mutate-node',
                 nodeId: this.nodeId,
@@ -1286,6 +1605,7 @@
               }, '*');
             },
             updatePanel(targetNodeId, instruction) {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:mutate-node',
                 nodeId: targetNodeId || this.nodeId,
@@ -1293,6 +1613,7 @@
               }, '*');
             },
             spawnRelatedPanel(options) {
+              if (_readOnly) return;
               const opts = typeof options === 'string' ? { prompt: options } : (options || {});
               window.parent.postMessage({
                 type: 'asterism:spawn-related',
@@ -1304,6 +1625,7 @@
               }, '*');
             },
             spawnFork(prompt, options) {
+              if (_readOnly) return;
               window.parent.postMessage(Object.assign({
                 type: 'asterism:trigger-speculate',
                 nodeId: this.nodeId,
@@ -1311,6 +1633,7 @@
               }, options || {}), '*');
             },
             keepFork(pruneSiblings) {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:commit-branch',
                 nodeId: this.nodeId,
@@ -1318,6 +1641,7 @@
               }, '*');
             },
             advanceStage(instruction, targetStage) {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:advance-stage',
                 nodeId: this.nodeId,
@@ -1326,6 +1650,7 @@
               }, '*');
             },
             synthesizeWith(otherNodeIds, instruction, targetStage) {
+              if (_readOnly) return;
               const ids = [this.nodeId].concat(Array.isArray(otherNodeIds) ? otherNodeIds : [otherNodeIds]);
               window.parent.postMessage({
                 type: 'asterism:synthesize-nodes',
@@ -1335,6 +1660,7 @@
               }, '*');
             },
             runImplementAgent(instruction) {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:run-implement',
                 nodeId: this.nodeId,
@@ -1342,6 +1668,7 @@
               }, '*');
             },
             switchFacet(facetRole, tearOff) {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:switch-facet',
                 nodeId: this.nodeId,
@@ -1350,6 +1677,7 @@
               }, '*');
             },
             tearOffFacet(facetRole) {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:switch-facet',
                 nodeId: this.nodeId,
@@ -1358,33 +1686,65 @@
               }, '*');
             },
             pulseBasalEnergy() {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:pulse-basal-energy',
                 nodeId: this.nodeId
               }, '*');
             },
             openComparisonMatrix() {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:open-compare-matrix',
                 nodeId: this.nodeId
               }, '*');
             },
             unfoldShadowChildren() {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:unfold-shadow',
                 parentNodeId: this.nodeId
               }, '*');
             },
             openAttentionBroker() {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:open-attention-broker',
                 nodeId: this.nodeId
               }, '*');
             },
             submitIdeaBoxSeed(seedPrompt) {
+              if (_readOnly) return;
               window.parent.postMessage({
                 type: 'asterism:ideabox-seed',
                 seedPrompt: seedPrompt
+              }, '*');
+            },
+            resolveDecision(predictionId, chosenOptionIds) {
+              if (_readOnly) return;
+              window.parent.postMessage({
+                type: 'asterism:resolve-decision',
+                nodeId: this.nodeId,
+                predictionId: predictionId,
+                chosenOptionIds: Array.isArray(chosenOptionIds) ? chosenOptionIds : (chosenOptionIds ? [chosenOptionIds] : [])
+              }, '*');
+            },
+            counterfactual(action, predictionId, targetOptionIds) {
+              if (_readOnly) return;
+              window.parent.postMessage({
+                type: 'asterism:counterfactual',
+                nodeId: this.nodeId,
+                predictionId: predictionId,
+                action: action,
+                targetOptionIds: Array.isArray(targetOptionIds) ? targetOptionIds : (targetOptionIds ? [targetOptionIds] : [])
+              }, '*');
+            },
+            pruneUnkept(parentId) {
+              if (_readOnly) return;
+              window.parent.postMessage({
+                type: 'asterism:prune-unkept',
+                nodeId: this.nodeId,
+                parentId: parentId || this.nodeId
               }, '*');
             },
             bindInputs(root) {
@@ -1392,29 +1752,42 @@
               const els = container.querySelectorAll('input[data-state-key], select[data-state-key], textarea[data-state-key], input[name], select[name], textarea[name]');
               els.forEach((el) => {
                 const key = el.getAttribute('data-state-key') || el.getAttribute('name');
-                if (!key || el._asterismBound) return;
-                el._asterismBound = true;
+                if (!key || key === '__proto__' || key === 'constructor' || key === 'prototype') return;
                 if (Object.prototype.hasOwnProperty.call(_state, key)) {
                   if (el.type === 'checkbox') {
                     el.checked = Boolean(_state[key]);
                   } else if (String(el.value) !== String(_state[key])) {
                     el.value = _state[key];
-                    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
+                    if (!el._asterismBound) { try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {} }
                   }
                 }
-                const sync = () => {
+                if (el._asterismBound) return;
+                el._asterismBound = true;
+                const readVal = () => {
                   let val = el.type === 'checkbox' ? el.checked : el.value;
                   if (el.type === 'range' || el.type === 'number') {
                     const num = Number(val);
                     if (!Number.isNaN(num)) val = num;
                   }
-                  window.asterism.setState({ [key]: val });
+                  return val;
                 };
-                el.addEventListener('input', sync);
-                el.addEventListener('change', sync);
+                let debounceTimer = null;
+                const sync = () => { window.asterism.setState({ [key]: readVal() }); };
+                el.addEventListener('input', () => {
+                  clearTimeout(debounceTimer);
+                  debounceTimer = setTimeout(sync, 120);
+                });
+                el.addEventListener('change', () => {
+                  clearTimeout(debounceTimer);
+                  sync();
+                });
               });
             }
           };
+          document.addEventListener('pointerdown', () => {
+            try { window.parent.postMessage({ type: 'asterism:focus-card', nodeId: window.asterism.nodeId }, '*'); } catch {}
+          });
+          window.addEventListener('message', (e) => { if (e.data?.type === 'asterism:state-sync' && e.data.state) { for (const k of ['__proto__', 'constructor', 'prototype']) delete e.data.state[k]; Object.assign(_state, e.data.state); window.asterism.bindInputs(document); window.dispatchEvent(new CustomEvent('asterism:statechange', { detail: window.asterism.getState() })); } });
           window.addEventListener('DOMContentLoaded', () => {
             window.asterism.bindInputs(document);
           });
@@ -1431,7 +1804,7 @@
       const diff = impl?.diff;
       const patchLines = (diff?.patch || '').split('\n');
       const coloredPatch = patchLines.map((line) => {
-        const esc = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const esc = escHtml(line);
         if (line.startsWith('+') && !line.startsWith('+++')) {
           return `<div style="background:rgba(16,185,129,0.14);color:#6ee7b7;">${esc}</div>`;
         }
@@ -1445,17 +1818,17 @@
       }).join('');
 
       const filesHtml = (diff?.changedFiles || []).map(f =>
-        `<span style="background:rgba(30,41,59,0.9);border:1px solid rgba(148,163,184,0.25);padding:2px 6px;border-radius:4px;font-size:10px;">${f.status} ${f.path} (<span style="color:#34d399">+${f.insertions}</span>/<span style="color:#f87171">-${f.deletions}</span>)</span>`
+        `<span style="background:rgba(30,41,59,0.9);border:1px solid rgba(148,163,184,0.25);padding:2px 6px;border-radius:4px;font-size:10px;">${escHtml(f.status)} ${escHtml(f.path)} (<span style="color:#34d399">+${escHtml(f.insertions)}</span>/<span style="color:#f87171">-${escHtml(f.deletions)}</span>)</span>`
       ).join(' ');
 
       return `
         <div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(148,163,184,0.2);">
           <div style="display:flex;justify-content:space-between;color:#f8fafc;font-weight:700;margin-bottom:4px;">
-            <span>Branch: ${wt?.branchName || diff?.branchName || 'asterism/implement'}</span>
-            <span>HEAD: ${wt?.headCommit || diff?.headCommit || wt?.baseCommit || 'HEAD'}</span>
+            <span>Branch: ${escHtml(wt?.branchName || diff?.branchName || 'asterism/implement')}</span>
+            <span>HEAD: ${escHtml(wt?.headCommit || diff?.headCommit || wt?.baseCommit || 'HEAD')}</span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">${filesHtml || '<span style="color:#64748b;">Working tree clean (all changes committed)</span>'}</div>
-          ${impl?.testOutput ? `<details style="margin-top:4px;"><summary style="cursor:pointer;color:${impl.testPassed ? '#34d399' : '#f87171'};font-weight:600;">${impl.testPassed ? '✓ node --test Passed' : '✕ node --test Failed'} (${impl.lineageCount || 1} panel lineage)</summary><pre style="margin:4px 0 0;padding:6px;background:#020617;border-radius:4px;color:#cbd5e1;white-space:pre-wrap;font-size:10px;">${impl.testOutput.replace(/</g, '&lt;')}</pre></details>` : ''}
+          ${impl?.testOutput ? `<details style="margin-top:4px;"><summary style="cursor:pointer;color:${impl.testPassed ? '#34d399' : '#f87171'};font-weight:600;">${impl.testPassed ? '✓ node --test Passed' : '✕ node --test Failed'} (${impl.lineageCount || 1} panel lineage)</summary><pre style="margin:4px 0 0;padding:6px;background:#020617;border-radius:4px;color:#cbd5e1;white-space:pre-wrap;font-size:10px;">${escHtml(impl.testOutput)}</pre></details>` : ''}
         </div>
         <div style="font-size:10px;line-height:1.4;white-space:pre-wrap;">${coloredPatch || '<span style="color:#64748b;">No uncommitted diff lines.</span>'}</div>
       `;
@@ -1481,6 +1854,7 @@
             <div class="node-header">
               <div class="node-title-wrap">
                 <button class="synth-check-btn" title="Select panel to compare or synthesize (Shift+Click)">☐</button>
+                <span class="constellation-dot dot-surface" aria-hidden="true"></span>
                 <span class="node-title"></span>
               </div>
               <div class="node-actions">
@@ -1518,7 +1892,7 @@
               </div>
             </div>
             <div class="node-body">
-              <iframe class="node-iframe" sandbox="allow-scripts allow-same-origin"></iframe>
+              <iframe class="node-iframe" sandbox="allow-scripts"></iframe>
               <textarea class="node-code-editor" spellcheck="false"></textarea>
               <div class="node-diff-inspector"></div>
             </div>
@@ -1562,6 +1936,7 @@
           `stage-${node.stage || 'note'}`,
           `role-${resolvedRole}`,
           isSelected ? 'selected-for-synth' : '',
+          connectSourceId === node.id ? 'is-connect-source' : '',
           isFocused ? 'is-focused' : '',
           plexClass,
           keepEditing ? 'editing-html' : '',
@@ -1604,6 +1979,17 @@
           node.status === 'committed' ? `✓ ${stageLabel}` : stageLabel;
         card.querySelector('.node-title').textContent = node.title;
         card.querySelector('.node-title').title = node.title;
+        const constellationDot = card.querySelector('.constellation-dot');
+        if (constellationDot) {
+          const dotKind = node.kind === 'decision'
+            ? 'dot-decision'
+            : node.autonomousReceipt
+              ? 'dot-autonomous'
+              : node.kind === 'speculative'
+                ? 'dot-speculative'
+                : 'dot-surface';
+          constellationDot.className = `constellation-dot ${dotKind}`;
+        }
 
         const modelSelect = card.querySelector('.model-select');
         const activeModel = node.model || 'openai/gpt-6-luna';
@@ -1642,12 +2028,18 @@
 
         const iframe = card.querySelector('.node-iframe');
         const editor = card.querySelector('.node-code-editor');
+        if (iframe) iframe.title = node.title || 'Asterism Card Surface';
+        const _stateJson = JSON.stringify(node.state || {});
         if (card.dataset.lastHtml !== node.html) {
           card.dataset.lastHtml = node.html;
+          card.dataset.lastStateJson = _stateJson;
           iframe.srcdoc = buildSrcDoc(node);
           if (document.activeElement !== editor) {
             editor.value = node.html;
           }
+        } else if (card.dataset.lastStateJson !== _stateJson) {
+          card.dataset.lastStateJson = _stateJson;
+          try { iframe.contentWindow?.postMessage({ type: 'asterism:state-sync', state: node.state || {} }, '*'); } catch {}
         }
       }
     }
@@ -1733,6 +2125,7 @@
       }
 
       header.addEventListener('dblclick', (e) => {
+        if (!e.altKey) return;
         if (e.target.closest('button') || e.target.closest('select')) return;
         e.stopPropagation();
         if (state.viewProjection === 'plex') {
@@ -1745,11 +2138,6 @@
       header.addEventListener('pointerdown', (e) => {
         if (e.target.closest('button') || e.target.closest('select')) return;
         e.stopPropagation();
-
-        if (state.viewProjection === 'plex' && state.plexFocusNodeId !== nodeId && !e.shiftKey && mode === 'select') {
-          focusPlexNode(nodeId);
-          return;
-        }
 
         if (focusedNodeId !== nodeId) {
           focusedNodeId = nodeId;
@@ -1765,24 +2153,60 @@
         if (mode === 'connect') {
           if (!connectSourceId) {
             connectSourceId = nodeId;
+            document.querySelectorAll('.canvas-node.is-connect-source').forEach(c => c.classList.remove('is-connect-source'));
+            card.classList.add('is-connect-source');
             showToast(`Source panel selected (${nodeId}). Now click a target panel header.`);
           } else if (connectSourceId !== nodeId) {
             const targetNode = state.nodes.find(n => n.id === nodeId);
             const tRole = targetNode?.surfaceRole || defaultRoleForStage(targetNode?.stage);
-            const rel = tRole === 'ui-prototype' ? 'visualizes-ui' : tRole === 'spec-diagram' ? 'specifies' : tRole === 'artifact-harness' ? 'implements' : 'annotates';
-            state.edges.push({
-              id: 'edge-' + Date.now(),
-              from: connectSourceId,
-              to: nodeId,
-              relation: rel,
-              kind: rel,
-              label: rel
-            });
+            const rel = tRole === 'ui-prototype' ? 'visualizes-ui' : tRole === 'spec-diagram' ? 'specifies' : tRole === 'artifact-harness' ? 'implements' : 'cross-pollinates';
+            const fromId = connectSourceId;
             connectSourceId = null;
+            document.querySelectorAll('.canvas-node.is-connect-source').forEach(c => c.classList.remove('is-connect-source'));
             setMode('select');
-            renderEdges();
-            persistState();
+            createCrossPollinateEdge(fromId, nodeId, rel, rel === 'cross-pollinates' ? 'association' : rel);
           }
+          return;
+        }
+
+        if (e.altKey) {
+          const sourceNode = state.nodes.find(n => n.id === nodeId);
+          if (!sourceNode) return;
+          connectSourceId = nodeId;
+          document.querySelectorAll('.canvas-node.is-connect-source').forEach(c => c.classList.remove('is-connect-source'));
+          card.classList.add('is-connect-source');
+          document.body.classList.add('is-dragging-card');
+          try { header.setPointerCapture?.(e.pointerId); } catch {}
+          const tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          tempLine.setAttribute('class', 'connect-temp-line');
+          const sx = sourceNode.x + sourceNode.width / 2;
+          const sy = sourceNode.y + sourceNode.height / 2;
+          tempLine.setAttribute('x1', String(sx)); tempLine.setAttribute('y1', String(sy));
+          tempLine.setAttribute('x2', String(sx)); tempLine.setAttribute('y2', String(sy));
+          edgesGroup.appendChild(tempLine);
+          const altStartX = e.clientX; const altStartY = e.clientY;
+          function onAltMove(ev) {
+            const pt = screenToWorld(ev.clientX, ev.clientY);
+            tempLine.setAttribute('x2', String(pt.x)); tempLine.setAttribute('y2', String(pt.y));
+          }
+          function onAltUp(ev) {
+            window.removeEventListener('pointermove', onAltMove);
+            window.removeEventListener('pointerup', onAltUp);
+            tempLine.remove();
+            document.body.classList.remove('is-dragging-card');
+            card.classList.remove('is-connect-source');
+            const fromId = connectSourceId;
+            connectSourceId = null;
+            const dist = Math.hypot(ev.clientX - altStartX, ev.clientY - altStartY);
+            if (dist < 5) return;
+            const targetCard = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.canvas-node');
+            const targetId = targetCard?.dataset?.id;
+            if (targetId && targetId !== fromId) {
+              createCrossPollinateEdge(fromId, targetId, 'cross-pollinates', 'association');
+            }
+          }
+          window.addEventListener('pointermove', onAltMove);
+          window.addEventListener('pointerup', onAltUp);
           return;
         }
 
@@ -1792,18 +2216,33 @@
         const startY = e.clientY;
         const origX = node.x;
         const origY = node.y;
+        let moved = false;
+        draggingNodeId = nodeId;
+        document.body.classList.add('is-dragging-card');
+        try { header.setPointerCapture?.(e.pointerId); } catch {}
 
         function onMove(ev) {
+          if (Math.abs(ev.clientX - startX) > 2 || Math.abs(ev.clientY - startY) > 2) moved = true;
           node.x = Math.round(origX + (ev.clientX - startX) / state.viewport.scale);
           node.y = Math.round(origY + (ev.clientY - startY) / state.viewport.scale);
           card.style.left = `${node.x}px`;
           card.style.top = `${node.y}px`;
           renderEdges();
         }
-        function onUp() {
+        function onUp(ev) {
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
-          persistState();
+          document.body.classList.remove('is-dragging-card');
+          draggingNodeId = null;
+          const dist = ev ? Math.hypot(ev.clientX - startX, ev.clientY - startY) : (moved ? 99 : 0);
+          if (state.viewProjection === 'plex' && state.plexFocusNodeId !== nodeId && !e.shiftKey && mode === 'select' && dist < 5) {
+            node.x = origX; node.y = origY;
+            card.style.left = `${node.x}px`; card.style.top = `${node.y}px`;
+            renderEdges();
+            focusPlexNode(nodeId);
+            return;
+          }
+          if (moved || node.x !== origX || node.y !== origY) persistNodeMove(node);
         }
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
@@ -1817,8 +2256,13 @@
         const startY = e.clientY;
         const origW = node.width;
         const origH = node.height;
+        let resized = false;
+        resizingNodeId = nodeId;
+        document.body.classList.add('is-dragging-card');
+        try { resizeHandle.setPointerCapture?.(e.pointerId); } catch {}
 
         function onMove(ev) {
+          resized = true;
           node.width = Math.max(300, Math.round(origW + (ev.clientX - startX) / state.viewport.scale));
           node.height = Math.max(185, Math.round(origH + (ev.clientY - startY) / state.viewport.scale));
           card.style.width = `${node.width}px`;
@@ -1828,7 +2272,9 @@
         function onUp() {
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
-          persistState();
+          document.body.classList.remove('is-dragging-card');
+          resizingNodeId = null;
+          if (resized && (node.width !== origW || node.height !== origH)) persistNodeMove(node);
         }
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
@@ -1899,14 +2345,28 @@
         advanceStage(nodeId, customPrompt);
       });
 
-      delBtn.addEventListener('click', () => {
+      delBtn.addEventListener('click', async () => {
+        const deletedNode = state.nodes.find(n => n.id === nodeId);
+        const incidentEdges = state.edges.filter(e => e.from === nodeId || e.to === nodeId);
+        if (deletedNode) lastDeletedCard = { node: deletedNode, edges: incidentEdges };
         selectedForSynth.delete(nodeId);
         if (focusedNodeId === nodeId) focusedNodeId = null;
+        if (connectSourceId === nodeId) connectSourceId = null;
         updateSynthButtonLabel();
         state.nodes = state.nodes.filter(n => n.id !== nodeId);
         state.edges = state.edges.filter(e => e.from !== nodeId && e.to !== nodeId);
         renderAll();
-        persistState();
+        try {
+          const res = await fetch('/api/nodes/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nodeId })
+          });
+          if (!res.ok) await persistState();
+        } catch {
+          try { await persistState(); } catch {}
+        }
+        showUndoToast(`Deleted "${deletedNode?.title || nodeId}".`);
       });
 
       async function runMutate() {
@@ -1977,15 +2437,16 @@
         col.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(30,41,59,0.92);border-bottom:1px solid rgba(148,163,184,0.16);font-size:11px;">
             <div>
-              <strong style="color:#f8fafc;">${n.title}</strong>
-              <span style="margin-left:6px;color:#38bdf8;font-family:ui-monospace,monospace;font-size:10px;">${shortModel} • ${pScore}</span>
+              <strong style="color:#f8fafc;">${escHtml(n.title)}</strong>
+              <span style="margin-left:6px;color:#38bdf8;font-family:ui-monospace,monospace;font-size:10px;">${escHtml(shortModel)} • ${escHtml(pScore)}</span>
             </div>
-            <button class="mini-btn" onclick="commitBranch('${n.id}', false); closeComparisonMatrix();">✓ Keep</button>
+            <button class="mini-btn" onclick="commitBranch('${escAttr(n.id)}', false); closeComparisonMatrix();">✓ Keep</button>
           </div>
-          <iframe style="flex:1;width:100%;border:none;background:transparent;" sandbox="allow-scripts allow-same-origin"></iframe>
+          <iframe style="flex:1;width:100%;border:none;background:transparent;" sandbox="allow-scripts"></iframe>
         `;
         const iframe = col.querySelector('iframe');
-        iframe.srcdoc = buildSrcDoc(n);
+        iframe.title = n.title || 'Asterism Card Surface';
+        iframe.srcdoc = buildSrcDoc(n, { readOnly: true });
         grid.appendChild(col);
       }
       document.getElementById('compare-modal').classList.add('open');
@@ -2129,26 +2590,39 @@
     window.addEventListener('message', async (e) => {
       if (!e.data || typeof e.data !== 'object') return;
       const msg = e.data;
-      if (msg.type === 'asterism:set-state' && msg.nodeId && msg.patch) {
-        const node = state.nodes.find(n => n.id === msg.nodeId);
+      if (!msg.type || !String(msg.type).startsWith('asterism:')) return;
+      const senderCard = Array.from(nodesLayer.querySelectorAll('.canvas-node')).find(c => c.querySelector('.node-iframe')?.contentWindow === e.source);
+      if (!senderCard) return;
+      const verifiedNodeId = senderCard.dataset.id;
+      if (msg.type === 'asterism:focus-card') {
+        focusedNodeId = verifiedNodeId;
+        updateFocusClasses();
+      } else if (msg.type === 'asterism:set-state' && msg.patch) {
+        const cleanPatch = {};
+        for (const k of Object.keys(msg.patch)) {
+          if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+          cleanPatch[k] = msg.patch[k];
+        }
+        const node = state.nodes.find(n => n.id === verifiedNodeId);
         if (node) {
-          node.state = Object.assign({}, node.state || {}, msg.patch);
+          node.state = Object.assign({}, node.state || {}, cleanPatch);
+          senderCard.dataset.lastStateJson = JSON.stringify(node.state || {});
         }
         await fetch('/api/nodes/state', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodeId: msg.nodeId, patch: msg.patch })
+          body: JSON.stringify({ nodeId: verifiedNodeId, patch: cleanPatch })
         });
       } else if (msg.type === 'asterism:mutate-node') {
         mutateNode(msg.nodeId, msg.instruction);
       } else if (msg.type === 'asterism:spawn-related') {
-        triggerSpawnRelated(msg);
+        triggerSpawnRelated({ ...msg, sourceNodeId: verifiedNodeId });
       } else if (msg.type === 'asterism:trigger-speculate') {
         triggerSpeculate(msg.nodeId, msg.prompt, msg);
       } else if (msg.type === 'asterism:commit-branch') {
         commitBranch(msg.nodeId, Boolean(msg.pruneSiblings));
       } else if (msg.type === 'asterism:prune-unkept') {
-        pruneUnkeptForks(msg.parentId);
+        pruneUnkeptForks(msg.parentId || verifiedNodeId);
       } else if (msg.type === 'asterism:advance-stage') {
         advanceStage(msg.nodeId, msg.instruction, msg.targetStage);
       } else if (msg.type === 'asterism:synthesize-nodes') {
@@ -2168,7 +2642,9 @@
       } else if (msg.type === 'asterism:ideabox-seed') {
         submitIdeaBoxSeed(msg.seedPrompt);
       } else if (msg.type === 'asterism:resolve-decision') {
-        resolveSurfacedDecision(msg.nodeId, msg.predictionId, msg.chosenOptionIds || []);
+        resolveSurfacedDecision(verifiedNodeId, msg.predictionId, msg.chosenOptionIds || []);
+      } else if (msg.type === 'asterism:counterfactual') {
+        triggerCounterfactualAction(verifiedNodeId || msg.nodeId, msg.predictionId, msg.action, msg.targetOptionIds);
       }
     });
 
@@ -2212,14 +2688,144 @@
     }
 
     async function resolveSurfacedDecision(nodeId, predictionId, chosenOptionIds) {
-      const res = await fetch('/api/decisions/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, predictionId, chosenOptionIds })
-      });
-      const data = await res.json();
-      if (data.resolvedPrediction) {
-        showToast(`✓ ${data.resolvedPrediction.calibrationNote}`, 9000);
+      const key = `${nodeId}::${predictionId || ''}`;
+      if (resolvingDecisionInFlight.has(key)) return;
+      resolvingDecisionInFlight.add(key);
+      try {
+        const res = await fetch('/api/decisions/resolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId, predictionId, chosenOptionIds })
+        });
+        const data = await res.json();
+        if (data.resolvedPrediction) {
+          showToast(`✓ ${data.resolvedPrediction.calibrationNote}`, 9000);
+        }
+      } finally {
+        resolvingDecisionInFlight.delete(key);
+      }
+    }
+
+    async function triggerCounterfactualAction(nodeId, predictionId, action = 'swap', targetOptionIds = []) {
+      const resolvedAction = action || 'swap';
+      const key = predictionId + ':' + resolvedAction;
+      if (counterfactualInFlight.has(key)) return;
+      counterfactualInFlight.add(key);
+      try {
+        const res = await fetch('/api/decisions/counterfactual', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId, predictionId, action: resolvedAction, targetOptionIds: Array.isArray(targetOptionIds) ? targetOptionIds : [] })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast(`↺ Counterfactual ${resolvedAction} failed${data.error ? `: ${data.error}` : ''}`);
+          return;
+        }
+        showToast(`↺ Counterfactual ${resolvedAction} applied · ${data.resolvedPrediction?.calibrationNote || 'User Model updated'}`);
+        if (data.state) {
+          const prevViewport = state.viewport ? { ...state.viewport } : null;
+          const prevViewProjection = state.viewProjection;
+          state = data.state;
+          if (prevViewport) state.viewport = prevViewport;
+          if (prevViewProjection) state.viewProjection = prevViewProjection;
+        } else if (data.userModel) {
+          state.userModel = data.userModel;
+        }
+        renderAll();
+      } catch {
+        showToast('↺ Counterfactual request failed — please try again.');
+      } finally {
+        counterfactualInFlight.delete(key);
+      }
+    }
+
+    async function tidyCanvasLayout() {
+      if (tidyInFlight) return;
+      tidyInFlight = true;
+      try {
+        const res = await fetch('/api/canvas/tidy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast(`✨ Tidy failed${data.error ? `: ${data.error}` : ''}`);
+          return;
+        }
+        if (data.state) {
+          const prevViewport = state.viewport ? { ...state.viewport } : null;
+          const prevViewProjection = state.viewProjection;
+          state = data.state;
+          if (prevViewport) state.viewport = prevViewport;
+          if (prevViewProjection) state.viewProjection = prevViewProjection;
+        }
+        renderAll();
+        showToast(`✨ Tidied canvas layout (${data.movedCount || 0} overlapping card(s) nudged clear).`);
+      } catch {
+        showToast('✨ Tidy request failed — please try again.');
+      } finally {
+        tidyInFlight = false;
+      }
+    }
+
+    async function observeUserBehavior(type, nodeId, detail) {
+      try {
+        await fetch('/api/user-model/observe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, nodeId, detail, projectId: state.activeProjectId })
+        });
+      } catch {}
+    }
+
+    async function pinOrDismissHypothesis(hypothesisId, action) {
+      try {
+        const res = await fetch('/api/user-model/hypotheses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hypothesisId, action })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast(action === 'pin' ? '📌 Pin failed — please try again.' : '✕ Dismiss failed — please try again.');
+          return;
+        }
+        if (data.state) {
+          const prevViewport = state.viewport ? { ...state.viewport } : null;
+          const prevViewProjection = state.viewProjection;
+          state = data.state;
+          if (prevViewport) state.viewport = prevViewport;
+          if (prevViewProjection) state.viewProjection = prevViewProjection;
+        } else if (data.userModel) {
+          state.userModel = data.userModel;
+        }
+        renderAll();
+        showToast(action === 'pin'
+          ? '📌 Pinned inferred preference to your User Model.'
+          : '✕ Dismissed inferred hypothesis.');
+      } catch {
+        showToast(action === 'pin' ? '📌 Pin failed — please try again.' : '✕ Dismiss failed — please try again.');
+      }
+    }
+
+    function panAndFocusNode(nodeId) {
+      const node = state.nodes.find(n => n.id === nodeId);
+      if (!node) return;
+      if (node.shadowStaged) {
+        node.shadowStaged = false;
+        try { unfoldShadowForParent(node.parentId || node.id); } catch {}
+      }
+      focusedNodeId = nodeId;
+      const scale = Math.max(0.88, state.viewport.scale);
+      state.viewport.scale = scale;
+      state.viewport.x = Math.round(window.innerWidth / 2 - (node.x + (node.width || 360) / 2) * scale);
+      state.viewport.y = Math.round(window.innerHeight / 2 - (node.y + (node.height || 220) / 2) * scale);
+      if (state.viewProjection && state.viewProjection !== 'canvas') {
+        setViewProjection('canvas');
+      } else {
+        renderAll();
       }
     }
 
@@ -2362,21 +2968,21 @@
         const shadowTag = node.shadowStaged
           ? `<span style="background:rgba(251,191,36,0.16);color:#fde68a;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:600;">Staged</span>`
           : `<span style="background:rgba(56,189,248,0.12);color:#38bdf8;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:600;">On Canvas</span>`;
-        const askLabel = node.askDefault?.label || 'Promote & Keep';
+        const askLabel = typeof node.askDefault === 'string' ? node.askDefault : (node.askDefault?.label || 'Promote & Keep');
         return `
           <div class="attention-item">
             <div class="attention-item-top">
-              <div class="attention-item-title">${node.title}</div>
+              <div class="attention-item-title">${escHtml(node.title)}</div>
               <span class="evoi-badge">EVOI ${evoi.toFixed(2)} · p=${p}</span>
             </div>
             <div class="attention-item-meta">
               ${shadowTag}
-              <span>${stanceBadge}</span>
-              <span>${(node.model || 'gpt-6-luna').replace('openai/', '')}</span>
+              <span>${escHtml(stanceBadge)}</span>
+              <span>${escHtml((node.model || 'gpt-6-luna').replace('openai/', ''))}</span>
             </div>
             <div class="attention-item-actions">
-              ${node.shadowStaged ? `<button class="mini-btn" style="color:#fde68a;border-color:rgba(251,191,36,0.35);" onclick="unfoldShadowForParent('${node.parentId || node.id}')">Unfold</button>` : ''}
-              <button class="mini-btn" style="color:#6ee7b7;border-color:rgba(16,185,129,0.35);" onclick="autoResolveTopAttentionItem('${node.id}')">✓ ${askLabel}</button>
+              ${node.shadowStaged ? `<button class="mini-btn" style="color:#fde68a;border-color:rgba(251,191,36,0.35);" onclick="unfoldShadowForParent('${escAttr(node.parentId || node.id)}')">Unfold</button>` : ''}
+              ${node.kind === 'decision' ? `<button class="mini-btn" style="color:#fde68a;border-color:rgba(251,191,36,0.4);" onclick="focusDecisionNode('${escAttr(node.id)}')">Focus Decision</button>` : `<button class="mini-btn" style="color:#6ee7b7;border-color:rgba(16,185,129,0.35);" onclick="autoResolveTopAttentionItem('${escAttr(node.id)}')">✓ ${escHtml(askLabel)}</button>`}
             </div>
           </div>
         `;
@@ -2410,6 +3016,7 @@
       }
 
       isPanning = true;
+      document.body.classList.add('is-dragging-card');
       viewportEl.classList.add('panning');
       panStart = { x: e.clientX - state.viewport.x, y: e.clientY - state.viewport.y };
     });
@@ -2433,6 +3040,7 @@
       }
       if (isPanning) {
         isPanning = false;
+        document.body.classList.remove('is-dragging-card');
         viewportEl.classList.remove('panning');
       }
     });
@@ -2487,6 +3095,7 @@
     }
 
     async function resetCanvas() {
+      if (!window.confirm('Reset canvas to default state?')) return;
       selectedForSynth.clear();
       focusedNodeId = null;
       updateSynthButtonLabel();
@@ -2500,6 +3109,140 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(state)
       });
+    }
+
+    function renderBriefView(briefingData) {
+      const needsEl = document.getElementById('brief-needs-list');
+      const autoEl = document.getElementById('brief-autonomous-list');
+      const modelSummaryEl = document.getElementById('brief-model-summary');
+      const modelListEl = document.getElementById('brief-model-list');
+      if (!needsEl || !autoEl || !modelListEl) return;
+      const briefing = briefingData && typeof briefingData === 'object' ? briefingData : {};
+      const briefNodes = Array.isArray(briefing.nodes) ? briefing.nodes : state.nodes;
+      const byId = new Map(briefNodes.map(n => [n.id, n]));
+      const resolveList = (list, fallback) => Array.isArray(list) && list.length
+        ? list.map(item => {
+            if (typeof item === 'string') return byId.get(item);
+            const itemId = item?.nodeId || item?.id;
+            const full = itemId ? byId.get(itemId) : null;
+            return full ? { ...full, ...item, id: full.id, autonomousReceipt: full.autonomousReceipt } : (itemId ? { ...item, id: itemId } : item);
+          }).filter(Boolean)
+        : fallback;
+
+      // Column 1: Needs Your Call — unresolved decisions + staged shadow branches
+      const needsFallback = briefNodes.filter(n =>
+        (n.kind === 'decision' && n.status !== 'committed' && !n.resolvedAt) || n.shadowStaged);
+      const needs = resolveList(briefing.needsYourCall || briefing.needsCall || briefing.decisions, needsFallback);
+      needsEl.innerHTML = needs.length === 0
+        ? `<div class="brief-empty">Nothing is waiting on you. Enjoy the coffee.</div>`
+        : needs.map(n => `
+          <div class="brief-item">
+            <div class="brief-item-title">${escHtml(n.title || n.id)}</div>
+            <div class="brief-item-meta">${n.shadowStaged ? '🌑 Staged shadow branch' : 'Decision awaiting your call'} · ${escHtml(n.stage || 'note')}</div>
+            <div class="brief-item-actions">
+              <button class="mini-btn" onclick="panAndFocusNode('${escAttr(n.id)}')">Focus on Canvas</button>
+            </div>
+          </div>`).join('');
+
+      // Column 2: Autonomous & Basal Moves — receipts, syntheses, basal recharges
+      const autoFallback = briefNodes.filter(n =>
+        n.autonomousReceipt || n.kind === 'synthesis' || n.branchTag === 'synthesis' ||
+        String(n.id).startsWith('node-synth-') ||
+        n.basalRecharged || n.basal?.recharged || (n.energy?.basalRechargedTokens || 0) > 0);
+      const autonomous = resolveList(briefing.autonomousAndBasalMoves || briefing.autonomousMoves || briefing.autonomous || briefing.basalMoves, autoFallback);
+      autoEl.innerHTML = autonomous.length === 0
+        ? `<div class="brief-empty">No autonomous or basal moves yet.</div>`
+        : autonomous.map(n => {
+            const receipt = n.autonomousReceipt || {};
+            const predictionId = receipt.predictionId || n.predictionId || '';
+            const regime = receipt.regime || n.regime || '';
+            const meta = regime
+              ? `${escHtml(regime)}${receipt.note || receipt.calibrationNote ? ` · ${escHtml(receipt.note || receipt.calibrationNote)}` : ''}`
+              : (n.basalRecharged || n.basal?.recharged ? '🔋 Basal free-energy recharge' : 'Synthesis');
+            const counterfactualButtons = (n.autonomousReceipt || n.canSwapCounterfactual)
+              ? `<button class="mini-btn" onclick="triggerCounterfactualAction('${escAttr(n.id)}', '${escAttr(predictionId)}', 'swap')">↺ Swap</button>
+                 <button class="mini-btn" onclick="triggerCounterfactualAction('${escAttr(n.id)}', '${escAttr(predictionId)}', 'keep-both')">✦ Keep Both</button>
+                 <button class="mini-btn" onclick="triggerCounterfactualAction('${escAttr(n.id)}', '${escAttr(predictionId)}', 'neither')">∅ Neither</button>`
+              : '';
+            return `
+          <div class="brief-item">
+            <div class="brief-item-title">${escHtml(n.title || n.id)}</div>
+            <div class="brief-item-meta">${meta}</div>
+            <div class="brief-item-actions">
+              <button class="mini-btn" onclick="panAndFocusNode('${escAttr(n.id)}')">Focus on Canvas</button>
+              ${counterfactualButtons}
+            </div>
+          </div>`;
+          }).join('');
+
+      // Column 3: Model Shifts — calibration, inferred + stale hypotheses
+      const um = briefing.userModel || state.userModel || {};
+      const hyps = Array.isArray(um.hypotheses) ? um.hypotheses : [];
+      const activeHyps = hyps.filter(h => h.status === 'active');
+      const totalTrials = activeHyps.reduce((s, h) => s + (h.empiricalTrials || 0), 0);
+      const totalHits = activeHyps.reduce((s, h) => s + (h.empiricalHits || 0), 0);
+      const totalBrier = activeHyps.reduce((s, h) => s + (h.brierSum || 0), 0);
+      const modelShifts = briefing.modelShifts && typeof briefing.modelShifts === 'object' ? briefing.modelShifts : {};
+      const calibration = modelShifts.calibration || briefing.calibration || {};
+      const meanBrier = typeof calibration.meanBrier === 'number'
+        ? calibration.meanBrier.toFixed(3)
+        : totalTrials > 0 ? (totalBrier / totalTrials).toFixed(3) : '0.250';
+      const hitRate = modelShifts.resolvedCount > 0
+        ? `${Math.round(((modelShifts.accurateCount || 0) / modelShifts.resolvedCount) * 100)}%`
+        : totalTrials > 0 ? `${Math.round((totalHits / totalTrials) * 100)}%` : '—';
+      const calibrationFactor = calibration.calibrationFactor ?? briefing.calibrationFactor ?? um.calibrationFactor ?? '—';
+      if (modelSummaryEl) {
+        modelSummaryEl.innerHTML = `
+          <div class="brief-item" style="font-family:ui-monospace,monospace;font-size:11px;">
+            <div>Calibration factor: <strong style="color:#38bdf8;">${escHtml(calibrationFactor)}</strong></div>
+            <div>Hit rate: <strong style="color:#6ee7b7;">${hitRate}</strong> (${totalHits}/${totalTrials}) · Mean Brier: <strong>${meanBrier}</strong></div>
+          </div>`;
+      }
+      const inferredHyps = Array.isArray(modelShifts.inferredHypotheses)
+        ? modelShifts.inferredHypotheses.filter(h => !h.pinned)
+        : activeHyps.filter(h => h.source === 'inferred' && !h.pinned);
+      const staleHyps = Array.isArray(modelShifts.staleHypotheses)
+        ? modelShifts.staleHypotheses
+        : activeHyps.filter(h => h.stale || (h.usesSinceLastProbe || 0) >= 3);
+      const modelItems = [
+        ...inferredHyps.map(h => `
+          <div class="brief-item">
+            <div style="line-height:1.45;"><span style="background:rgba(168,85,247,0.18);color:#d8b4fe;border:1px solid rgba(168,85,247,0.35);padding:1px 6px;border-radius:99px;font-size:9.5px;font-weight:600;margin-right:6px;">✦ inferred</span>${escHtml(h.statement)}</div>
+            <div class="brief-item-actions">
+              <button class="mini-btn" onclick="pinOrDismissHypothesis('${escAttr(h.id)}', 'pin')">✓ Pin</button>
+              <button class="mini-btn" onclick="pinOrDismissHypothesis('${escAttr(h.id)}', 'dismiss')">✕ Dismiss</button>
+            </div>
+          </div>`),
+        ...staleHyps.map(h => `
+          <div class="brief-item">
+            <div style="line-height:1.45;">${escHtml(h.statement)}</div>
+            <div class="brief-item-meta">Stale · ${h.usesSinceLastProbe || 0} auto-uses since last probe</div>
+            <div class="brief-item-actions">
+              <button class="mini-btn" onclick="compileAutonomousIntent(undefined, true)">🎯 Spot-Check</button>
+            </div>
+          </div>`)
+      ];
+      modelListEl.innerHTML = modelItems.length === 0
+        ? `<div class="brief-empty">No new inferred or stale hypotheses.</div>`
+        : modelItems.join('');
+    }
+
+    async function fetchBriefing() {
+      if (briefingInFlight) return;
+      if (Date.now() - briefingLastFetchAt < 4000) return;
+      briefingInFlight = true;
+      briefingLastFetchAt = Date.now();
+      try {
+        const res = await fetch('/api/views/briefing');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!data) return;
+        lastBriefingData = data;
+        if (state.viewProjection === 'brief') renderBriefView(data);
+      } catch {
+      } finally {
+        briefingInFlight = false;
+      }
     }
 
     function renderProjectionViews() {
@@ -2516,7 +3259,7 @@
 
       // 2. Sync View Switcher & Plex Focus Banner
       const viewProj = state.viewProjection || 'canvas';
-      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline', 'view-model');
+      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline', 'view-model', 'view-brief');
       document.body.classList.add('view-' + viewProj);
       document.querySelectorAll('#view-switcher .seg-btn').forEach(b => b.classList.remove('active'));
       const activeViewBtn = document.getElementById('view-' + viewProj);
@@ -2538,28 +3281,29 @@
         tableBody.innerHTML = state.nodes.map(n => {
           const isChecked = selectedForSynth.has(n.id);
           const role = n.surfaceRole || defaultRoleForStage(n.stage);
-          const pScore = typeof n.jevScore === 'number' ? `p=${n.jevScore}` : 'p=0.72';
+          const pVal = n.warrant?.pass ?? n.jevScore;
+          const pScore = typeof pVal === 'number' ? `p=${pVal}` : '—';
           const verdict = n.warrant?.verdict || (n.status === 'committed' ? 'pass' : 'calibrated');
-          const tokens = n.energy?.remainingTokens ?? 180;
-          const tupleText = n.ideonomy?.tupleLabel || (n.branchTag || 'canonical');
+          const tokens = n.energy?.remainingTokens;
+          const tupleText = n.ideonomyTuple?.tupleLabel || n.ideonomy?.tupleLabel || (n.branchTag || 'canonical');
           return `
             <tr style="${n.shadowStaged ? 'opacity:0.65;' : ''}">
               <td>
-                <button class="mini-btn" onclick="toggleNodeSynthSelection('${n.id}')">${isChecked ? '☑' : '☐'}</button>
+                <button class="mini-btn" onclick="toggleNodeSynthSelection('${escAttr(n.id)}')">${isChecked ? '☑' : '☐'}</button>
               </td>
               <td>
-                <div style="font-weight:600;color:#f8fafc;">${n.title}</div>
-                <div style="font-size:10.5px;color:#64748b;margin-top:2px;">${n.id}${n.shadowStaged ? ' · 🌑 Shadow Staged' : ''}</div>
+                <div style="font-weight:600;color:#f8fafc;">${escHtml(n.title)}</div>
+                <div style="font-size:10.5px;color:#8b9bb4;margin-top:2px;">${escHtml(n.id)}${n.shadowStaged ? ' · 🌑 Shadow Staged' : ''}</div>
               </td>
-              <td><span class="node-stage-pill" style="display:inline-block;">${(n.stage || 'note').toUpperCase()}</span></td>
-              <td style="font-family:ui-monospace,monospace;font-size:11px;color:#cbd5e1;">${role}</td>
-              <td style="font-family:ui-monospace,monospace;font-size:11px;color:${verdict === 'pass' ? '#6ee7b7' : '#38bdf8'};">${verdict} · ${pScore}</td>
-              <td style="font-family:ui-monospace,monospace;font-size:11px;color:#94a3b8;">${tokens} tok</td>
-              <td style="font-family:ui-monospace,monospace;font-size:10.5px;color:#fde68a;">${tupleText}</td>
+              <td><span class="node-stage-pill" style="display:inline-block;">${escHtml((n.stage || 'note').toUpperCase())}</span></td>
+              <td style="font-family:ui-monospace,monospace;font-size:11px;color:#cbd5e1;">${escHtml(role)}</td>
+              <td style="font-family:ui-monospace,monospace;font-size:11px;color:${verdict === 'pass' ? '#6ee7b7' : '#38bdf8'};">${escHtml(verdict)} · ${escHtml(pScore)}</td>
+              <td style="font-family:ui-monospace,monospace;font-size:11px;color:#94a3b8;">${tokens !== undefined && tokens !== null ? `${escHtml(tokens)} tok` : '—'}</td>
+              <td style="font-family:ui-monospace,monospace;font-size:10.5px;color:#fde68a;">${escHtml(tupleText)}</td>
               <td>
                 <div style="display:flex;gap:5px;">
-                  <button class="mini-btn" onclick="setViewProjection('plex', '${n.id}')">🕸 Focus in Plex</button>
-                  <button class="mini-btn" onclick="commitBranch('${n.id}', false)">✓ Keep</button>
+                  <button class="mini-btn" onclick="setViewProjection('plex', '${escAttr(n.id)}')">🕸 Focus in Plex</button>
+                  <button class="mini-btn" onclick="commitBranch('${escAttr(n.id)}', false)">✓ Keep</button>
                 </div>
               </td>
             </tr>
@@ -2580,28 +3324,29 @@
         timelineBody.innerHTML = sortedNodes.map(n => {
           const parent = state.nodes.find(p => p.id === n.parentId);
           const revCount = Array.isArray(n.revisions) ? n.revisions.length : 0;
-          const tupleBadge = n.ideonomy?.tupleLabel
-            ? `<span style="color:#fde68a;font-family:ui-monospace,monospace;font-size:10.5px;">⧖ ${n.ideonomy.tupleLabel}</span>`
+          const tupleLabel = n.ideonomyTuple?.tupleLabel || n.ideonomy?.tupleLabel;
+          const tupleBadge = tupleLabel
+            ? `<span style="color:#fde68a;font-family:ui-monospace,monospace;font-size:10.5px;">⧖ ${escHtml(tupleLabel)}</span>`
             : '';
           return `
             <div class="timeline-entry">
               <div class="timeline-card">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                   <div>
-                    <span class="node-stage-pill" style="display:inline-block;margin-right:6px;">${(n.stage || 'note').toUpperCase()}</span>
-                    <strong style="color:#f8fafc;font-size:13px;">${n.title}</strong>
+                    <span class="node-stage-pill" style="display:inline-block;margin-right:6px;">${escHtml((n.stage || 'note').toUpperCase())}</span>
+                    <strong style="color:#f8fafc;font-size:13px;">${escHtml(n.title)}</strong>
                     ${n.shadowStaged ? '<span style="margin-left:6px;color:#fde68a;font-size:10.5px;">🌑 Shadow Staged</span>' : ''}
                   </div>
                   <div style="display:flex;gap:6px;align-items:center;">
                     ${tupleBadge}
-                    <button class="mini-btn" onclick="setViewProjection('plex', '${n.id}')">🕸 Focus in Plex</button>
+                    <button class="mini-btn" onclick="setViewProjection('plex', '${escAttr(n.id)}')">🕸 Focus in Plex</button>
                   </div>
                 </div>
                 <div style="font-size:11px;color:#94a3b8;display:flex;gap:14px;flex-wrap:wrap;">
-                  <span>Facet: <strong style="color:#cbd5e1;">${n.surfaceRole || defaultRoleForStage(n.stage)}</strong></span>
-                  ${parent ? `<span>Derived from: <strong style="color:#38bdf8;">${parent.title}</strong></span>` : '<span>Root Seed Node</span>'}
+                  <span>Facet: <strong style="color:#cbd5e1;">${escHtml(n.surfaceRole || defaultRoleForStage(n.stage))}</strong></span>
+                  ${parent ? `<span>Derived from: <strong style="color:#38bdf8;">${escHtml(parent.title)}</strong></span>` : '<span>Root Seed Node</span>'}
                   <span>Revisions: <strong style="color:#cbd5e1;">v${revCount + 1}</strong></span>
-                  ${n.worktree?.branchName ? `<span>Branch: <code style="color:#6ee7b7;">${n.worktree.branchName}</code></span>` : ''}
+                  ${n.worktree?.branchName ? `<span>Branch: <code style="color:#6ee7b7;">${escHtml(n.worktree.branchName)}</code></span>` : ''}
                 </div>
               </div>
             </div>
@@ -2631,14 +3376,28 @@
         hypListEl.innerHTML = hyps.map(h => {
           const hBrier = h.empiricalTrials > 0 ? (h.brierSum / h.empiricalTrials).toFixed(2) : 'untested';
           const isRefuted = h.status === 'refuted';
+          const isInferred = h.source === 'inferred';
+          const isPinned = Boolean(h.pinned);
+          const sourceBadge = isInferred && !isPinned
+            ? `<span style="background:rgba(168,85,247,0.18);color:#d8b4fe;border:1px solid rgba(168,85,247,0.35);padding:1px 6px;border-radius:99px;font-size:9.5px;font-weight:600;margin-right:6px;">✦ inferred</span>`
+            : isInferred && isPinned
+              ? `<span style="background:rgba(16,185,129,0.16);color:#6ee7b7;border:1px solid rgba(16,185,129,0.35);padding:1px 6px;border-radius:99px;font-size:9.5px;font-weight:600;margin-right:6px;">📌 pinned (inferred)</span>`
+              : `<span style="background:rgba(56,189,248,0.12);color:#7dd3fc;border:1px solid rgba(56,189,248,0.25);padding:1px 6px;border-radius:99px;font-size:9.5px;font-weight:600;margin-right:6px;">explicit</span>`;
+          const pinDismissButtons = isInferred && !isPinned && h.status === 'active'
+            ? `<div style="margin-top:7px;display:flex;gap:5px;">
+                <button class="mini-btn" onclick="pinOrDismissHypothesis('${escAttr(h.id)}', 'pin')">✓ Pin</button>
+                <button class="mini-btn" onclick="pinOrDismissHypothesis('${escAttr(h.id)}', 'dismiss')">✕ Dismiss</button>
+              </div>`
+            : '';
           return `
             <div style="background:rgba(15,23,42,0.72);border:1px solid ${isRefuted ? 'rgba(239,68,68,0.28)' : 'rgba(148,163,184,0.16)'};border-radius:9px;padding:10px 12px;opacity:${isRefuted ? '0.55' : '1'};">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-                <div style="font-size:12px;color:#f1f5f9;line-height:1.45;${isRefuted ? 'text-decoration:line-through;' : ''}">${h.statement}</div>
-                <button class="mini-btn" onclick="toggleHypothesisStatus('${h.id}', '${h.status}')">${isRefuted ? '↺ Restore' : '✕ Refute'}</button>
+                <div style="font-size:12px;color:#f1f5f9;line-height:1.45;${isRefuted ? 'text-decoration:line-through;' : ''}">${sourceBadge}${escHtml(h.statement)}</div>
+                <button class="mini-btn" onclick="toggleHypothesisStatus('${escAttr(h.id)}', '${escAttr(h.status)}')">${isRefuted ? '↺ Restore' : '✕ Refute'}</button>
               </div>
+              ${pinDismissButtons}
               <div style="margin-top:6px;display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:#94a3b8;font-family:ui-monospace,monospace;">
-                <span>scope: <strong style="color:#38bdf8;">${h.scopeProjectId}</strong></span>
+                <span>scope: <strong style="color:#38bdf8;">${escHtml(h.scopeProjectId)}</strong></span>
                 <span>hits: <strong style="color:#6ee7b7;">${h.empiricalHits}/${h.empiricalTrials}</strong></span>
                 <span>Brier: <strong>${hBrier}</strong></span>
                 <span>auto-uses since probe: <strong style="color:${h.usesSinceLastProbe >= 4 ? '#fde68a' : '#cbd5e1'};">${h.usesSinceLastProbe}</strong></span>
@@ -2651,7 +3410,7 @@
           const profiles = Object.values(um.economicProfiles || {});
           profListEl.innerHTML = profiles.map(p => `
             <div style="background:rgba(15,23,42,0.68);border:1px solid ${p.projectId === state.activeProjectId ? 'rgba(56,189,248,0.4)' : 'rgba(148,163,184,0.14)'};border-radius:9px;padding:9px 11px;font-size:11px;color:#cbd5e1;">
-              <div style="font-weight:600;color:#f8fafc;margin-bottom:4px;">${p.label}</div>
+              <div style="font-weight:600;color:#f8fafc;margin-bottom:4px;">${escHtml(p.label)}</div>
               <div style="font-family:ui-monospace,monospace;font-size:10px;color:#94a3b8;display:grid;gap:2px;">
                 <span>Basal Floor: <strong style="color:#6ee7b7;">${p.basalFreeTokens} tok</strong></span>
                 <span>$ Weight: <strong>${p.dollarCostWeight}/$1</strong></span>
@@ -2668,23 +3427,29 @@
             : preds.map(pr => {
                 const topProb = Math.round((pr.subsetProbabilities?.[pr.predictedSubsetKey] || 0) * 100);
                 const statusBadge = pr.resolvedAt
-                  ? `<span style="color:${pr.accurate ? '#6ee7b7' : '#fca5a5'};">${pr.accurate ? '✓ Hit' : '↺ Drift Updated'} · Brier ${pr.brierScore}</span>`
-                  : `<span style="color:#fde68a;">Sealed (${pr.regime})</span>`;
+                  ? `<span style="color:${pr.accurate ? '#6ee7b7' : '#fca5a5'};">${pr.accurate ? '✓ Hit' : '↺ Drift Updated'} · Brier ${escHtml(pr.brierScore)}</span>`
+                  : `<span style="color:#fde68a;">Sealed (${escHtml(pr.regime)})</span>`;
                 return `
                   <div style="background:rgba(15,23,42,0.65);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:9px 11px;font-size:11px;">
                     <div style="display:flex;justify-content:space-between;gap:8px;color:#f1f5f9;font-weight:500;">
-                      <span>${pr.prompt.slice(0, 62)}</span>
+                      <span>${escHtml((pr.prompt || '').slice(0, 62))}</span>
                       <span style="font-family:ui-monospace,monospace;font-size:10px;">${statusBadge}</span>
                     </div>
                     <div style="margin-top:4px;font-family:ui-monospace,monospace;font-size:10px;color:#94a3b8;">
-                      Pre-predicted: <strong style="color:#38bdf8;">${pr.predictedSubsetKey} (${topProb}%)</strong>
-                      ${pr.chosenSubsetKey ? ` · Chosen: <strong style="color:#f8fafc;">${pr.chosenSubsetKey}</strong>` : ''}
+                      ${pr.resolvedAt ? `Pre-predicted: <strong style="color:#38bdf8;">${escHtml(pr.predictedSubsetKey)} (${topProb}%)</strong>` : `Pre-predicted: <strong style="color:#94a3b8;">🔒 Sealed until resolved</strong>`}
+                      ${pr.chosenSubsetKey ? ` · Chosen: <strong style="color:#f8fafc;">${escHtml(pr.chosenSubsetKey)}</strong>` : ''}
                       · R_act=${pr.expectedRegretOfActing} · V_cal=${pr.calibrationValue}
                     </div>
                   </div>
                 `;
               }).join('');
         }
+      }
+
+      // 6. Populate Morning Coffee Brief (render from state now, refresh from server)
+      if (viewProj === 'brief') {
+        renderBriefView(lastBriefingData);
+        fetchBriefing();
       }
     }
 
@@ -2697,13 +3462,234 @@
       renderProjectionViews();
     }
 
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.workspace-menu-wrap')) closeWorkspaceMenu();
+    });
+
+    function zoomByFactor(factor) {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const wx = (cx - state.viewport.x) / state.viewport.scale;
+      const wy = (cy - state.viewport.y) / state.viewport.scale;
+      const nextScale = Math.min(3.0, Math.max(0.15, state.viewport.scale * factor));
+      state.viewport.scale = nextScale;
+      state.viewport.x = cx - wx * nextScale;
+      state.viewport.y = cy - wy * nextScale;
+      applyTransform();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.isComposing) return;
+      const target = e.target || document.activeElement;
+      const tag = target && target.tagName ? String(target.tagName).toUpperCase() : '';
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || Boolean(target && target.isContentEditable);
+      if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') {
+        e.preventDefault();
+        toggleSpatialSpotlight();
+        return;
+      }
+      if (e.key === 'Escape') {
+        const spotlight = document.getElementById('spotlight-modal');
+        if (spotlight && spotlight.classList.contains('open')) { closeSpatialSpotlight(); return; }
+        const dd = document.getElementById('workspace-dropdown');
+        if (dd && !dd.hidden) { closeWorkspaceMenu(); return; }
+        if (inField) return;
+        const compare = document.getElementById('compare-modal');
+        if (compare && compare.classList.contains('open')) { closeComparisonMatrix(); return; }
+        const drawer = document.getElementById('attention-drawer');
+        if (drawer && drawer.classList.contains('open')) { drawer.classList.remove('open'); return; }
+        const editing = document.querySelectorAll('.canvas-node.editing-html, .canvas-node.viewing-diff');
+        if (editing.length) { editing.forEach(c => c.classList.remove('editing-html', 'viewing-diff')); return; }
+        if (state.viewProjection && state.viewProjection !== 'canvas') { setViewProjection('canvas'); return; }
+        if (focusedNodeId || connectSourceId) {
+          focusedNodeId = null;
+          connectSourceId = null;
+          document.querySelectorAll('.canvas-node.is-connect-source').forEach(c => c.classList.remove('is-connect-source'));
+          updateFocusClasses();
+          renderEdges();
+        }
+        return;
+      }
+      if (inField) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const viewMap = { '1': 'canvas', '2': 'plex', '3': 'table', '4': 'timeline', '5': 'model', '6': 'brief' };
+      if (viewMap[e.key]) { setViewProjection(viewMap[e.key]); return; }
+      if (e.key === '=' || e.key === '+') { zoomByFactor(1.12); return; }
+      if (e.key === '-' || e.key === '_') { zoomByFactor(0.88); return; }
+      if (e.key === '0') { resetViewportZoom(); return; }
+    });
+
+    function buildSpotlightItems(query) {
+      const q = String(query || '').trim().toLowerCase();
+      const match = (text) => !q || String(text).toLowerCase().includes(q);
+      const actions = [
+        { label: '✨ Tidy Overlapping Cards', hint: 'Action', run: () => tidyCanvasLayout() },
+        { label: '☀ Open Morning Coffee Brief', hint: 'Lens · 6', run: () => setViewProjection('brief') },
+        { label: '🎯 Run Calibration Spot-Check Probe', hint: 'Action', run: () => compileAutonomousIntent(undefined, true) },
+        { label: '🌱 Plant 4-Branch Idea Seed', hint: 'Action', run: () => submitIdeaBoxSeed(query && String(query).trim() ? String(query).trim() : undefined) },
+        { label: '🔋 Pulse Basal Free-Energy', hint: 'Action', run: () => pulseBasalFreeEnergy() },
+        { label: '📁 Cycle Active Workspace Project', hint: 'Action', run: () => cycleOrPromptProject() },
+        { label: '🖼 Switch to Canvas', hint: 'Lens · 1', run: () => setViewProjection('canvas') },
+        { label: '🖼 Switch to Plex', hint: 'Lens · 2', run: () => setViewProjection('plex') },
+        { label: '🖼 Switch to Table', hint: 'Lens · 3', run: () => setViewProjection('table') },
+        { label: '🖼 Switch to Timeline', hint: 'Lens · 4', run: () => setViewProjection('timeline') },
+        { label: '🖼 Switch to Model', hint: 'Lens · 5', run: () => setViewProjection('model') }
+      ].filter(item => match(item.label));
+
+      const cards = state.nodes
+        .filter(n => match(n.title) || match(n.id) || match(n.kind) || match(n.stage))
+        .map(n => ({
+          label: n.title || n.id,
+          hint: n.shadowStaged ? 'Card · 🌑 Shadow' : `Card · ${n.stage || 'note'}`,
+          run: () => panAndFocusNode(n.id)
+        }));
+
+      const items = [...actions, ...cards];
+      const trimmed = String(query || '').trim();
+      if (trimmed) {
+        items.push({
+          label: `⚡ Act on intent: ${trimmed}`,
+          hint: 'Compile intent',
+          run: () => compileAutonomousIntent(trimmed)
+        });
+      }
+      return items;
+    }
+
+    function renderSpotlightResults(query) {
+      const listEl = document.getElementById('spotlight-list');
+      if (!listEl) return;
+      spotlightItems = buildSpotlightItems(query);
+      if (spotlightIndex >= spotlightItems.length) spotlightIndex = Math.max(0, spotlightItems.length - 1);
+      if (spotlightItems.length === 0) {
+        listEl.innerHTML = `<div class="spotlight-empty">No matching cards or actions.</div>`;
+        return;
+      }
+      listEl.innerHTML = spotlightItems.map((item, i) => `
+        <button class="spotlight-item${i === spotlightIndex ? ' active' : ''}" role="option" data-spotlight-index="${i}">
+          <span>${escHtml(item.label)}</span>
+          <span class="spotlight-hint">${escHtml(item.hint || '')}</span>
+        </button>`).join('');
+      listEl.querySelectorAll('.spotlight-item').forEach(btn => {
+        btn.addEventListener('mouseenter', () => {
+          spotlightIndex = Number(btn.dataset.spotlightIndex) || 0;
+          listEl.querySelectorAll('.spotlight-item').forEach(b => b.classList.toggle('active', b === btn));
+        });
+        btn.addEventListener('click', () => {
+          spotlightIndex = Number(btn.dataset.spotlightIndex) || 0;
+          runSpotlightSelection();
+        });
+      });
+      const activeEl = listEl.querySelector('.spotlight-item.active');
+      if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+    }
+
+    function runSpotlightSelection() {
+      const item = spotlightItems[spotlightIndex];
+      if (!item) return;
+      closeSpatialSpotlight();
+      item.run();
+    }
+
+    function openSpatialSpotlight() {
+      const modal = document.getElementById('spotlight-modal');
+      const input = document.getElementById('spotlight-input');
+      if (!modal || !input) return;
+      modal.classList.add('open');
+      spotlightIndex = 0;
+      renderSpotlightResults(input.value);
+      requestAnimationFrame(() => { input.focus(); input.select(); });
+    }
+
+    function closeSpatialSpotlight() {
+      const modal = document.getElementById('spotlight-modal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function toggleSpatialSpotlight() {
+      const modal = document.getElementById('spotlight-modal');
+      if (modal && modal.classList.contains('open')) closeSpatialSpotlight();
+      else openSpatialSpotlight();
+    }
+
+    const spotlightModalEl = document.getElementById('spotlight-modal');
+    const spotlightInputEl = document.getElementById('spotlight-input');
+    if (spotlightModalEl) {
+      spotlightModalEl.addEventListener('pointerdown', (e) => {
+        if (e.target === spotlightModalEl) closeSpatialSpotlight();
+      });
+    }
+    if (spotlightInputEl) {
+      spotlightInputEl.addEventListener('input', () => {
+        spotlightIndex = 0;
+        renderSpotlightResults(spotlightInputEl.value);
+      });
+      spotlightInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          spotlightIndex = Math.min(Math.max(spotlightItems.length - 1, 0), spotlightIndex + 1);
+          renderSpotlightResults(spotlightInputEl.value);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          spotlightIndex = Math.max(0, spotlightIndex - 1);
+          renderSpotlightResults(spotlightInputEl.value);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          runSpotlightSelection();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeSpatialSpotlight();
+        }
+      });
+    }
+
     const evtSource = new EventSource('/api/events');
+    evtSource.onopen = () => {
+      const dot = document.getElementById('brand-health-dot');
+      if (dot) { dot.style.background = '#10b981'; dot.style.boxShadow = '0 0 6px rgba(16, 185, 129, 0.6)'; }
+    };
+    evtSource.onerror = () => {
+      const dot = document.getElementById('brand-health-dot');
+      if (dot) { dot.style.background = '#fbbf24'; dot.style.boxShadow = '0 0 6px rgba(251, 191, 36, 0.6)'; }
+    };
     evtSource.addEventListener('state', (e) => {
-      const incoming = JSON.parse(e.data);
-      const keepViewport = isPanning;
-      const prevVp = state.viewport;
+      let incoming;
+      try { incoming = JSON.parse(e.data); } catch { return; }
+      if (!incoming || typeof incoming !== 'object') return;
+      const prevViewport = state.viewport ? { ...state.viewport } : null;
+      const prevViewProjection = state.viewProjection;
+      incoming.nodes = Array.isArray(incoming.nodes) ? incoming.nodes : [];
+      incoming.edges = Array.isArray(incoming.edges) ? incoming.edges : [];
+      incoming.strokes = Array.isArray(incoming.strokes) ? incoming.strokes : [];
+      incoming.projects = Array.isArray(incoming.projects) ? incoming.projects : (state.projects || []);
+      const rawVp = incoming.viewport && typeof incoming.viewport === 'object' ? incoming.viewport : {};
+      incoming.viewport = {
+        x: typeof rawVp.x === 'number' ? rawVp.x : 65,
+        y: typeof rawVp.y === 'number' ? rawVp.y : 55,
+        scale: Math.min(3.0, Math.max(0.15, typeof rawVp.scale === 'number' ? rawVp.scale : 0.88))
+      };
+      const activeGeomId = draggingNodeId || resizingNodeId;
+      if (activeGeomId) {
+        const localNode = state.nodes.find(n => n.id === activeGeomId);
+        const incomingNode = incoming.nodes.find(n => n.id === activeGeomId);
+        if (localNode && incomingNode) {
+          incomingNode.x = localNode.x;
+          incomingNode.y = localNode.y;
+          incomingNode.width = localNode.width;
+          incomingNode.height = localNode.height;
+        }
+      }
       state = incoming;
-      if (keepViewport) state.viewport = prevVp;
+      if (prevViewport) {
+        state.viewport = { ...prevViewport, scale: Math.min(3.0, Math.max(0.15, prevViewport.scale || 0.88)) };
+      }
+      if (prevViewProjection) state.viewProjection = prevViewProjection;
+      const validIds = new Set(state.nodes.map(n => n.id));
+      for (const id of [...selectedForSynth]) { if (!validIds.has(id)) selectedForSynth.delete(id); }
+      if (focusedNodeId && !validIds.has(focusedNodeId)) focusedNodeId = null;
+      if (connectSourceId && !validIds.has(connectSourceId)) connectSourceId = null;
+      comparedNodeIds = comparedNodeIds.filter(id => validIds.has(id));
+      updateSynthButtonLabel();
       renderAll();
     });
   </script>

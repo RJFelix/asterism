@@ -5,7 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import * as Effect from "effect/Effect";
 import { removeIsolatedWorktree } from "@asterism/core";
-import { createAsterismServer } from "../server.mjs";
+import { createAsterismServer, resolveOpenCanvasPosition } from "../server.mjs";
 
 test("Asterism server supports keeping multiple speculative branches in parallel and pruning only unkept forks", async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "asterism-srv1-"));
@@ -444,3 +444,81 @@ test("Sovereign Compute: Power-Set Policy (Co-Fork, Neither, Ask/Probe) & Testab
 
 
 
+
+test('Surprise additions: counterfactual receipts, passive preferences, tidy and morning briefing', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'asterism-surprises-'));
+  const server = createAsterismServer({ dbPath: path.join(dir, 'events.sqlite'), stateFile: path.join(dir, 'state.json'), worktreesDir: path.join(dir, 'worktrees') });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const post = async (route, body = {}, status = 200) => {
+    const res = await fetch(base + route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json(); assert.equal(res.status, status, JSON.stringify(data)); return data;
+  };
+  const overlaps = (a, b) => a.x < b.x + (b.width || 400) && a.x + (a.width || 400) > b.x && a.y < b.y + (b.height || 260) && a.y + (a.height || 260) > b.y;
+  try {
+    await post('/api/reset');
+    await post('/api/user-model/observe', { type: 'invalid' }, 400);
+    for (const type of ['counterfactual-override', 'co-fork-upgrade', 'branch-pruned', 'tearoff-promoted']) {
+      const observed = await post('/api/user-model/observe', { type });
+      assert.equal(observed.affectedHypothesis.source, 'inferred');
+      const id = observed.affectedHypothesis.id;
+      const pinned = await post('/api/user-model/hypotheses', { hypothesisId: id, action: 'pin' });
+      assert.ok(pinned.userModel.hypotheses.find(h => h.id === id).confidence >= 0.85);
+      assert.equal(pinned.userModel.hypotheses.find(h => h.id === id).pinned, true);
+      const dismissed = await post('/api/user-model/hypotheses', { hypothesisId: id, action: 'dismiss' });
+      assert.equal(dismissed.userModel.hypotheses.find(h => h.id === id).status, 'refuted');
+    }
+    // Reset priors so the deterministic compiler chooses its basal co-fork.
+    await post('/api/reset');
+    const compiled = await post('/api/decisions/compile', { prompt: 'Compare optimizer schedule A and data curriculum B in ergodic worktrees', projectId: 'proj-misc-attic', model: 'offline-deterministic', x: 25, y: 25 });
+    assert.equal(compiled.materializedNodes.length, 2);
+    for (const n of compiled.materializedNodes) for (const other of compiled.state.nodes.filter(o => o.id !== n.id && !o.shadowStaged)) assert.equal(overlaps(n, other), false);
+    const node = compiled.materializedNodes[0], predictionId = compiled.sealedPrediction.id;
+    assert.ok(node.html.includes('data-counterfactual-bar="1"'));
+    assert.equal(node.autonomousReceipt.candidates.length, 2);
+    const otherId = node.autonomousReceipt.candidates.find(c => c.id !== node.autonomousReceipt.candidateId).id;
+    await post('/api/decisions/counterfactual', { nodeId: node.id, predictionId, targetOptionIds: ['bogus'] }, 400);
+    await post('/api/decisions/counterfactual', { predictionId: 'missing' }, 404);
+    const swapped = await post('/api/decisions/counterfactual', { nodeId: node.id, predictionId, targetOptionIds: [otherId] });
+    assert.equal(swapped.materializedNodes[0].autonomousReceipt.candidateId, otherId);
+    assert.equal(swapped.resolvedPrediction.accurate, false);
+    assert.ok(Number.isFinite(swapped.resolvedPrediction.brierScore));
+    assert.ok(swapped.materializedNodes[0].html.includes('✦ Keep Both'));
+    assert.ok(swapped.userModel.hypotheses.some(h => h.id === 'hyp-inferred-counterfactual-autonomy'));
+    const both = await post('/api/decisions/counterfactual', { nodeId: node.id, action: 'keep-both' });
+    assert.equal(both.resolvedPrediction.chosenOptionIds.length, 2);
+    assert.ok(both.userModel.hypotheses.some(h => h.id === 'hyp-inferred-cofork-expansion'));
+    const briefing = await (await fetch(base + '/api/views/briefing')).json();
+    assert.ok(Array.isArray(briefing.needsYourCall)); assert.ok(briefing.autonomousAndBasalMoves.some(n => n.predictionId === predictionId && n.canSwapCounterfactual));
+    assert.equal(briefing.modelShifts.resolvedCount, 1); assert.ok(briefing.modelShifts.inferredHypotheses.length >= 2);
+    const neither = await post('/api/decisions/counterfactual', { nodeId: node.id, action: 'neither' });
+    assert.ok(neither.removedNodeIds.includes(node.id)); assert.deepEqual(neither.resolvedPrediction.chosenOptionIds, []);
+    assert.ok(neither.state.edges.every(e => !neither.removedNodeIds.includes(e.from) && !neither.removedNodeIds.includes(e.to)));
+    const seeded = await post('/api/ideabox/seed', { prompt: 'Ambient counterfactual lenses', model: 'offline-deterministic', x: 25, y: 25 });
+    for (const n of seeded.state.nodes.filter(n => !n.shadowStaged && n.id !== seeded.seedNode.id)) assert.equal(overlaps(n, seeded.seedNode), false);
+    const pending = await (await fetch(base + '/api/views/briefing')).json();
+    assert.ok(pending.needsYourCall.some(n => n.regime === 'shadow-staged'));
+    const unfolded = await post('/api/shadow/unfold', { parentNodeId: seeded.seedNode.id });
+    assert.ok(unfolded.unfoldedIds.length > 0);
+    for (const id of unfolded.unfoldedIds) {
+      const n = unfolded.state.nodes.find(n => n.id === id);
+      for (const other of unfolded.state.nodes.filter(o => o.id !== id && !o.shadowStaged)) assert.equal(overlaps(n, other), false);
+    }
+    // Explicit movements can overlap; tidy must restore collision-free order.
+    const ids = neither.state.nodes.slice(0, 3).map(n => n.id);
+    for (const nodeId of ids) await post('/api/nodes/move', { nodeId, x: 25, y: 25 });
+    const tidy = await post('/api/canvas/tidy');
+    assert.ok(tidy.movedCount > 0);
+    const visible = tidy.nodes.filter(n => !n.shadowStaged);
+    for (let i = 0; i < visible.length; i++) for (let j = i + 1; j < visible.length; j++) assert.equal(overlaps(visible[i], visible[j]), false, `${visible[i].id} overlaps ${visible[j].id}`);
+  } finally { await new Promise(resolve => server.close(resolve)); fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+test('Open canvas placement respects dimensions, exclusions and shadow staging', () => {
+  const nodes = [{ id: 'occupied', x: 25, y: 25, width: 700, height: 500 }];
+  const pos = resolveOpenCanvasPosition(nodes, 25, 25, 395, 260);
+  assert.ok(pos.x >= 753 || pos.y >= 553);
+  assert.deepEqual(resolveOpenCanvasPosition(nodes, 25, 25, 395, 260, 28, new Set(['occupied'])), { x: 25, y: 25 });
+  assert.deepEqual(resolveOpenCanvasPosition([{ ...nodes[0], shadowStaged: true }], 25, 25), { x: 25, y: 25 });
+});

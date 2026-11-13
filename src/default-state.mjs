@@ -25,7 +25,7 @@ const BRIEF_STEER_HTML = `<div class="surface-root">
       border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.1); color: #e0f2fe;
     }
   </style>
-  <p>Explore directions in-place using the facet tabs above, or branch a new revision without disturbing downstream work.</p>
+  <p>Click this card to focus its facet lenses (Chat · Spec · UI · Code) or steer a new revision branch.</p>
   <div class="control-group">
     <div class="row">
       <span>Edit Policy</span>

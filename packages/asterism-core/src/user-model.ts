@@ -11,6 +11,10 @@ export const StateReachability = Schema.Literals(["ergodic", "irreversible"]);
 export type StateReachability = typeof StateReachability.Type;
 
 export interface PreferenceHypothesis {
+  readonly source?: "explicit" | "inferred";
+  readonly pinned?: boolean;
+  readonly observationCount?: number;
+  readonly lastObservedEvent?: string;
   readonly id: string;
   readonly statement: string;
   readonly scopeProjectId: string; // "global" or specific project id
@@ -122,6 +126,7 @@ export function createDefaultUserModel(): UserModelState {
     version: 1,
     hypotheses: [
       {
+        source: "explicit", pinned: true,
         id: "hyp-calm-zero-chrome",
         statement: "Prefers calm, low-chrome surfaces that expose only active decisions and living artifacts rather than orchestration toolbars.",
         scopeProjectId: "global",
@@ -136,6 +141,7 @@ export function createDefaultUserModel(): UserModelState {
         updatedAt: now,
       },
       {
+        source: "explicit", pinned: true,
         id: "hyp-cofork-basal",
         statement: "Favors pursuing multiple non-exclusive experiments in parallel when covered by basal compute rather than forcing premature 1-of-k choices.",
         scopeProjectId: "global",
@@ -150,6 +156,7 @@ export function createDefaultUserModel(): UserModelState {
         updatedAt: now,
       },
       {
+        source: "explicit", pinned: true,
         id: "hyp-global-misc-repo",
         statement: "Prefers unblocked execution in a global 'anything goes' misc repo over per-card file/repository configuration prompts.",
         scopeProjectId: "proj-misc-attic",
@@ -164,6 +171,7 @@ export function createDefaultUserModel(): UserModelState {
         updatedAt: now,
       },
       {
+        source: "explicit", pinned: true,
         id: "hyp-work-latency-over-dollars",
         statement: "In active engineering sprints, values avoiding wait-time latency over moderate cloud/compute spend ($1-$100).",
         scopeProjectId: "proj-asterism",
@@ -213,7 +221,8 @@ export function computeEmpiricalCalibrationFactor(
   readonly meanBrier: number;
   readonly stalenessScore: number;
 } {
-  const active = hypotheses.filter((h) => h.status === "active");
+  const list = Array.isArray(hypotheses) ? hypotheses : [];
+  const active = list.filter((h) => h.status === "active");
   if (active.length === 0) {
     return { calibrationFactor: 0.5, meanBrier: 0.25, stalenessScore: 1.0 };
   }
@@ -221,10 +230,10 @@ export function computeEmpiricalCalibrationFactor(
   let totalBrier = 0;
   let maxStaleness = 0;
   for (const h of active) {
-    totalTrials += h.empiricalTrials;
-    totalBrier += h.brierSum;
+    totalTrials += Number.isFinite(h.empiricalTrials) ? Math.max(0, h.empiricalTrials) : 0;
+    totalBrier += Number.isFinite(h.brierSum) ? Math.max(0, h.brierSum) : 0;
     const trialScarcity = h.empiricalTrials < 3 ? 1.4 : 1.0;
-    maxStaleness = Math.max(maxStaleness, h.usesSinceLastProbe * 0.22 * trialScarcity);
+    maxStaleness = Math.max(maxStaleness, (Number.isFinite(h.usesSinceLastProbe) ? Math.max(0, h.usesSinceLastProbe) : 0) * 0.22 * trialScarcity);
   }
   const meanBrier = totalTrials > 0 ? totalBrier / totalTrials : 0.25;
   // Brier 0.0 -> factor 1.0; Brier 0.35 -> factor ~0.55
@@ -293,12 +302,22 @@ export function evaluatePowerSetPolicy(input: {
   readonly effectiveAskCost: number;
   readonly sealedPrediction: SealedPrediction;
 } {
-  const k = Math.min(input.candidates.length, 6);
-  const candidates = input.candidates.slice(0, k);
+  const userModel = { ...input.userModel, hypotheses: input.userModel?.hypotheses || [], economicProfiles: input.userModel?.economicProfiles || {}, sealedPredictions: input.userModel?.sealedPredictions || [] };
+  const candidates = [...new Map(input.candidates.map(c => [c.id, c])).values()].slice(0, 6).map(c => ({
+    ...c,
+    portfolioInteraction: Math.max(-1, Math.min(0.5, Number.isFinite(c.portfolioInteraction) ? c.portfolioInteraction : 0)),
+    dollarCost: Math.max(0, Number.isFinite(c.dollarCost) ? c.dollarCost : 0),
+    tokenCost: Math.max(0, Number.isFinite(c.tokenCost) ? c.tokenCost : 1000),
+    utilityStd: Math.max(0.05, Number.isFinite(c.utilityStd) ? c.utilityStd : 1),
+    baseUtilityMean: Number.isFinite(c.baseUtilityMean) ? c.baseUtilityMean : 0,
+    reversalCostTokens: Number.isFinite(c.reversalCostTokens) ? Math.max(0, c.reversalCostTokens) : 0,
+    supportingHypothesisIds: c.supportingHypothesisIds || [],
+  }));
+  const k = candidates.length;
   const projectId = input.projectId || "proj-misc-attic";
   const profile =
-    input.userModel.economicProfiles[projectId] ||
-    input.userModel.economicProfiles["proj-misc-attic"] || {
+    userModel.economicProfiles[projectId] ||
+    userModel.economicProfiles["proj-misc-attic"] || {
       projectId,
       label: "Default",
       dollarCostWeight: 0.35,
@@ -317,7 +336,7 @@ export function evaluatePowerSetPolicy(input: {
   );
 
   const activeHyps = new Map(
-    input.userModel.hypotheses
+    userModel.hypotheses
       .filter((h) => h.status === "active" && (h.scopeProjectId === "global" || h.scopeProjectId === projectId))
       .map((h) => [h.id, h]),
   );
@@ -340,7 +359,7 @@ export function evaluatePowerSetPolicy(input: {
     .map((id) => activeHyps.get(id))
     .filter((h): h is PreferenceHypothesis => Boolean(h));
   const calib = computeEmpiricalCalibrationFactor(
-    citedHyps.length > 0 ? citedHyps : input.userModel.hypotheses,
+    citedHyps.length > 0 ? citedHyps : userModel.hypotheses,
   );
 
   // Enumerate all subsets S in P(A): 0 .. (2^k - 1)
@@ -519,6 +538,9 @@ export function evaluatePowerSetPolicy(input: {
     subsetProbabilities[s.subsetKey] = s.winProbability;
   }
 
+  const probabilitySum = Object.values(subsetProbabilities).reduce((a, b) => a + b, 0);
+  if (probabilitySum > 0) subsetProbabilities[bestSubset.subsetKey] = Number((subsetProbabilities[bestSubset.subsetKey]! + 1 - probabilitySum).toFixed(3));
+
   const sealedPrediction: SealedPrediction = {
     id: `pred-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     ...(input.nodeId ? { nodeId: input.nodeId } : {}),
@@ -578,6 +600,7 @@ export function scoreSealedPrediction(input: {
   readonly userModel: UserModelState;
   readonly predictionId: string;
   readonly chosenOptionIds: ReadonlyArray<string>;
+  readonly allowOverride?: boolean;
 }): {
   readonly updatedUserModel: UserModelState;
   readonly resolvedPrediction: SealedPrediction;
@@ -589,7 +612,12 @@ export function scoreSealedPrediction(input: {
     throw new Error(`Sealed prediction not found: ${input.predictionId}`);
   }
 
-  const actualKey = subsetKeyFor(input.chosenOptionIds);
+  if (pred.resolvedAt && !input.allowOverride) throw Object.assign(new Error(`Sealed prediction already resolved: ${input.predictionId}`), { code: "ALREADY_RESOLVED" });
+  if (!Array.isArray(input.chosenOptionIds)) throw new Error("chosenOptionIds must be an array");
+  const dedupedIds = [...new Set(input.chosenOptionIds.map(id => String(id).trim()))];
+  if (dedupedIds.some(id => !pred.candidateIds.includes(id))) throw Object.assign(new Error("Invalid choice"), { code: "INVALID_CHOICE" });
+  const actualKey = subsetKeyFor(dedupedIds);
+  if (!Object.hasOwn(pred.subsetProbabilities, actualKey)) throw Object.assign(new Error("Infeasible subset"), { code: "INFEASIBLE_SUBSET" });
   const keys = Object.keys(pred.subsetProbabilities);
   if (!keys.includes(actualKey)) keys.push(actualKey);
 
@@ -612,7 +640,7 @@ export function scoreSealedPrediction(input: {
   const resolvedPrediction: SealedPrediction = {
     ...pred,
     resolvedAt: now,
-    chosenOptionIds: [...input.chosenOptionIds],
+    chosenOptionIds: dedupedIds,
     chosenSubsetKey: actualKey,
     brierScore,
     accurate,
@@ -647,14 +675,14 @@ export function scoreSealedPrediction(input: {
   const updatedProfiles = { ...input.userModel.economicProfiles };
   const prof = updatedProfiles[pred.projectId];
   if (prof && !accurate) {
-    if (input.chosenOptionIds.length >= 2 && pred.predictedOptionIds.length < 2) {
+    if (dedupedIds.length >= 2 && pred.predictedOptionIds.length < 2) {
       // Operator preferred co-forking more aggressively than predicted -> lower marginal cost weight
       updatedProfiles[pred.projectId] = {
         ...prof,
         dollarCostWeight: Number(Math.max(0.02, prof.dollarCostWeight * 0.82).toFixed(3)),
         kTokenCostWeight: Number(Math.max(0.01, prof.kTokenCostWeight * 0.85).toFixed(3)),
       };
-    } else if (input.chosenOptionIds.length < pred.predictedOptionIds.length) {
+    } else if (dedupedIds.length < pred.predictedOptionIds.length) {
       updatedProfiles[pred.projectId] = {
         ...prof,
         dollarCostWeight: Number((prof.dollarCostWeight * 1.18).toFixed(3)),
@@ -675,4 +703,28 @@ export function scoreSealedPrediction(input: {
     },
     resolvedPrediction,
   };
+}
+
+export type BehavioralEventType = "counterfactual-override" | "co-fork-upgrade" | "branch-pruned" | "tearoff-promoted";
+
+export function recordBehavioralObservation(userModel: UserModelState, event: { readonly type: BehavioralEventType; readonly projectId?: string; readonly nodeId?: string; readonly detail?: string }): { readonly updatedUserModel: UserModelState; readonly affectedHypothesis: PreferenceHypothesis } {
+  const templates = {
+    "counterfactual-override": ["hyp-inferred-counterfactual-autonomy", "Prefers inspecting counterfactual sibling paths when autonomous single-branch commits omit trade-offs."],
+    "co-fork-upgrade": ["hyp-inferred-cofork-expansion", "Upgrades single-branch autonomous picks into side-by-side co-forks when covered by basal compute."],
+    "branch-pruned": ["hyp-inferred-prune-selectivity", "Actively prunes low-signal speculative branches to keep spatial canvas density calm."],
+    "tearoff-promoted": ["hyp-inferred-tearoff-lenses", "Prefers tearing off dedicated Spec and UI companion lenses side-by-side over in-place tab switching."],
+  } as const;
+  const [id, statement] = templates[event.type];
+  const now = new Date().toISOString();
+  const h = userModel.hypotheses.find(h => h.id === id);
+  const affectedHypothesis: PreferenceHypothesis = h ? {
+    ...h, status: "active", empiricalTrials: h.empiricalTrials + 1, empiricalHits: h.empiricalHits + 1,
+    confidence: Number(Math.min(0.96, h.confidence + 0.06).toFixed(3)), weight: Number(Math.min(0.98, h.weight + 0.05).toFixed(3)),
+    observationCount: (h.observationCount || 1) + 1, lastObservedEvent: event.type, updatedAt: now,
+  } : {
+    id, statement, source: "inferred", pinned: false, scopeProjectId: event.projectId || "global", polarity: "positive",
+    weight: 0.72, confidence: 0.68, empiricalHits: 1, empiricalTrials: 1, brierSum: 0.06, usesSinceLastProbe: 0,
+    status: "active", observationCount: 1, lastObservedEvent: event.type, updatedAt: now,
+  };
+  return { affectedHypothesis, updatedUserModel: { ...userModel, hypotheses: h ? userModel.hypotheses.map(h => h.id === id ? affectedHypothesis : h) : [affectedHypothesis, ...userModel.hypotheses] } };
 }

@@ -1,3 +1,5 @@
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
 import {
   pickIdeonomyTuple,
   renderIdeonomyMachineryHtml,
@@ -457,7 +459,7 @@ export async function collaborateAcrossPanels({
     PANEL_RELATIONS[inferredRelation] || PANEL_RELATIONS["visualizes-ui"];
   const roleMeta = SURFACE_ROLES[inferredRole] || SURFACE_ROLES["ui-prototype"];
   const linkFooter = `<div style="margin-top:10px;padding:7px 10px;background:rgba(15,23,42,0.85);border:1px solid rgba(244,114,182,0.35);border-radius:7px;display:flex;justify-content:space-between;align-items:center;font-family:system-ui,sans-serif;font-size:11px;color:#e2e8f0;">
-    <span>Linked <strong>${roleMeta.shortBadge}</strong> spawned (${relationMeta.label}): <em>${companionNode.title}</em></span>
+    <span>Linked <strong>${roleMeta.shortBadge}</strong> spawned (${relationMeta.label}): <em>${escapeHtml(companionNode.title)}</em></span>
     <button onclick="window.asterism.updatePanel('${companionNode.id}', 'Sync with latest parent state')" style="background:rgba(244,114,182,0.2);color:#f9a8d4;border:1px solid rgba(244,114,182,0.45);border-radius:5px;padding:3px 7px;font-size:10px;cursor:pointer;">↻ Sync Companion</button>
   </div>`;
 
@@ -591,7 +593,7 @@ export function buildFallbackRoleHtml({
     return `<div style="font-family:system-ui,sans-serif;padding:14px;color:#e2e8f0;font-size:12px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
     <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • ORGANON: ${tuple.primaryOrganon.toUpperCase()}</span>
-    <span style="color:#94a3b8;font-size:10.5px;">${relMeta.label} "${sourceNode.title.slice(0, 22)}"</span>
+    <span style="color:#94a3b8;font-size:10.5px;">${relMeta.label} "${escapeHtml(sourceNode.title.slice(0, 22))}"</span>
   </div>
   <div style="background:#0b1120;border:1px solid rgba(244,114,182,0.35);border-radius:8px;padding:10px;margin-bottom:9px;">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(148,163,184,0.15);padding-bottom:6px;margin-bottom:8px;">
@@ -601,7 +603,7 @@ export function buildFallbackRoleHtml({
         <option value="spacious">Spacious Split</option>
       </select>
     </div>
-    <p style="margin:0 0 8px;color:#cbd5e1;font-size:11.5px;">${prompt}</p>
+    <p style="margin:0 0 8px;color:#cbd5e1;font-size:11.5px;">${escapeHtml(prompt)}</p>
     <div style="display:flex;gap:6px;align-items:center;font-size:11px;color:#94a3b8;">
       <span>Preview Scale:</span>
       <input type="range" min="50" max="150" value="100" data-state-key="previewScalePct" style="flex:1;accent-color:#f472b6;" />
@@ -621,8 +623,8 @@ export function buildFallbackRoleHtml({
     <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • ORGANON: ${tuple.primaryOrganon.toUpperCase()}</span>
     <span style="color:#94a3b8;font-size:10px;">${relMeta.label}</span>
   </div>
-  <h4 style="margin:0 0 6px;font-family:system-ui,sans-serif;font-size:13.5px;color:#f8fafc;">${title}</h4>
-  <p style="margin:0 0 8px;font-family:system-ui,sans-serif;color:#94a3b8;font-size:11.5px;">${prompt}</p>
+  <h4 style="margin:0 0 6px;font-family:system-ui,sans-serif;font-size:13.5px;color:#f8fafc;">${escapeHtml(title)}</h4>
+  <p style="margin:0 0 8px;font-family:system-ui,sans-serif;color:#94a3b8;font-size:11.5px;">${escapeHtml(prompt)}</p>
   <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(192,132,252,0.35);border-radius:7px;padding:8px;margin-bottom:8px;">
     <label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;">
       <input type="checkbox" checked data-state-key="invariantIdempotent" style="accent-color:#c084fc;" />
@@ -643,8 +645,8 @@ export function buildFallbackRoleHtml({
     <span style="background:${roleMeta.bgTint};color:${roleMeta.color};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">${roleMeta.shortBadge} • ORGANON: ${tuple.primaryOrganon.toUpperCase()}</span>
     <span style="color:#94a3b8;font-size:10.5px;">${relMeta.label}</span>
   </div>
-  <h4 style="margin:0 0 6px;font-size:14px;">${title}</h4>
-  <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">${prompt}</p>
+  <h4 style="margin:0 0 6px;font-size:14px;">${escapeHtml(title)}</h4>
+  <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">${escapeHtml(prompt)}</p>
   <div style="display:flex;gap:6px;">
     <button onclick="window.asterism.spawnRelatedPanel({relation:'visualizes-ui', surfaceRole:'ui-prototype'})" style="flex:1;background:rgba(244,114,182,0.18);color:#f472b6;border:1px solid rgba(244,114,182,0.4);padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;cursor:pointer;">🎨 + UI Prototype</button>
     <button onclick="window.asterism.spawnRelatedPanel({relation:'specifies', surfaceRole:'spec-diagram'})" style="flex:1;background:rgba(168,85,247,0.18);color:#c084fc;border:1px solid rgba(168,85,247,0.4);padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;cursor:pointer;">📐 + Spec Panel</button>
@@ -795,7 +797,7 @@ Include a compact top header bar showing badge "⚔ ${arch.tag.toUpperCase()} �
     <span style="color:#94a3b8;font-size:10.5px;">${roleMeta.shortBadge} • Jev: ${score}</span>
   </div>
   <h4 style="margin:0 0 6px;font-size:13.5px;">${arch.lens.split("(")[0].trim()}</h4>
-  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Harness: <code>${combatantMeta.harness}</code> — ${prompt || "Parallel Arena exploration"}</p>
+  <p style="margin:0 0 8px;color:#94a3b8;font-size:11.5px;">Harness: <code>${combatantMeta.harness}</code> — ${escapeHtml(prompt || "Parallel Arena exploration")}</p>
   <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#cbd5e1;">
     <span>Weight:</span>
     <input type="range" min="1" max="100" value="75" data-state-key="branchWeight" style="flex:1;accent-color:${combatantMeta.badgeColor};" />
@@ -916,8 +918,8 @@ ${parentsDigest}`;
     <span style="background:rgba(251,191,36,0.18);color:#fbbf24;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">⊕ SYNTHESIZED (${parentNodes.length} PANELS) • ${tuple.primaryOrganon.toUpperCase()}</span>
     <span style="color:${roleMeta.color};font-size:10.5px;font-weight:600;">${roleMeta.shortBadge}</span>
   </div>
-  <h4 style="margin:0 0 6px;font-size:14px;">Hybrid Convergence: ${parentNodes.map((p) => p.branchTag || p.title.slice(0, 18)).join(" × ")}</h4>
-  <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">${instruction || "Unified collaboration surface combining parent proposals, UI prototypes, and state constraints."}</p>
+  <h4 style="margin:0 0 6px;font-size:14px;">Hybrid Convergence: ${escapeHtml(parentNodes.map((p) => p.branchTag || p.title.slice(0, 18)).join(" × "))}</h4>
+  <p style="margin:0 0 10px;color:#94a3b8;font-size:11.5px;">${escapeHtml(instruction || "Unified collaboration surface combining parent proposals, UI prototypes, and state constraints.")}</p>
   <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(251,191,36,0.35);border-radius:8px;padding:9px;">
     <div style="font-size:10.5px;color:#fcd34d;margin-bottom:4px;font-weight:600;">Merged Lineage &amp; Interactive State</div>
     <code style="font-size:10px;color:#cbd5e1;display:block;white-space:pre-wrap;">${JSON.stringify(mergedState)}</code>
@@ -1319,8 +1321,8 @@ export async function runIdeonomyAndMatchmakerPipeline({
     <span style="color:#34d399;font-family:monospace;font-size:10px;">ANoul(p=${spec.pass}, u=${spec.abstain})</span>
   </div>
   <div style="background:#0b1120;border:1px solid rgba(148,163,184,0.25);border-radius:8px;padding:9px;margin-bottom:6px;">
-    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">═══ ◆ ${spec.tuple.primaryOrganon.toUpperCase()} ◆ ═══ ${spec.title}</div>
-    <p style="margin:0 0 8px;color:#94a3b8;font-size:10.5px;">${spec.summary}</p>
+    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">═══ ◆ ${spec.tuple.primaryOrganon.toUpperCase()} ◆ ═══ ${escapeHtml(spec.title)}</div>
+    <p style="margin:0 0 8px;color:#94a3b8;font-size:10.5px;">${escapeHtml(spec.summary)}</p>
     <div style="display:flex;align-items:center;gap:8px;font-size:10.5px;color:#cbd5e1;">
       <span>Confidence Threshold:</span>
       <input type="range" min="50" max="99" value="${Math.round(spec.pass * 100)}" data-state-key="thresholdPct" style="flex:1;accent-color:${spec.accent};" />
@@ -1328,7 +1330,6 @@ export async function runIdeonomyAndMatchmakerPipeline({
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#94a3b8;background:rgba(15,23,42,0.8);padding:5px 8px;border-radius:6px;">
     <span>AskDefault: <code>${spec.askDefaultLabel}</code></span>
-    <button onclick="window.asterism.keepFork(false)" style="background:rgba(16,185,129,0.18);color:#6ee7b7;border:1px solid rgba(16,185,129,0.45);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;">✓ Keep</button>
   </div>
   ${machineryHtml}
 </div>`;
@@ -1416,13 +1417,12 @@ export async function runIdeonomyAndMatchmakerPipeline({
     <span style="color:#fde68a;font-family:monospace;font-size:10px;">Affinity=${affinityScore} • p=${hybridPass}</span>
   </div>
   <div style="background:#0b1120;border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:9px;margin-bottom:6px;">
-    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">═══ ◆ ${tupleMatch.primaryOrganon.toUpperCase()} ◆ ═══ "${seedNode.title.slice(0, 20)}" × "${matchedTargetNode.title.slice(0, 20)}"</div>
-    <p style="margin:0 0 6px;color:#94a3b8;font-size:10.5px;">The Matchmaker agent scanned the Brain graph and applied Ideonomy <strong>combination</strong> across <code>${sharedStr}</code> with <strong>${matchedTargetNode.title}</strong>.</p>
-    <div style="font-size:10px;color:#fcd34d;">Couples seed intent with existing <code>${matchedTargetNode.surfaceRole || matchedTargetNode.stage}</code> state.</div>
+    <div style="font-weight:700;color:#f8fafc;margin-bottom:4px;">═══ ◆ ${tupleMatch.primaryOrganon.toUpperCase()} ◆ ═══ "${escapeHtml(seedNode.title.slice(0, 20))}" × "${escapeHtml(matchedTargetNode.title.slice(0, 20))}"</div>
+    <p style="margin:0 0 6px;color:#94a3b8;font-size:10.5px;">The Matchmaker agent scanned the Brain graph and applied Ideonomy <strong>combination</strong> across <code>${escapeHtml(sharedStr)}</code> with <strong>${escapeHtml(matchedTargetNode.title)}</strong>.</p>
+    <div style="font-size:10px;color:#fcd34d;">Couples seed intent with existing <code>${escapeHtml(matchedTargetNode.surfaceRole || matchedTargetNode.stage)}</code> state.</div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#94a3b8;background:rgba(15,23,42,0.8);padding:5px 8px;border-radius:6px;">
     <span>AskDefault: <code>Merge Cross-Pollinated Hybrid</code></span>
-    <button onclick="window.asterism.keepFork(false)" style="background:rgba(251,191,36,0.2);color:#fde68a;border:1px solid rgba(251,191,36,0.5);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;">✓ Keep Hybrid</button>
   </div>
   ${matchMachineryHtml}
 </div>`;
@@ -1537,7 +1537,7 @@ export async function compileDecisionTreeOnTheFly({
       return [
         {
           id: "opt-a",
-          label: `Direction A (${tuple.operators[0]?.name || "Dense"})`,
+          label: `Direction A (${tuple.operators?.[0]?.title || tuple.operatorIds?.[0] || "Dense"})`,
           summary: `High-commitment path for "${prompt.slice(0, 70)}" prioritizing throughput & directness.`,
           baseUtilityMean: 5.4,
           utilityStd: 3.4,
@@ -1551,7 +1551,7 @@ export async function compileDecisionTreeOnTheFly({
         },
         {
           id: "opt-b",
-          label: `Direction B (${tuple.operators[1]?.name || "Ambient"})`,
+          label: `Direction B (${tuple.operators?.[1]?.title || tuple.operatorIds?.[1] || "Ambient"})`,
           summary: `Alternative architecture for "${prompt.slice(0, 70)}" prioritizing calm legibility & invariants.`,
           baseUtilityMean: 5.5,
           utilityStd: 3.4,
@@ -1571,8 +1571,8 @@ export async function compileDecisionTreeOnTheFly({
     return [
       {
         id: "opt-a",
-        label: `${tuple.operators[0]?.name || "Structural"} Experiment`,
-        summary: `Explore "${prompt.slice(0, 68)}" via ${tuple.operators[0]?.name || "Inversion"} × ${tuple.organons[0]?.name || "Matrix"} in an isolated ergodic branch.`,
+        label: `${tuple.operators?.[0]?.title || tuple.operatorIds?.[0] || "Structural"} Experiment`,
+        summary: `Explore "${prompt.slice(0, 68)}" via ${tuple.operators?.[0]?.title || tuple.operatorIds?.[0] || "Inversion"} × ${tuple.organons?.[0]?.title || tuple.organonIds?.[0] || "Matrix"} in an isolated ergodic branch.`,
         baseUtilityMean: 4.2,
         utilityStd: 0.9,
         tokenCost: 1800,
@@ -1584,8 +1584,8 @@ export async function compileDecisionTreeOnTheFly({
       },
       {
         id: "opt-b",
-        label: `${tuple.operators[1]?.name || "Counterfactual"} Experiment`,
-        summary: `Complementarily test "${prompt.slice(0, 68)}" along "${tuple.dimensions[0]?.question || "orthogonal assumption"}" so both discoveries compound.`,
+        label: `${tuple.operators?.[1]?.title || tuple.operatorIds?.[1] || "Counterfactual"} Experiment`,
+        summary: `Complementarily test "${prompt.slice(0, 68)}" along "${tuple.dimensions?.[0]?.title || tuple.dimensionIds?.[0] || "orthogonal assumption"}" so both discoveries compound.`,
         baseUtilityMean: 3.9,
         utilityStd: 0.95,
         tokenCost: 1800,
@@ -1630,7 +1630,7 @@ Situation / Intent: "${prompt}"`,
       const parsed = JSON.parse(match[0]);
       if (Array.isArray(parsed.candidates) && parsed.candidates.length >= 2) {
         const sanitized = parsed.candidates.slice(0, 3).map((c, idx) => ({
-          id: c.id || `opt-${idx === 0 ? "a" : idx === 1 ? "b" : "c"}`,
+          id: (typeof c.id === "string" && /^[a-zA-Z0-9_-]+$/.test(c.id) ? c.id : null) || `opt-${idx === 0 ? "a" : idx === 1 ? "b" : "c"}`,
           label: String(c.label || `Option ${idx + 1}`).slice(0, 60),
           summary: String(c.summary || "").slice(0, 220),
           baseUtilityMean: Number.isFinite(Number(c.baseUtilityMean)) ? Number(c.baseUtilityMean) : 3.8,
@@ -1681,7 +1681,7 @@ export function renderCompiledDecisionSurfaceHtml({
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/\\/g, "&#92;");
 
   const a = candidates[0];
   const b = candidates[1];
@@ -1720,31 +1720,34 @@ export function renderCompiledDecisionSurfaceHtml({
   <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:2px;">
     ${
       allowBoth
-        ? `<button onclick="window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:${bothIdsJson}},'*')" style="flex:1.3;min-width:110px;padding:7px 10px;border-radius:7px;border:1px solid rgba(56,189,248,0.38);background:rgba(56,189,248,0.13);color:#e0f2fe;font-size:11px;font-weight:600;cursor:pointer;">✦ Both</button>`
+        ? `<button onclick="this.parentElement.querySelectorAll('button').forEach(b=>{b.disabled=true;b.style.opacity='0.5';});window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:${bothIdsJson}},'*')" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.24);background:rgba(30,41,59,0.75);color:#f1f5f9;font-size:11px;font-weight:500;cursor:pointer;">✦ Both</button>`
         : ""
     }
     ${
       a
-        ? `<button onclick="window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:['${esc(a.id)}']},'*')" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.24);background:rgba(30,41,59,0.75);color:#f1f5f9;font-size:11px;font-weight:500;cursor:pointer;">${esc(a.label.split(" ")[0] || "Option A")}</button>`
+        ? `<button onclick="this.parentElement.querySelectorAll('button').forEach(b=>{b.disabled=true;b.style.opacity='0.5';});window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:['${esc(a.id)}']},'*')" title="${esc(a.label)}" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.24);background:rgba(30,41,59,0.75);color:#f1f5f9;font-size:11px;font-weight:500;cursor:pointer;">${esc(a.label.length > 28 ? a.label.slice(0, 27) + "…" : a.label)}</button>`
         : ""
     }
     ${
       b
-        ? `<button onclick="window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:['${esc(b.id)}']},'*')" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.24);background:rgba(30,41,59,0.75);color:#f1f5f9;font-size:11px;font-weight:500;cursor:pointer;">${esc(b.label.split(" ")[0] || "Option B")}</button>`
+        ? `<button onclick="this.parentElement.querySelectorAll('button').forEach(b=>{b.disabled=true;b.style.opacity='0.5';});window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:['${esc(b.id)}']},'*')" title="${esc(b.label)}" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.24);background:rgba(30,41,59,0.75);color:#f1f5f9;font-size:11px;font-weight:500;cursor:pointer;">${esc(b.label.length > 28 ? b.label.slice(0, 27) + "…" : b.label)}</button>`
         : ""
     }
-    <button onclick="window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:[]},'*')" style="padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.16);background:transparent;color:#94a3b8;font-size:11px;cursor:pointer;" title="Status quo (do neither)">∅ Neither</button>
+    <button onclick="this.parentElement.querySelectorAll('button').forEach(b=>{b.disabled=true;b.style.opacity='0.5';});window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:[]},'*')" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.24);background:rgba(30,41,59,0.75);color:#f1f5f9;font-size:11px;font-weight:500;cursor:pointer;" title="Status quo (do neither)">∅ Neither</button>
   </div>
 </div>`;
 }
 
-export function renderAutonomousBranchHtml({ candidate, prompt, ideonomyTuple, regimeLabel }) {
+export function renderAutonomousBranchHtml({ candidate, prompt, ideonomyTuple, regimeLabel, nodeId, predictionId, candidates = [], chosenOptionIds = [] }) {
   const esc = (s) =>
     String(s || "")
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  const machinery = ideonomyTuple ? renderIdeonomyMachineryHtml(ideonomyTuple) : "";
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const button = (label, action, targetOptionIds) => `<button style="border:0;background:transparent;color:#94a3b8;font-size:11px;cursor:pointer;padding:6px" onclick="${esc(`this.parentElement.querySelectorAll('button').forEach(b => b.disabled = true);window.parent.postMessage(${JSON.stringify({ type: 'asterism:counterfactual', nodeId, predictionId, action, targetOptionIds })},'*')`)}">${esc(label)}</button>`;
+  const otherCand = Array.isArray(candidates) && candidates.find(c => c.id !== candidate.id);
+  const footer = nodeId && predictionId ? `<div data-counterfactual-bar="1" style="margin-top:12px;border-top:1px solid #33415555;padding-top:4px">${otherCand ? button(`↺ Try ${otherCand.label.length > 24 ? otherCand.label.slice(0, 23) + "…" : otherCand.label}`, "swap", [otherCand.id]) : ""}${Array.isArray(candidates) && candidates.length >= 2 && chosenOptionIds.length < 2 ? button("✦ Keep Both", "keep-both", candidates.map(c => c.id)) : ""}${button("∅ Neither", "neither", [])}</div>` : "";
+  const machinery = ideonomyTuple ? renderIdeonomyMachineryHtml(ideonomyTuple.tuple ? ideonomyTuple : { tuple: ideonomyTuple, ideaTitle: candidate.label }) : "";
   return `<div style="font-family:'Inter',system-ui,sans-serif;padding:15px 17px;color:#e2e8f0;font-size:12px;line-height:1.55;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:10.5px;color:#64748b;">
     <span>${esc(regimeLabel || "Auto-executed on behalf of operator")}</span>
@@ -1753,6 +1756,7 @@ export function renderAutonomousBranchHtml({ candidate, prompt, ideonomyTuple, r
   <div style="color:#cbd5e1;margin-bottom:10px;">${esc(candidate.summary)}</div>
   <div style="font-size:11px;color:#94a3b8;">Origin intent: <em>${esc(prompt)}</em></div>
   ${machinery}
+  ${footer}
 </div>`;
 }
 

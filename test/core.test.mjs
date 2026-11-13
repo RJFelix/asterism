@@ -202,3 +202,45 @@ test("4. Rebuilt Multi-Route Connection Supervisor gives direct routes head-star
   assert.equal(Option.isSome(upgrade), true);
   assert.equal(Option.getOrThrow(upgrade).route.id, "r-tailscale");
 });
+
+import { createDefaultUserModel, scoreSealedPrediction, recordBehavioralObservation, allocateBasalFreeEnergy, shouldBranchForRegretMinimization } from '@asterism/core';
+
+test('Sealed predictions reject duplicate scoring and invalid choices, and accept counterfactual overrides', () => {
+  const model = { ...createDefaultUserModel(), sealedPredictions: [{ id: 'sealed-test', projectId: 'global', candidateIds: ['a', 'b'], supportingHypothesisIds: ['hyp-calm-zero-chrome'], predictedSubsetKey: 'a', predictedOptionIds: ['a'], subsetProbabilities: { '∅': 0.1, a: 0.6, b: 0.2, 'a+b': 0.1 } }] };
+  assert.throws(() => scoreSealedPrediction({ userModel: model, predictionId: 'sealed-test', chosenOptionIds: ['unknown'] }), { code: 'INVALID_CHOICE' });
+  const first = scoreSealedPrediction({ userModel: model, predictionId: 'sealed-test', chosenOptionIds: ['a'] });
+  assert.equal(first.resolvedPrediction.accurate, true);
+  assert.throws(() => scoreSealedPrediction({ userModel: first.updatedUserModel, predictionId: 'sealed-test', chosenOptionIds: ['b'] }), { code: 'ALREADY_RESOLVED' });
+  const override = scoreSealedPrediction({ userModel: first.updatedUserModel, predictionId: 'sealed-test', chosenOptionIds: ['b'], allowOverride: true });
+  assert.equal(override.resolvedPrediction.accurate, false);
+  assert.ok(override.resolvedPrediction.brierScore > first.resolvedPrediction.brierScore);
+  assert.equal(override.updatedUserModel.sealedPredictions.length, 1);
+});
+
+test('Behavioral observations distill all four inferred preferences and reinforce within confidence caps', () => {
+  let model = createDefaultUserModel();
+  assert.ok(model.hypotheses.every(h => h.source === 'explicit' && h.pinned));
+  for (const type of ['counterfactual-override', 'co-fork-upgrade', 'branch-pruned', 'tearoff-promoted']) {
+    const original = model;
+    const first = recordBehavioralObservation(model, { type, projectId: 'project-test' });
+    const h = first.affectedHypothesis;
+    assert.equal(h.source, 'inferred'); assert.equal(h.pinned, false); assert.equal(h.scopeProjectId, 'project-test'); assert.equal(h.observationCount, 1);
+    assert.equal(original.hypotheses.length + 1, first.updatedUserModel.hypotheses.length);
+    model = first.updatedUserModel;
+    for (let i = 0; i < 20; i++) model = recordBehavioralObservation(model, { type }).updatedUserModel;
+    const reinforced = model.hypotheses.find(v => v.id === h.id);
+    assert.equal(reinforced.observationCount, 21); assert.equal(reinforced.empiricalTrials, 21); assert.equal(reinforced.empiricalHits, 21);
+    assert.equal(reinforced.confidence, 0.96); assert.equal(reinforced.weight, 0.98); assert.equal(reinforced.lastObservedEvent, type);
+  }
+});
+
+test('Basal allocation obeys its global budget across large populations and lateral links do not force revisions', () => {
+  for (const count of [51, 120, 501]) {
+    const result = allocateBasalFreeEnergy(Array.from({ length: count }, (_, i) => ({ id: `n-${i}`, jevScore: i % 2 ? 0.9 : 0.1 })), { basalFloorTokensPerTick: 37, minNodeEnergyFloor: 100 });
+    assert.equal(result.totalGrantedTokens, 37);
+    assert.equal(result.allocations.reduce((sum, a) => sum + a.grantedTokens, 0), 37);
+    assert.ok(result.allocations.every(a => a.grantedTokens >= 0));
+  }
+  for (const kind of ['association', 'jump']) assert.equal(shouldBranchForRegretMinimization({ nodeId: 'a', edges: [{ from: 'a', to: 'b', kind }] }), false);
+  assert.equal(shouldBranchForRegretMinimization({ nodeId: 'a', edges: [{ from: 'a', to: 'b', kind: 'forks' }] }), true);
+});

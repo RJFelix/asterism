@@ -298,11 +298,17 @@ export function allocateBasalFreeEnergy<
   const now = new Date().toISOString();
   let totalGrantedTokens = 0;
 
-  const allocations = scored.map(({ node, env, bid, weight }) => {
-    const share = Math.max(
-      120,
-      Math.round((weight / totalWeight) * config.basalFloorTokensPerTick),
-    );
+  const minPerNode = Math.min(120, Math.max(1, Math.floor(config.basalFloorTokensPerTick / eligible.length)));
+  const rawShares = scored.map(({ weight }) => Math.max(minPerNode, weight / totalWeight * config.basalFloorTokensPerTick));
+  const rawTotal = rawShares.reduce((a, b) => a + b, 0);
+  const scaledShares = rawShares.map(share => share / rawTotal * config.basalFloorTokensPerTick);
+  const grants = scaledShares.map(Math.floor);
+  const remainderOrder = scaledShares.map((share, index) => ({ index, fraction: share - grants[index]! }))
+    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+  const remainder = config.basalFloorTokensPerTick - grants.reduce((sum, grant) => sum + grant, 0);
+  for (let i = 0; i < remainder; i++) grants[remainderOrder[i % remainderOrder.length]!.index]! += 1;
+  const allocations = scored.map(({ node, env, bid }, index) => {
+    const share = grants[index]!;
     totalGrantedTokens += share;
     const newRemainingTokens = env.remainingTokens + share;
     const reason =
@@ -352,14 +358,14 @@ export interface RevisionSnapshot {
 
 export function shouldBranchForRegretMinimization(input: {
   readonly nodeId: string;
-  readonly edges: ReadonlyArray<{ readonly from: string; readonly to: string }>;
+  readonly edges: ReadonlyArray<{ readonly from: string; readonly to: string; readonly relation?: string; readonly kind?: string }>;
   readonly editIntent?: EditIntent;
 }): boolean {
   if (input.editIntent === "branch") return true;
   if (input.editIntent === "in-place") return false;
   // Default ("auto-branch"): if this node has ANY downstream children in the graph,
   // branching into an additional future preserves the existing downstream train without regret!
-  const hasDownstream = input.edges.some((e) => e.from === input.nodeId);
+  const hasDownstream = input.edges.some((e) => e.from === input.nodeId && !["jump", "association", "lens"].includes(e.kind || "") && !["cross-pollinates", "association", "annotates"].includes(e.relation || ""));
   return hasDownstream;
 }
 
