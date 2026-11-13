@@ -352,4 +352,95 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
   }
 });
 
+test("Sovereign Compute: Power-Set Policy (Co-Fork, Neither, Ask/Probe) & Testable UserModel Brier Calibration", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "asterism-sovereign-"));
+  const server = createAsterismServer({
+    dbPath: path.join(tmpDir, "sovereign.sqlite"),
+    worktreesDir: path.join(tmpDir, "worktrees"),
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    await fetch(`${baseUrl}/api/reset`, { method: "POST" });
+
+    // 1. Complementary ergodic experiments within Basal Free-Energy Floor -> Silent Co-Fork ("Both")
+    const coforkRes = await fetch(`${baseUrl}/api/decisions/compile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "Compare optimizer schedule A and data curriculum B in ergodic worktrees",
+        projectId: "proj-misc-attic",
+        model: "offline-deterministic",
+      }),
+    });
+    assert.equal(coforkRes.status, 200);
+    const coforkData = await coforkRes.json();
+    assert.equal(coforkData.regime, "co-fork", "Ergodic complementary experiments within basal energy must co-fork both paths automatically");
+    assert.equal(coforkData.materializedNodes.length, 2);
+    assert.equal(coforkData.sealedPrediction.predictedSubsetKey, "opt-a+opt-b");
+
+    // 2. Negative-utility trap ("$1k cat food vs $1k dog food") -> Status-Quo ∅ ("abstain-neither")
+    const neitherRes = await fetch(`${baseUrl}/api/decisions/compile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "Decide between buying $1k cat food or $1k dog food",
+        projectId: "proj-misc-attic",
+        model: "offline-deterministic",
+      }),
+    });
+    assert.equal(neitherRes.status, 200);
+    const neitherData = await neitherRes.json();
+    assert.equal(neitherData.regime, "abstain-neither", "Negative-utility options must resolve to ∅ (neither) rather than forcing a bad choice");
+    assert.equal(neitherData.materializedNodes.length, 0);
+    assert.equal(neitherData.sealedPrediction.predictedSubsetKey, "∅");
+
+    // 3. Calibration Spot-Check Probe -> Seals prediction first, renders unanchored {Both, A, B, Neither} surface, then scores Brier on click
+    const probeRes = await fetch(`${baseUrl}/api/decisions/compile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "Spot-check co-fork preference on reversible UI layout variants",
+        projectId: "proj-misc-attic",
+        forceProbe: true,
+        model: "offline-deterministic",
+      }),
+    });
+    assert.equal(probeRes.status, 200);
+    const probeData = await probeRes.json();
+    assert.equal(probeData.regime, "probe-calibration");
+    assert.ok(probeData.decisionNode, "Calibration probe must surface a compiled decision card");
+    assert.ok(!probeData.decisionNode.html.includes("Pre-predicted"), "Decision card must not leak pre-prediction before user clicks (no anchoring)");
+    assert.ok(probeData.decisionNode.html.includes("✦ Both"), "Non-exclusive decision card must offer Both to avoid false-dichotomy label corruption");
+    assert.ok(probeData.decisionNode.html.includes("∅ Neither"), "Decision card must offer Neither baseline");
+
+    const resolveRes = await fetch(`${baseUrl}/api/decisions/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nodeId: probeData.decisionNode.id,
+        predictionId: probeData.sealedPrediction.id,
+        chosenOptionIds: ["opt-a", "opt-b"],
+      }),
+    });
+    assert.equal(resolveRes.status, 200);
+    const resolveData = await resolveRes.json();
+    assert.equal(resolveData.resolvedPrediction.chosenSubsetKey, "opt-a+opt-b");
+    assert.equal(typeof resolveData.resolvedPrediction.brierScore, "number");
+    assert.equal(resolveData.resolvedPrediction.accurate, true);
+    assert.equal(resolveData.spawnedNodes.length, 2, "Choosing Both materializes both branches");
+
+    const coforkHyp = resolveData.userModel.hypotheses.find((h) => h.id === "hyp-cofork-basal");
+    assert.equal(coforkHyp.usesSinceLastProbe, 0, "Resolving a probe resets staleness counter on tested hypotheses");
+    assert.ok(coforkHyp.empiricalTrials >= 7);
+
+    await fetch(`${baseUrl}/api/reset`, { method: "POST" });
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+
 

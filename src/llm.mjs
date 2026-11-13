@@ -1474,4 +1474,287 @@ export async function runIdeonomyAndMatchmakerPipeline({
   };
 }
 
+/**
+ * Constructs an on-the-fly decision structure for any novel situation using the LLM
+ * (with fast deterministic fallback for offline/test modes), explicitly modeling:
+ *  - State reachability (`ergodic` LRR === R vs `irreversible` sink basin)
+ *  - Utility relative to status-quo ∅ = 0 (so bad options lose to "Neither")
+ *  - Portfolio interaction (complementary fruitful co-forks vs redundant tournament variants)
+ */
+export async function compileDecisionTreeOnTheFly({
+  prompt,
+  userModel,
+  projectId = "proj-misc-attic",
+  model = DEFAULT_MODEL,
+}) {
+  const tuple = pickIdeonomyTuple({ mode: "plain" });
+  const activeHyps = (userModel?.hypotheses || []).filter((h) => h.status === "active");
+  const lower = String(prompt || "").toLowerCase();
+
+  const buildFallbackCandidates = () => {
+    // 1. Detect negative-utility mismatch ("cat food vs dog food" / unwanted spend) -> ∅ wins
+    if (lower.includes("cat food") || lower.includes("dog food") || lower.includes("neither-trap")) {
+      return [
+        {
+          id: "opt-a",
+          label: "Buy $1k Cat Food",
+          summary: "Bulk feline kibble commitment mismatched with current household state.",
+          baseUtilityMean: -4.5,
+          utilityStd: 0.6,
+          tokenCost: 400,
+          dollarCost: 1000,
+          reachability: "irreversible",
+          reversalCostTokens: 0,
+          supportingHypothesisIds: [],
+          portfolioInteraction: -0.5,
+        },
+        {
+          id: "opt-b",
+          label: "Buy $1k Dog Food",
+          summary: "Bulk canine kibble commitment mismatched with current household state.",
+          baseUtilityMean: -4.5,
+          utilityStd: 0.6,
+          tokenCost: 400,
+          dollarCost: 1000,
+          reachability: "irreversible",
+          reversalCostTokens: 0,
+          supportingHypothesisIds: [],
+          portfolioInteraction: -0.5,
+        },
+      ];
+    }
+
+    // 2. Detect high-regret irreversible / expensive GPU/cloud dilemma -> Ask or Project-dependent Speculate
+    const dollarMatch = lower.match(/\$(\d+)/);
+    const parsedDollars = dollarMatch ? Number(dollarMatch[1]) : 0;
+    const isIrreversible =
+      lower.includes("irreversible") ||
+      lower.includes("production") ||
+      lower.includes("delete") ||
+      parsedDollars >= 80;
+
+    if (isIrreversible) {
+      return [
+        {
+          id: "opt-a",
+          label: `Direction A (${tuple.operators[0]?.name || "Dense"})`,
+          summary: `High-commitment path for "${prompt.slice(0, 70)}" prioritizing throughput & directness.`,
+          baseUtilityMean: 5.4,
+          utilityStd: 3.4,
+          tokenCost: 2200,
+          dollarCost: parsedDollars || 90,
+          reachability: "irreversible",
+          reversalCostTokens: 0,
+          supportingHypothesisIds: ["hyp-work-latency-over-dollars"],
+          portfolioInteraction: parsedDollars >= 80 ? 0.15 : -0.9,
+          ...(parsedDollars === 0 ? { mutuallyExclusiveWith: ["opt-b"] } : {}),
+        },
+        {
+          id: "opt-b",
+          label: `Direction B (${tuple.operators[1]?.name || "Ambient"})`,
+          summary: `Alternative architecture for "${prompt.slice(0, 70)}" prioritizing calm legibility & invariants.`,
+          baseUtilityMean: 5.5,
+          utilityStd: 3.4,
+          tokenCost: 2200,
+          dollarCost: parsedDollars || 90,
+          reachability: "irreversible",
+          reversalCostTokens: 0,
+          supportingHypothesisIds: ["hyp-calm-zero-chrome"],
+          portfolioInteraction: parsedDollars >= 80 ? 0.15 : -0.9,
+          ...(parsedDollars === 0 ? { mutuallyExclusiveWith: ["opt-a"] } : {}),
+        },
+      ];
+    }
+
+    // 3. Default novel exploration: Ergodic (LRR === R) complementary experiments covered by Basal Energy!
+    // Counteracts LLM risk-aversion: both forks are fruitful and cheap to co-evolve.
+    return [
+      {
+        id: "opt-a",
+        label: `${tuple.operators[0]?.name || "Structural"} Experiment`,
+        summary: `Explore "${prompt.slice(0, 68)}" via ${tuple.operators[0]?.name || "Inversion"} × ${tuple.organons[0]?.name || "Matrix"} in an isolated ergodic branch.`,
+        baseUtilityMean: 4.2,
+        utilityStd: 0.9,
+        tokenCost: 1800,
+        dollarCost: 0,
+        reachability: "ergodic",
+        reversalCostTokens: 200,
+        supportingHypothesisIds: ["hyp-cofork-basal", "hyp-calm-zero-chrome"],
+        portfolioInteraction: 0.25,
+      },
+      {
+        id: "opt-b",
+        label: `${tuple.operators[1]?.name || "Counterfactual"} Experiment`,
+        summary: `Complementarily test "${prompt.slice(0, 68)}" along "${tuple.dimensions[0]?.question || "orthogonal assumption"}" so both discoveries compound.`,
+        baseUtilityMean: 3.9,
+        utilityStd: 0.95,
+        tokenCost: 1800,
+        dollarCost: 0,
+        reachability: "ergodic",
+        reversalCostTokens: 200,
+        supportingHypothesisIds: ["hyp-cofork-basal", "hyp-global-misc-repo"],
+        portfolioInteraction: 0.25,
+      },
+    ];
+  };
+
+  if (String(model).startsWith("offline-")) {
+    return {
+      candidates: buildFallbackCandidates(),
+      ideonomyTuple: tuple,
+      source: "deterministic-compiler",
+    };
+  }
+
+  try {
+    const hypList = activeHyps
+      .map((h) => `- ${h.id} (${h.scopeProjectId}, w=${h.weight}): ${h.statement}`)
+      .join("\n");
+    const raw = await callLlmResponses({
+      model,
+      instructions: `You compile novel situations into a 2-candidate decision tree JSON object for a calibrated autonomous compute engine.
+CRITICAL ANTI-PARALYSIS RULES:
+1. Do NOT be risk-averse! Most software, design, spec, and sandboxed/worktree actions are ERGODIC ("reachability": "ergodic"), meaning path LRR reaches the same state equivalence class as R up to tiny transition cost. Only use "irreversible" for true non-communicating sink commitments (deleting prod data, huge unrecoverable external spend).
+2. Two experiments are often BOTH fruitful ("portfolioInteraction": 0.1 to 0.35). Only use negative portfolioInteraction (-0.8) when two options are purely redundant ways to do the exact same thing.
+3. Baseline status-quo ∅ = 0. If options are actively bad or mismatched for the user, give negative baseUtilityMean so "Neither" wins.
+4. Output ONLY valid JSON matching: {"candidates":[{"id":"opt-a","label":"...","summary":"...","baseUtilityMean":4.2,"utilityStd":1.1,"tokenCost":1800,"dollarCost":0,"reachability":"ergodic","reversalCostTokens":200,"supportingHypothesisIds":["..."],"portfolioInteraction":0.2}]}`,
+      prompt: `Project context: ${projectId}
+Active User Model Hypotheses:
+${hypList}
+
+Ideonomy lens: ${tuple.tupleLabel}
+Situation / Intent: "${prompt}"`,
+    });
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      if (Array.isArray(parsed.candidates) && parsed.candidates.length >= 2) {
+        const sanitized = parsed.candidates.slice(0, 3).map((c, idx) => ({
+          id: c.id || `opt-${idx === 0 ? "a" : idx === 1 ? "b" : "c"}`,
+          label: String(c.label || `Option ${idx + 1}`).slice(0, 60),
+          summary: String(c.summary || "").slice(0, 220),
+          baseUtilityMean: Number.isFinite(Number(c.baseUtilityMean)) ? Number(c.baseUtilityMean) : 3.8,
+          utilityStd: Math.max(0.2, Number(c.utilityStd) || 1.1),
+          tokenCost: Math.max(100, Number(c.tokenCost) || 1600),
+          dollarCost: Math.max(0, Number(c.dollarCost) || 0),
+          reachability: c.reachability === "irreversible" ? "irreversible" : "ergodic",
+          reversalCostTokens: Math.max(0, Number(c.reversalCostTokens) || 150),
+          supportingHypothesisIds: Array.isArray(c.supportingHypothesisIds)
+            ? c.supportingHypothesisIds.filter((id) => activeHyps.some((h) => h.id === id))
+            : ["hyp-cofork-basal"],
+          portfolioInteraction: Math.max(-1, Math.min(0.5, Number(c.portfolioInteraction) || 0.2)),
+          ...(Array.isArray(c.mutuallyExclusiveWith) ? { mutuallyExclusiveWith: c.mutuallyExclusiveWith } : {}),
+        }));
+        return {
+          candidates: sanitized,
+          ideonomyTuple: tuple,
+          source: "llm-compiler",
+        };
+      }
+    }
+  } catch {
+    // Fall back cleanly
+  }
+
+  return {
+    candidates: buildFallbackCandidates(),
+    ideonomyTuple: tuple,
+    source: "deterministic-compiler",
+  };
+}
+
+/**
+ * Renders a neutral, unanchored Zero-Chrome Decision / Calibration Probe Surface.
+ * Crucially, it NEVER reveals the sealed pre-prediction BEFORE the human clicks,
+ * avoiding anchoring bias and false-dichotomy label corruption (supports {A}, {B}, {Both}, {Neither}).
+ */
+export function renderCompiledDecisionSurfaceHtml({
+  nodeId,
+  prompt,
+  candidates,
+  predictionId,
+  allowBoth = true,
+  resolvedReceipt = null,
+}) {
+  const esc = (s) =>
+    String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const a = candidates[0];
+  const b = candidates[1];
+  const bothIdsJson = JSON.stringify(candidates.map((c) => c.id)).replace(/"/g, "&quot;");
+
+  if (resolvedReceipt) {
+    return `<div style="font-family:'Inter',system-ui,sans-serif;padding:16px 18px;color:#e2e8f0;font-size:12.5px;line-height:1.55;">
+  <div style="font-size:11px;color:#6ee7b7;margin-bottom:6px;font-weight:500;">✓ Decision Recorded · User Model Updated</div>
+  <div style="font-size:13px;font-weight:600;color:#f8fafc;margin-bottom:8px;">${esc(prompt)}</div>
+  <div style="background:rgba(15,23,42,0.65);border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:10px 12px;font-size:11.5px;color:#cbd5e1;">
+    <div>Chosen subset: <strong style="color:#f8fafc;font-family:ui-monospace,monospace;">${esc(resolvedReceipt.chosenSubsetKey)}</strong></div>
+    <div style="margin-top:4px;color:#94a3b8;font-size:11px;">Sealed Audit: ${esc(resolvedReceipt.calibrationNote)}</div>
+  </div>
+</div>`;
+  }
+
+  return `<div style="font-family:'Inter',system-ui,sans-serif;padding:16px 18px;color:#e2e8f0;font-size:12px;line-height:1.5;display:flex;flex-direction:column;gap:12px;">
+  <div style="font-size:13px;font-weight:600;color:#f8fafc;line-height:1.4;">${esc(prompt)}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    ${candidates
+      .slice(0, 2)
+      .map(
+        (c) => `<div style="background:rgba(15,23,42,0.58);border:1px solid rgba(148,163,184,0.16);border-radius:9px;padding:10px 11px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;">
+      <div>
+        <div style="font-weight:600;color:#f1f5f9;font-size:11.5px;margin-bottom:3px;">${esc(c.label)}</div>
+        <div style="color:#94a3b8;font-size:11px;line-height:1.42;">${esc(c.summary)}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#64748b;font-family:ui-monospace,monospace;">
+        <span>${c.reachability === "ergodic" ? "↺ reversible" : "⚠ commitment"}</span>
+        <span>${c.dollarCost > 0 ? "$" + c.dollarCost : "basal"}</span>
+      </div>
+    </div>`,
+      )
+      .join("")}
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:2px;">
+    ${
+      allowBoth
+        ? `<button onclick="window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:${bothIdsJson}},'*')" style="flex:1.3;min-width:110px;padding:7px 10px;border-radius:7px;border:1px solid rgba(56,189,248,0.38);background:rgba(56,189,248,0.13);color:#e0f2fe;font-size:11px;font-weight:600;cursor:pointer;">✦ Both</button>`
+        : ""
+    }
+    ${
+      a
+        ? `<button onclick="window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:['${esc(a.id)}']},'*')" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.24);background:rgba(30,41,59,0.75);color:#f1f5f9;font-size:11px;font-weight:500;cursor:pointer;">${esc(a.label.split(" ")[0] || "Option A")}</button>`
+        : ""
+    }
+    ${
+      b
+        ? `<button onclick="window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:['${esc(b.id)}']},'*')" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.24);background:rgba(30,41,59,0.75);color:#f1f5f9;font-size:11px;font-weight:500;cursor:pointer;">${esc(b.label.split(" ")[0] || "Option B")}</button>`
+        : ""
+    }
+    <button onclick="window.parent.postMessage({type:'asterism:resolve-decision',nodeId:'${esc(nodeId)}',predictionId:'${esc(predictionId)}',chosenOptionIds:[]},'*')" style="padding:7px 10px;border-radius:7px;border:1px solid rgba(148,163,184,0.16);background:transparent;color:#94a3b8;font-size:11px;cursor:pointer;" title="Status quo (do neither)">∅ Neither</button>
+  </div>
+</div>`;
+}
+
+export function renderAutonomousBranchHtml({ candidate, prompt, ideonomyTuple, regimeLabel }) {
+  const esc = (s) =>
+    String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  const machinery = ideonomyTuple ? renderIdeonomyMachineryHtml(ideonomyTuple) : "";
+  return `<div style="font-family:'Inter',system-ui,sans-serif;padding:15px 17px;color:#e2e8f0;font-size:12px;line-height:1.55;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:10.5px;color:#64748b;">
+    <span>${esc(regimeLabel || "Auto-executed on behalf of operator")}</span>
+    <span style="font-family:ui-monospace,monospace;">${candidate.reachability === "ergodic" ? "↺ ergodic" : "committed"}</span>
+  </div>
+  <div style="color:#cbd5e1;margin-bottom:10px;">${esc(candidate.summary)}</div>
+  <div style="font-size:11px;color:#94a3b8;">Origin intent: <em>${esc(prompt)}</em></div>
+  ${machinery}
+</div>`;
+}
+
+
 

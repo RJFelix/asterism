@@ -23,6 +23,9 @@ import {
   pickIdeonomyTuple,
   getIdeonomyCatalogSummary,
   renderIdeonomyMachineryHtml,
+  compileDecisionTreeOnTheFly,
+  renderCompiledDecisionSurfaceHtml,
+  renderAutonomousBranchHtml,
 } from "./src/llm.mjs";
 import {
   makeSqliteEventSink,
@@ -41,6 +44,11 @@ import {
   allocateBasalFreeEnergy,
   shouldBranchForRegretMinimization,
   rankMatchmakerCandidates,
+  createDefaultUserModel,
+  evaluatePowerSetPolicy,
+  recordAutonomousActionOnUserModel,
+  scoreSealedPrediction,
+  computeEmpiricalCalibrationFactor,
 } from "@asterism/core";
 import { CodexProviderCapabilitiesV2 } from "@t3tools/provider-codex/server/adapter";
 import { ClaudeProviderCapabilitiesV2 } from "@t3tools/provider-claude/server/adapter";
@@ -143,7 +151,11 @@ export const EXTRACTED_PROVIDER_CATALOG = [
 export function loadState() {
   try {
     if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+      const parsed = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+      if (!parsed.userModel) {
+        parsed.userModel = createDefaultUserModel();
+      }
+      return parsed;
     }
   } catch {
     // Fall back to default state
@@ -835,6 +847,396 @@ export function createAsterismServer(options = {}) {
             relation: l.edge.relation || l.edge.kind || "jump",
             direction: l.direction,
           })),
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Testable Implicit User Model (`GET /api/user-model` & `POST /api/user-model/hypotheses`)
+    if (req.method === "GET" && url.pathname === "/api/user-model") {
+      canvasState.userModel = canvasState.userModel || createDefaultUserModel();
+      const calibration = computeEmpiricalCalibrationFactor(
+        canvasState.userModel.hypotheses,
+      );
+      return sendJson(res, 200, {
+        userModel: canvasState.userModel,
+        calibration,
+      });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/user-model/hypotheses") {
+      try {
+        canvasState.userModel = canvasState.userModel || createDefaultUserModel();
+        const body = await readJsonBody(req);
+        const now = new Date().toISOString();
+        let hypotheses = [...canvasState.userModel.hypotheses];
+
+        if (body.hypothesisId) {
+          hypotheses = hypotheses.map((h) => {
+            if (h.id !== body.hypothesisId) return h;
+            return {
+              ...h,
+              ...(typeof body.statement === "string" ? { statement: body.statement.trim() } : {}),
+              ...(body.status === "active" || body.status === "refuted" ? { status: body.status } : {}),
+              ...(body.polarity === "positive" || body.polarity === "negative" ? { polarity: body.polarity } : {}),
+              ...(typeof body.weight === "number" ? { weight: body.weight } : {}),
+              updatedAt: now,
+            };
+          });
+        } else if (typeof body.statement === "string" && body.statement.trim()) {
+          hypotheses.unshift({
+            id: `hyp-${Date.now().toString(36)}`,
+            statement: body.statement.trim(),
+            scopeProjectId: body.scopeProjectId || "global",
+            polarity: body.polarity === "negative" ? "negative" : "positive",
+            weight: typeof body.weight === "number" ? body.weight : 0.75,
+            confidence: 0.65,
+            empiricalHits: 0,
+            empiricalTrials: 0,
+            brierSum: 0,
+            usesSinceLastProbe: 3, // Untested hypothesis starts ripe for calibration spot-checking
+            status: "active",
+            updatedAt: now,
+          });
+        }
+
+        canvasState.userModel = {
+          ...canvasState.userModel,
+          hypotheses,
+        };
+        saveState(canvasState);
+        broadcastState();
+        return sendJson(res, 200, {
+          userModel: canvasState.userModel,
+          calibration: computeEmpiricalCalibrationFactor(hypotheses),
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Sovereign Compute On-the-Fly Decision Compiler (`POST /api/decisions/compile`)
+    // Compiles novel situations into a local candidate set A, evaluates the Power Set P(A)
+    // (including ∅ = "Neither" and multi-branch "Co-Fork / Both") against Basal Free Energy & Reachability,
+    // seals its pre-prediction first, and either acts silently OR surfaces a neutral Choice/Probe card.
+    if (req.method === "POST" && url.pathname === "/api/decisions/compile") {
+      try {
+        canvasState.userModel = canvasState.userModel || createDefaultUserModel();
+        const body = await readJsonBody(req);
+        const prompt =
+          String(body.prompt || "").trim() ||
+          "Explore two complementary directions for ambient zero-chrome UI";
+        const projectId =
+          body.projectId || canvasState.activeProjectId || "proj-misc-attic";
+        const altitudeScale =
+          typeof body.attentionalAltitudeScale === "number"
+            ? body.attentionalAltitudeScale
+            : canvasState.viewport?.scale || 0.88;
+        const baseX = typeof body.x === "number" ? body.x : 520;
+        const baseY = typeof body.y === "number" ? body.y : 380;
+
+        const compiled = await compileDecisionTreeOnTheFly({
+          prompt,
+          userModel: canvasState.userModel,
+          projectId,
+          model: body.model || DEFAULT_MODEL,
+        });
+
+        const decisionNodeId = `node-dec-${Date.now().toString(36)}`;
+        const policy = evaluatePowerSetPolicy({
+          prompt,
+          candidates: compiled.candidates,
+          userModel: canvasState.userModel,
+          projectId,
+          attentionalAltitudeScale: altitudeScale,
+          nodeId: decisionNodeId,
+        });
+
+        const effectiveRegime = body.forceProbe
+          ? "probe-calibration"
+          : policy.regime;
+
+        const sealedPrediction = {
+          ...policy.sealedPrediction,
+          regime: effectiveRegime,
+        };
+
+        const materializedNodes = [];
+        let decisionNode = null;
+
+        if (
+          effectiveRegime === "ask-regret" ||
+          effectiveRegime === "probe-calibration"
+        ) {
+          // Surface a neutral, unanchored Zero-Chrome Decision / Calibration Probe Card
+          const hasMutualExclusion = compiled.candidates.some(
+            (c) => Array.isArray(c.mutuallyExclusiveWith) && c.mutuallyExclusiveWith.length > 0,
+          );
+          const html = renderCompiledDecisionSurfaceHtml({
+            nodeId: decisionNodeId,
+            prompt,
+            candidates: compiled.candidates,
+            predictionId: sealedPrediction.id,
+            allowBoth: !hasMutualExclusion,
+          });
+          decisionNode = {
+            id: decisionNodeId,
+            title:
+              effectiveRegime === "probe-calibration"
+                ? prompt.slice(0, 56)
+                : prompt.slice(0, 56),
+            kind: "decision",
+            stage: "refine",
+            surfaceRole: "dialogue",
+            commitment: "speculative",
+            status: "ready",
+            x: baseX,
+            y: baseY,
+            width: 440,
+            height: 270,
+            model: body.model || DEFAULT_MODEL,
+            parentId: body.parentNodeId || undefined,
+            decisionMeta: {
+              predictionId: sealedPrediction.id,
+              regime: effectiveRegime,
+              prompt,
+              candidates: compiled.candidates,
+              resolved: false,
+            },
+            facets: { dialogue: html },
+            html,
+            energy: createDefaultEnergyEnvelope(),
+          };
+          canvasState.nodes.push(decisionNode);
+          if (body.parentNodeId) {
+            canvasState.edges.push({
+              id: `edge-dec-${Date.now().toString(36)}`,
+              from: body.parentNodeId,
+              to: decisionNode.id,
+              relation: "advances",
+              kind: "advances",
+              label: "elicits decision",
+            });
+          }
+          canvasState.userModel = {
+            ...canvasState.userModel,
+            sealedPredictions: [
+              sealedPrediction,
+              ...canvasState.userModel.sealedPredictions,
+            ].slice(0, 60),
+          };
+        } else {
+          // Act autonomously without interrupting the human! ("co-fork", "act-single", or "abstain-neither")
+          const chosenSet = new Set(policy.bestSubset.optionIds);
+          const chosenCandidates = compiled.candidates.filter((c) =>
+            chosenSet.has(c.id),
+          );
+          chosenCandidates.forEach((cand, idx) => {
+            const branchId = `node-auto-${Date.now().toString(36)}-${idx}`;
+            const regimeLabel =
+              effectiveRegime === "co-fork"
+                ? `✦ Co-Forked (${idx + 1}/${chosenCandidates.length})`
+                : "⚡ Auto-Committed";
+            const html = renderAutonomousBranchHtml({
+              candidate: cand,
+              prompt,
+              ideonomyTuple: compiled.ideonomyTuple,
+              regimeLabel,
+            });
+            const branchNode = {
+              id: branchId,
+              title: cand.label,
+              kind: "surface",
+              stage: "design",
+              surfaceRole: "ui-prototype",
+              commitment: "committed",
+              status: "committed",
+              x: baseX + idx * 425,
+              y: baseY,
+              width: 395,
+              height: 260,
+              model: body.model || DEFAULT_MODEL,
+              parentId: body.parentNodeId || undefined,
+              ideonomyTuple: {
+                operatorIds: compiled.ideonomyTuple.operatorIds,
+                organonIds: compiled.ideonomyTuple.organonIds,
+                dimensionIds: compiled.ideonomyTuple.dimensionIds,
+                tupleLabel: compiled.ideonomyTuple.tupleLabel,
+              },
+              autonomousReceipt: {
+                predictionId: sealedPrediction.id,
+                regime: effectiveRegime,
+                reachability: cand.reachability,
+              },
+              facets: { "ui-prototype": html },
+              html,
+              energy: createDefaultEnergyEnvelope(),
+            };
+            canvasState.nodes.push(branchNode);
+            materializedNodes.push(branchNode);
+            if (body.parentNodeId) {
+              canvasState.edges.push({
+                id: `edge-auto-${Date.now().toString(36)}-${idx}`,
+                from: body.parentNodeId,
+                to: branchNode.id,
+                relation: "forks",
+                kind: "forks",
+                label: regimeLabel,
+              });
+            }
+          });
+
+          canvasState.userModel = recordAutonomousActionOnUserModel(
+            canvasState.userModel,
+            sealedPrediction,
+          );
+        }
+
+        saveState(canvasState);
+        await recordDomainCommand(
+          "decision.compile",
+          decisionNode?.id || materializedNodes[0]?.id || "canvas-root",
+          `decision.${effectiveRegime}`,
+          {
+            predictionId: sealedPrediction.id,
+            regime: effectiveRegime,
+            predictedSubsetKey: sealedPrediction.predictedSubsetKey,
+            materializedNodeIds: materializedNodes.map((n) => n.id),
+          },
+          [],
+          body.commandId,
+        );
+        broadcastState();
+
+        return sendJson(res, 200, {
+          regime: effectiveRegime,
+          policy,
+          sealedPrediction,
+          candidates: compiled.candidates,
+          decisionNode,
+          materializedNodes,
+          userModel: canvasState.userModel,
+          state: canvasState,
+        });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
+
+    // Resolve a Surfaced Decision / Calibration Probe (`POST /api/decisions/resolve`)
+    // Scores the sealed pre-prediction via proper multi-subset Brier score, updates User Model
+    // hypotheses, and materializes the chosen subset ({A}, {B}, {Both}, or ∅ = Neither).
+    if (req.method === "POST" && url.pathname === "/api/decisions/resolve") {
+      try {
+        canvasState.userModel = canvasState.userModel || createDefaultUserModel();
+        const {
+          predictionId,
+          nodeId,
+          chosenOptionIds = [],
+          commandId,
+        } = await readJsonBody(req);
+
+        const scored = scoreSealedPrediction({
+          userModel: canvasState.userModel,
+          predictionId,
+          chosenOptionIds,
+        });
+        canvasState.userModel = scored.updatedUserModel;
+
+        const decNode = canvasState.nodes.find((n) => n.id === nodeId);
+        const spawnedNodes = [];
+
+        if (decNode && decNode.decisionMeta) {
+          decNode.decisionMeta.resolved = true;
+          decNode.decisionMeta.resolvedReceipt = scored.resolvedPrediction;
+          decNode.status = "committed";
+          decNode.commitment = "committed";
+          const updatedHtml = renderCompiledDecisionSurfaceHtml({
+            nodeId: decNode.id,
+            prompt: decNode.decisionMeta.prompt,
+            candidates: decNode.decisionMeta.candidates || [],
+            predictionId,
+            resolvedReceipt: scored.resolvedPrediction,
+          });
+          decNode.html = updatedHtml;
+          decNode.facets = { ...(decNode.facets || {}), dialogue: updatedHtml };
+          decNode.height = 195;
+
+          const chosenSet = new Set(chosenOptionIds);
+          const chosenCandidates = (decNode.decisionMeta.candidates || []).filter(
+            (c) => chosenSet.has(c.id),
+          );
+          const tuple = pickIdeonomyTuple({ mode: "plain" });
+
+          chosenCandidates.forEach((cand, idx) => {
+            const childId = `node-choice-${Date.now().toString(36)}-${idx}`;
+            const childHtml = renderAutonomousBranchHtml({
+              candidate: cand,
+              prompt: decNode.decisionMeta.prompt,
+              ideonomyTuple: tuple,
+              regimeLabel:
+                chosenCandidates.length >= 2
+                  ? `✦ Co-Forked (${idx + 1}/${chosenCandidates.length})`
+                  : "✓ Selected Path",
+            });
+            const childNode = {
+              id: childId,
+              title: cand.label,
+              kind: "surface",
+              stage: "design",
+              surfaceRole: "ui-prototype",
+              commitment: "committed",
+              status: "committed",
+              x: decNode.x + (idx - (chosenCandidates.length - 1) / 2) * 415,
+              y: decNode.y + 225,
+              width: 395,
+              height: 255,
+              model: decNode.model || DEFAULT_MODEL,
+              parentId: decNode.id,
+              facets: { "ui-prototype": childHtml },
+              html: childHtml,
+              energy: createDefaultEnergyEnvelope(),
+            };
+            canvasState.nodes.push(childNode);
+            spawnedNodes.push(childNode);
+            canvasState.edges.push({
+              id: `edge-choice-${Date.now().toString(36)}-${idx}`,
+              from: decNode.id,
+              to: childNode.id,
+              relation: "forks",
+              kind: "forks",
+              label: chosenCandidates.length >= 2 ? "✦ co-fork" : "→ chosen",
+            });
+          });
+        }
+
+        saveState(canvasState);
+        await recordDomainCommand(
+          "decision.resolve",
+          nodeId || predictionId,
+          "decision.sealed_prediction.scored",
+          {
+            predictionId,
+            chosenSubsetKey: scored.resolvedPrediction.chosenSubsetKey,
+            brierScore: scored.resolvedPrediction.brierScore,
+            accurate: scored.resolvedPrediction.accurate,
+            spawnedNodeIds: spawnedNodes.map((n) => n.id),
+          },
+          [],
+          commandId,
+        );
+        broadcastState();
+
+        return sendJson(res, 200, {
+          resolvedPrediction: scored.resolvedPrediction,
+          spawnedNodes,
+          userModel: canvasState.userModel,
+          calibration: computeEmpiricalCalibrationFactor(
+            canvasState.userModel.hypotheses,
+          ),
           state: canvasState,
         });
       } catch (err) {

@@ -1,3 +1,5 @@
+import { createDefaultUserModel } from "@asterism/core";
+
 export const INNOVATION_STAGES = [
   { id: "note", label: "1. Note", icon: "✎", color: "#94a3b8", next: "brainstorm", nextLabel: "Advance → Brainstorm" },
   { id: "brainstorm", label: "2. Brainstorm", icon: "⚡", color: "#c084fc", next: "refine", nextLabel: "Advance → Refine Spec" },
@@ -92,6 +94,7 @@ export function getDefaultCanvasState() {
     ],
     viewProjection: "canvas",
     plexFocusNodeId: "node-hydro",
+    userModel: createDefaultUserModel(),
     viewport: { x: 65, y: 55, scale: 0.88 },
     strokes: [],
     edges: [

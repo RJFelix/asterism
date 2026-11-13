@@ -320,11 +320,20 @@
       display: flex; align-items: center; gap: 4px; flex-shrink: 0;
     }
     .node-stage-pill {
+      display: none;
       font-family: ui-monospace, monospace; font-size: 8.5px; font-weight: 600;
       text-transform: uppercase; letter-spacing: 0.04em;
       padding: 2px 5px; border-radius: 4px;
       background: rgba(148, 163, 184, 0.1); color: #94a3b8;
       white-space: nowrap; flex-shrink: 0;
+    }
+    body.zoom-deep .node-stage-pill,
+    .canvas-node.is-focused .node-stage-pill {
+      display: inline-block;
+    }
+    .canvas-node.kind-decision {
+      border-top: 2px solid rgba(251, 191, 36, 0.78);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
     }
     .header-hover-actions {
       display: none; align-items: center; gap: 3px;
@@ -333,19 +342,12 @@
     .canvas-node.is-focused .header-hover-actions {
       display: flex;
     }
-    .model-select {
-      background: rgba(15, 23, 42, 0.8);
-      color: #94a3b8;
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 5px;
-      font-size: 9px;
-      font-family: ui-monospace, monospace;
-      padding: 2px 4px;
-      cursor: pointer;
-      outline: none;
-      max-width: 82px;
+    /* Hide Nov-2026 agent plumbing (model dropdown, 3x fork button, manual stage advance) from card chrome */
+    .model-select,
+    .mini-btn.spec-btn,
+    .mini-btn.advance-btn {
+      display: none !important;
     }
-    .model-select:hover { border-color: var(--accent-cyan); color: #f8fafc; }
     .mini-btn {
       background: rgba(15, 23, 42, 0.65);
       color: var(--text-muted);
@@ -364,33 +366,20 @@
     .canvas-node.kind-speculative .mini-btn.keep-btn {
       display: inline-block;
     }
-    .mini-btn.spec-btn {
-      color: #e9d5ff; border-color: rgba(168, 85, 247, 0.35);
-      background: rgba(168, 85, 247, 0.12);
-      font-weight: 500;
-    }
-    .mini-btn.advance-btn {
-      color: #6ee7b7; border-color: rgba(16, 185, 129, 0.35);
-      background: rgba(16, 185, 129, 0.12);
-      font-weight: 500;
-    }
 
-    /* Quiet Facet Strip (dims when card is at rest, full clarity on hover/focus) */
+    /* Zero-Chrome Default: Facet Strip hidden at rest; appears ONLY on explicit focus or deep zoom */
     .facet-tab-bar {
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: space-between;
       padding: 3px 10px;
-      background: rgba(15, 23, 42, 0.55);
-      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      background: rgba(15, 23, 42, 0.88);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
       gap: 4px;
-      opacity: 0.6;
-      transition: opacity 0.16s ease, background 0.16s ease;
     }
-    .canvas-node:hover .facet-tab-bar,
-    .canvas-node.is-focused .facet-tab-bar {
-      opacity: 1;
-      background: rgba(15, 23, 42, 0.9);
+    .canvas-node.is-focused:not(.kind-decision) .facet-tab-bar,
+    body.zoom-deep .canvas-node:not(.kind-decision) .facet-tab-bar {
+      display: flex;
     }
     .facet-tabs {
       display: flex; align-items: center; gap: 3px;
@@ -434,7 +423,7 @@
       color: #e2e8f0;
     }
 
-    /* Worktree Bar (only on implement/code nodes when hovered or focused) */
+    /* Worktree Bar (only on explicit focus or deep zoom on code/implement nodes) */
     .worktree-bar {
       display: none;
       align-items: center;
@@ -447,10 +436,9 @@
       font-size: 9.5px;
       color: #6ee7b7;
     }
-    .canvas-node.stage-implement:hover .worktree-bar,
     .canvas-node.stage-implement.is-focused .worktree-bar,
-    .canvas-node.role-artifact-harness:hover .worktree-bar,
-    .canvas-node.role-artifact-harness.is-focused .worktree-bar {
+    .canvas-node.role-artifact-harness.is-focused .worktree-bar,
+    body.zoom-deep .canvas-node.role-artifact-harness .worktree-bar {
       display: flex;
     }
     .wt-meta {
@@ -522,7 +510,7 @@
     .canvas-node.viewing-diff .node-iframe { display: none; }
     .canvas-node.viewing-diff .node-diff-inspector { display: block; }
 
-    /* Progressive-Disclosure Node Footer (Collapsed at Rest, Expands on Hover/Focus) */
+    /* Zero-Chrome Node Footer (Hidden at rest & hover; expands ONLY on explicit focus) */
     .node-footer {
       display: flex; align-items: center; gap: 5px;
       padding: 0 10px;
@@ -531,9 +519,8 @@
       border-top: 1px solid transparent;
       transition: max-height 0.16s ease, opacity 0.14s ease, padding 0.16s ease, border-color 0.16s ease;
     }
-    .canvas-node:hover .node-footer,
-    .canvas-node.is-focused .node-footer,
-    .canvas-node:focus-within .node-footer {
+    .canvas-node.is-focused:not(.kind-decision) .node-footer,
+    .canvas-node:not(.kind-decision):focus-within .node-footer {
       max-height: 44px; opacity: 1; padding: 6px 10px;
       pointer-events: auto;
       border-top-color: rgba(148, 163, 184, 0.12);
@@ -689,11 +676,13 @@
       overflow: hidden;
     }
     body.view-table #table-view-overlay,
-    body.view-timeline #timeline-view-overlay {
+    body.view-timeline #timeline-view-overlay,
+    body.view-model #model-view-overlay {
       display: flex;
     }
     body.view-table #canvas-viewport,
-    body.view-timeline #canvas-viewport {
+    body.view-timeline #canvas-viewport,
+    body.view-model #canvas-viewport {
       opacity: 0.12;
       pointer-events: none;
     }
@@ -731,28 +720,29 @@
 </head>
 <body>
   <header class="hud-topbar">
-    <div class="brand" title="Asterism • Feature Tender Healthy (0 drift) • Basal Floor 2.4k tok/tick">
+    <div class="brand" title="Asterism • Sovereign Compute & Calibrated Regret Engine">
       <span class="brand-star">✦</span>
       <span>Asterism</span>
       <span class="brand-health-dot" id="brand-health-dot"></span>
     </div>
 
-    <button class="project-pill-btn" id="btn-project-pill" onclick="cycleOrPromptProject()" title="Global Workspace Project (defaults to 'agent-attic (misc)' so development never blocks waiting for a repo)">
+    <button class="project-pill-btn" id="btn-project-pill" onclick="cycleOrPromptProject()" title="Global Workspace Project & Economic Context">
       <span style="opacity:0.75;">📁</span>
       <span id="project-pill-label">agent-attic (misc)</span>
     </button>
 
-    <div class="ideabox-wrap" title="Drop a seed idea to generate 3 Ideonomy branches + 1 Matchmaker synthesis in the Shadow Graph">
-      <span style="font-size:11.5px;opacity:0.8;">🌱</span>
-      <input id="ideabox-input" class="ideabox-input" type="text" placeholder="Drop a seed idea... (Enter)" />
-      <button class="ideabox-btn" onclick="submitIdeaBoxSeed()">Seed</button>
+    <div class="ideabox-wrap" title="State an intent or dilemma: Sovereign Compute compiles a power-set decision tree on-the-fly, auto-acts (Co-Fork / Single / Neither) under basal energy, or surfaces a Choice/Probe only when warranted">
+      <span style="font-size:11.5px;opacity:0.8;">⚡</span>
+      <input id="ideabox-input" class="ideabox-input" type="text" placeholder="State an intent or question... (Enter)" />
+      <button class="ideabox-btn" onclick="compileAutonomousIntent()">Act</button>
     </div>
 
     <div class="mode-segmented" id="view-switcher" role="group" aria-label="Graph View Projection">
-      <button class="seg-btn active" id="view-canvas" onclick="setViewProjection('canvas')" title="Freeform 2D Spatial Canvas">Canvas</button>
-      <button class="seg-btn" id="view-plex" onclick="setViewProjection('plex')" title="TheBrain-Style Focus-and-Context Plex (Parents Up, Children Down, Lateral Links Left/Right)">Plex</button>
+      <button class="seg-btn active" id="view-canvas" onclick="setViewProjection('canvas')" title="Calm Zero-Chrome Spatial Canvas">Canvas</button>
+      <button class="seg-btn" id="view-plex" onclick="setViewProjection('plex')" title="TheBrain-Style Focus-and-Context Plex">Plex</button>
       <button class="seg-btn" id="view-table" onclick="setViewProjection('table')" title="Structured Organon Table Projection">Table</button>
       <button class="seg-btn" id="view-timeline" onclick="setViewProjection('timeline')" title="Chronological Lineage & Revision Timeline">Timeline</button>
+      <button class="seg-btn" id="view-model" onclick="setViewProjection('model')" title="Testable Implicit User Model, Brier Calibration & Sealed Predictions">Model</button>
     </div>
 
     <div class="mode-segmented" id="tool-switcher" role="group" aria-label="Canvas Tool">
@@ -769,15 +759,18 @@
     <div class="topbar-right">
       <button class="attn-pill-btn" id="btn-attention-broker" onclick="toggleAttentionBroker()" title="Open EVOI Attention Queue & Staged Shadow Branches">
         <span class="attn-dot"></span>
-        <span id="attn-pill-label">Queue (3)</span>
+        <span id="attn-pill-label">Queue</span>
       </button>
 
-      <span class="zoom-readout" id="zoom-label" onclick="resetViewportZoom()" title="Click to reset zoom">88%</span>
+      <span class="zoom-readout" id="zoom-label" onclick="resetViewportZoom()" title="Zoom altitude (zoom in >=112% for deep spec/code lenses)">88%</span>
 
       <div class="workspace-menu-wrap">
         <button class="icon-btn" id="btn-workspace-menu" onclick="toggleWorkspaceMenu(event)" title="Workspace Actions">⋯</button>
         <div class="workspace-dropdown" id="workspace-dropdown" hidden>
+          <button onclick="compileAutonomousIntent(undefined, true); closeWorkspaceMenu();">🎯 Run Calibration Spot-Check Probe</button>
+          <button onclick="submitIdeaBoxSeed(); closeWorkspaceMenu();">🌱 Seed 4 Shadow-Graph Branches</button>
           <button onclick="createNewSurface(); closeWorkspaceMenu();">＋ New Blank Card</button>
+          <hr />
           <button onclick="openComparisonMatrix(); closeWorkspaceMenu();">⊞ Compare Forks Side-by-Side</button>
           <button onclick="synthesizeSelectedOrKept(); closeWorkspaceMenu();">⊕ Synthesize Forks</button>
           <button onclick="promptAddProject(); closeWorkspaceMenu();">📁 Switch / Add Project Repo...</button>
@@ -803,10 +796,9 @@
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
       <div>
         <strong style="color:#f1f5f9;font-size:13px;">⊞ Organon Table Projection</strong>
-        <span style="color:#64748b;font-size:11px;margin-left:8px;">All thoughts, warrants, energy envelopes, and Ideonomy tuples in one relational grid</span>
+        <span id="table-view-subtitle" style="color:#64748b;font-size:11px;margin-left:8px;">All thoughts, warrants, energy envelopes, and Ideonomy tuples</span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <input id="table-filter-input" type="text" placeholder="Filter by title, stage, or operator..." oninput="renderProjectionViews()" style="background:rgba(30,41,59,0.8);border:1px solid rgba(148,163,184,0.22);border-radius:6px;padding:4px 9px;color:#f8fafc;font-size:11px;width:220px;outline:none;" />
         <button class="tool-btn synth-btn" onclick="synthesizeSelectedOrKept()">⊕ Synthesize Checked</button>
         <button class="tool-btn" onclick="setViewProjection('canvas')">Back to Canvas</button>
       </div>
@@ -834,11 +826,41 @@
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
       <div>
         <strong style="color:#f1f5f9;font-size:13px;">⏱ Lineage &amp; Evergreen Revision Timeline</strong>
-        <span style="color:#64748b;font-size:11px;margin-left:8px;">Ordered by Innovation Train stage progression &amp; regret-free revision branches</span>
+        <span style="color:#64748b;font-size:11px;margin-left:8px;">Ordered by progression &amp; regret-free revision branches</span>
       </div>
       <button class="tool-btn" onclick="setViewProjection('canvas')">Back to Canvas</button>
     </div>
     <div id="timeline-view-body" style="flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <div id="model-view-overlay" class="projection-overlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.96);border-bottom:1px solid rgba(148,163,184,0.16);">
+      <div>
+        <strong style="color:#f1f5f9;font-size:13px;">🧠 Testable Implicit User Model &amp; Sealed Prediction Ledger</strong>
+        <span id="model-calibration-summary" style="color:#38bdf8;font-size:11px;margin-left:10px;font-family:ui-monospace,monospace;">Calibrating...</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="tool-btn" onclick="compileAutonomousIntent(undefined, true); setViewProjection('canvas');" title="Surface an unanchored choice card to empirically spot-check a hypothesis">🎯 Spot-Check Probe</button>
+        <button class="tool-btn" onclick="setViewProjection('canvas')">Back to Canvas</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow:auto;padding:16px 20px;display:grid;grid-template-columns:1.25fr 1fr;gap:18px;align-content:start;">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:#e2e8f0;font-size:12px;">Falsifiable Preference Hypotheses</strong>
+          <div style="display:flex;gap:6px;">
+            <input id="new-hyp-input" type="text" placeholder="Add explicit preference hypothesis..." style="background:rgba(30,41,59,0.8);border:1px solid rgba(148,163,184,0.22);border-radius:6px;padding:4px 8px;color:#f8fafc;font-size:11px;width:240px;outline:none;" />
+            <button class="mini-btn" onclick="addNewHypothesisFromUI()">＋ Add</button>
+          </div>
+        </div>
+        <div id="model-hypotheses-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <strong style="color:#e2e8f0;font-size:12px;">Context Economic Profiles &amp; Sealed Pre-Prediction Audit</strong>
+        <div id="model-profiles-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+        <div id="model-predictions-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    </div>
   </div>
 
   <div id="attention-drawer">
@@ -1001,7 +1023,7 @@
 
     async function setViewProjection(nextView, targetFocusNodeId) {
       state.viewProjection = nextView;
-      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline');
+      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline', 'view-model');
       document.body.classList.add('view-' + nextView);
       document.querySelectorAll('#view-switcher .seg-btn').forEach(b => b.classList.remove('active'));
       const btn = document.getElementById('view-' + nextView);
@@ -1079,6 +1101,7 @@
       const { x, y, scale } = state.viewport;
       worldEl.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
       zoomLabel.textContent = `${Math.round(scale * 100)}%`;
+      document.body.classList.toggle('zoom-deep', scale >= 1.12);
     }
 
     function screenToWorld(clientX, clientY) {
@@ -2144,8 +2167,84 @@
         toggleAttentionBroker(true);
       } else if (msg.type === 'asterism:ideabox-seed') {
         submitIdeaBoxSeed(msg.seedPrompt);
+      } else if (msg.type === 'asterism:resolve-decision') {
+        resolveSurfacedDecision(msg.nodeId, msg.predictionId, msg.chosenOptionIds || []);
       }
     });
+
+    async function compileAutonomousIntent(customPrompt, forceProbe = false) {
+      const inputEl = document.getElementById('ideabox-input');
+      const prompt = (customPrompt || inputEl?.value || '').trim() ||
+        'Explore complementary approaches to predictive zero-chrome surfaces';
+      if (inputEl && !customPrompt) inputEl.value = '';
+
+      const center = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+      showToast(
+        forceProbe
+          ? '🎯 Compiling Calibration Spot-Check Probe with sealed pre-prediction...'
+          : '⚡ Compiling local decision structure & evaluating power-set regret...',
+        14000
+      );
+      const res = await fetch('/api/decisions/compile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          forceProbe,
+          attentionalAltitudeScale: state.viewport?.scale || 0.88,
+          parentNodeId: focusedNodeId || undefined,
+          x: Math.round(center.x - 210),
+          y: Math.round(center.y - 110)
+        })
+      });
+      const data = await res.json();
+      if (data.regime === 'co-fork') {
+        showToast(`✦ Co-Forked ${data.materializedNodes?.length || 2} complementary paths automatically under Basal Energy.`);
+      } else if (data.regime === 'act-single') {
+        showToast(`⚡ Auto-committed "${data.materializedNodes?.[0]?.title || 'path'}" (expected regret below interruption threshold).`);
+      } else if (data.regime === 'abstain-neither') {
+        showToast(`∅ Auto-abstained (status-quo outperformed negative-utility options).`);
+      } else if (data.regime === 'probe-calibration') {
+        showToast(`🎯 Surfaced unanchored choice to spot-check User Model calibration.`);
+      } else if (data.regime === 'ask-regret') {
+        showToast(`Surfaced high-regret decision (${data.policy?.expectedRegretOfActing} > ask threshold ${data.policy?.effectiveAskCost}).`);
+      }
+    }
+
+    async function resolveSurfacedDecision(nodeId, predictionId, chosenOptionIds) {
+      const res = await fetch('/api/decisions/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId, predictionId, chosenOptionIds })
+      });
+      const data = await res.json();
+      if (data.resolvedPrediction) {
+        showToast(`✓ ${data.resolvedPrediction.calibrationNote}`, 9000);
+      }
+    }
+
+    async function toggleHypothesisStatus(hypothesisId, currentStatus) {
+      const nextStatus = currentStatus === 'active' ? 'refuted' : 'active';
+      await fetch('/api/user-model/hypotheses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hypothesisId, status: nextStatus })
+      });
+      showToast(nextStatus === 'refuted' ? 'Refuted hypothesis in User Model.' : 'Restored hypothesis in User Model.');
+    }
+
+    async function addNewHypothesisFromUI() {
+      const inp = document.getElementById('new-hyp-input');
+      const statement = inp?.value?.trim();
+      if (!statement) return;
+      inp.value = '';
+      await fetch('/api/user-model/hypotheses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statement, scopeProjectId: state.activeProjectId || 'global' })
+      });
+      showToast('Added falsifiable preference hypothesis (scheduled for calibration spot-checking).');
+    }
 
     async function submitIdeaBoxSeed(customPrompt) {
       const inputEl = document.getElementById('ideabox-input');
@@ -2234,7 +2333,7 @@
       const shadowNodes = state.nodes.filter(n => n.shadowStaged);
 
       const ranked = state.nodes
-        .filter(n => n.shadowStaged || n.kind === 'speculative' || n.askDefault || typeof n.jevScore === 'number')
+        .filter(n => n.shadowStaged || n.kind === 'speculative' || n.kind === 'decision' || n.askDefault || typeof n.jevScore === 'number')
         .map(n => ({
           node: n,
           evoi: computeClientEVOI(n),
@@ -2254,7 +2353,7 @@
       const listEl = document.getElementById('attention-list');
       if (!listEl) return;
       if (ranked.length === 0) {
-        listEl.innerHTML = `<div style="color:#64748b;font-size:11.5px;padding:10px;">No pending items. Drop a seed idea in the top bar to explore.</div>`;
+        listEl.innerHTML = `<div style="color:#64748b;font-size:11.5px;padding:10px;">No pending items. State an intent in the top bar to act.</div>`;
         return;
       }
 
@@ -2287,7 +2386,7 @@
     const ideaboxInputEl = document.getElementById('ideabox-input');
     if (ideaboxInputEl) {
       ideaboxInputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') submitIdeaBoxSeed();
+        if (e.key === 'Enter') compileAutonomousIntent();
       });
     }
 
@@ -2417,7 +2516,7 @@
 
       // 2. Sync View Switcher & Plex Focus Banner
       const viewProj = state.viewProjection || 'canvas';
-      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline');
+      document.body.classList.remove('view-canvas', 'view-plex', 'view-table', 'view-timeline', 'view-model');
       document.body.classList.add('view-' + viewProj);
       document.querySelectorAll('#view-switcher .seg-btn').forEach(b => b.classList.remove('active'));
       const activeViewBtn = document.getElementById('view-' + viewProj);
@@ -2452,7 +2551,7 @@
                 <div style="font-weight:600;color:#f8fafc;">${n.title}</div>
                 <div style="font-size:10.5px;color:#64748b;margin-top:2px;">${n.id}${n.shadowStaged ? ' · 🌑 Shadow Staged' : ''}</div>
               </td>
-              <td><span class="node-stage-pill">${(n.stage || 'note').toUpperCase()}</span></td>
+              <td><span class="node-stage-pill" style="display:inline-block;">${(n.stage || 'note').toUpperCase()}</span></td>
               <td style="font-family:ui-monospace,monospace;font-size:11px;color:#cbd5e1;">${role}</td>
               <td style="font-family:ui-monospace,monospace;font-size:11px;color:${verdict === 'pass' ? '#6ee7b7' : '#38bdf8'};">${verdict} · ${pScore}</td>
               <td style="font-family:ui-monospace,monospace;font-size:11px;color:#94a3b8;">${tokens} tok</td>
@@ -2489,7 +2588,7 @@
               <div class="timeline-card">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                   <div>
-                    <span class="node-stage-pill" style="margin-right:6px;">${(n.stage || 'note').toUpperCase()}</span>
+                    <span class="node-stage-pill" style="display:inline-block;margin-right:6px;">${(n.stage || 'note').toUpperCase()}</span>
                     <strong style="color:#f8fafc;font-size:13px;">${n.title}</strong>
                     ${n.shadowStaged ? '<span style="margin-left:6px;color:#fde68a;font-size:10.5px;">🌑 Shadow Staged</span>' : ''}
                   </div>
@@ -2508,6 +2607,84 @@
             </div>
           `;
         }).join('');
+      }
+
+      // 5. Populate Testable Implicit User Model & Sealed Prediction Ledger
+      const um = state.userModel;
+      const hypListEl = document.getElementById('model-hypotheses-list');
+      const profListEl = document.getElementById('model-profiles-list');
+      const predListEl = document.getElementById('model-predictions-list');
+      const calSummaryEl = document.getElementById('model-calibration-summary');
+      if (um && hypListEl) {
+        const hyps = um.hypotheses || [];
+        const activeHyps = hyps.filter(h => h.status === 'active');
+        const totalTrials = activeHyps.reduce((s, h) => s + (h.empiricalTrials || 0), 0);
+        const totalHits = activeHyps.reduce((s, h) => s + (h.empiricalHits || 0), 0);
+        const totalBrier = activeHyps.reduce((s, h) => s + (h.brierSum || 0), 0);
+        const meanBrier = totalTrials > 0 ? (totalBrier / totalTrials).toFixed(3) : '0.250';
+        const hitPct = totalTrials > 0 ? Math.round((totalHits / totalTrials) * 100) : 0;
+
+        if (calSummaryEl) {
+          calSummaryEl.textContent = `${totalHits}/${totalTrials} empirical hits (${hitPct}%) · Mean Brier ${meanBrier} · ${(um.sealedPredictions || []).length} sealed receipts`;
+        }
+
+        hypListEl.innerHTML = hyps.map(h => {
+          const hBrier = h.empiricalTrials > 0 ? (h.brierSum / h.empiricalTrials).toFixed(2) : 'untested';
+          const isRefuted = h.status === 'refuted';
+          return `
+            <div style="background:rgba(15,23,42,0.72);border:1px solid ${isRefuted ? 'rgba(239,68,68,0.28)' : 'rgba(148,163,184,0.16)'};border-radius:9px;padding:10px 12px;opacity:${isRefuted ? '0.55' : '1'};">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                <div style="font-size:12px;color:#f1f5f9;line-height:1.45;${isRefuted ? 'text-decoration:line-through;' : ''}">${h.statement}</div>
+                <button class="mini-btn" onclick="toggleHypothesisStatus('${h.id}', '${h.status}')">${isRefuted ? '↺ Restore' : '✕ Refute'}</button>
+              </div>
+              <div style="margin-top:6px;display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:#94a3b8;font-family:ui-monospace,monospace;">
+                <span>scope: <strong style="color:#38bdf8;">${h.scopeProjectId}</strong></span>
+                <span>hits: <strong style="color:#6ee7b7;">${h.empiricalHits}/${h.empiricalTrials}</strong></span>
+                <span>Brier: <strong>${hBrier}</strong></span>
+                <span>auto-uses since probe: <strong style="color:${h.usesSinceLastProbe >= 4 ? '#fde68a' : '#cbd5e1'};">${h.usesSinceLastProbe}</strong></span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        if (profListEl) {
+          const profiles = Object.values(um.economicProfiles || {});
+          profListEl.innerHTML = profiles.map(p => `
+            <div style="background:rgba(15,23,42,0.68);border:1px solid ${p.projectId === state.activeProjectId ? 'rgba(56,189,248,0.4)' : 'rgba(148,163,184,0.14)'};border-radius:9px;padding:9px 11px;font-size:11px;color:#cbd5e1;">
+              <div style="font-weight:600;color:#f8fafc;margin-bottom:4px;">${p.label}</div>
+              <div style="font-family:ui-monospace,monospace;font-size:10px;color:#94a3b8;display:grid;gap:2px;">
+                <span>Basal Floor: <strong style="color:#6ee7b7;">${p.basalFreeTokens} tok</strong></span>
+                <span>$ Weight: <strong>${p.dollarCostWeight}/$1</strong></span>
+                <span>Ask / Wait Cost: <strong>${p.askInterruptionCost} / ${p.waitLatencyCost}</strong></span>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        if (predListEl) {
+          const preds = (um.sealedPredictions || []).slice(0, 8);
+          predListEl.innerHTML = preds.length === 0
+            ? `<div style="color:#64748b;font-size:11.5px;padding:10px;background:rgba(15,23,42,0.5);border-radius:8px;">No sealed predictions recorded yet. State an intent in the top bar or run a Spot-Check Probe.</div>`
+            : preds.map(pr => {
+                const topProb = Math.round((pr.subsetProbabilities?.[pr.predictedSubsetKey] || 0) * 100);
+                const statusBadge = pr.resolvedAt
+                  ? `<span style="color:${pr.accurate ? '#6ee7b7' : '#fca5a5'};">${pr.accurate ? '✓ Hit' : '↺ Drift Updated'} · Brier ${pr.brierScore}</span>`
+                  : `<span style="color:#fde68a;">Sealed (${pr.regime})</span>`;
+                return `
+                  <div style="background:rgba(15,23,42,0.65);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:9px 11px;font-size:11px;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;color:#f1f5f9;font-weight:500;">
+                      <span>${pr.prompt.slice(0, 62)}</span>
+                      <span style="font-family:ui-monospace,monospace;font-size:10px;">${statusBadge}</span>
+                    </div>
+                    <div style="margin-top:4px;font-family:ui-monospace,monospace;font-size:10px;color:#94a3b8;">
+                      Pre-predicted: <strong style="color:#38bdf8;">${pr.predictedSubsetKey} (${topProb}%)</strong>
+                      ${pr.chosenSubsetKey ? ` · Chosen: <strong style="color:#f8fafc;">${pr.chosenSubsetKey}</strong>` : ''}
+                      · R_act=${pr.expectedRegretOfActing} · V_cal=${pr.calibrationValue}
+                    </div>
+                  </div>
+                `;
+              }).join('');
+        }
       }
     }
 
