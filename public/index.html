@@ -1387,12 +1387,40 @@
       }
     }
 
+    function getRenderedNodeRect(node) {
+      const isConstellation = document.body.classList.contains('zoom-constellation');
+      const escapedId = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+        ? CSS.escape(String(node.id))
+        : String(node.id).replace(/(["\\])/g, '\\$1');
+      const cardEl = nodesLayer ? nodesLayer.querySelector(`.canvas-node[data-id="${escapedId}"]`) : null;
+      let width = (cardEl && cardEl.offsetWidth > 0) ? cardEl.offsetWidth : (node.width || 360);
+      let height = isConstellation
+        ? ((cardEl && cardEl.offsetHeight > 0) ? cardEl.offsetHeight : 52)
+        : ((cardEl && cardEl.offsetHeight > 0) ? cardEl.offsetHeight : (node.height || 220));
+      let x = node.x;
+      let y = node.y;
+      if (cardEl && cardEl.classList.contains('plex-distant')) {
+        const insetX = width * 0.02;
+        const insetY = height * 0.02;
+        x += insetX;
+        y += insetY;
+        width *= 0.96;
+        height *= 0.96;
+      }
+      return { x, y, width, height };
+    }
+
     function applyTransform() {
       const { x, y, scale } = state.viewport;
+      const wasConstellation = document.body.classList.contains('zoom-constellation');
+      const isConstellation = scale < 0.60;
       worldEl.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
       zoomLabel.textContent = `${Math.round(scale * 100)}%`;
       document.body.classList.toggle('zoom-deep', scale >= 1.12);
-      document.body.classList.toggle('zoom-constellation', scale < 0.60);
+      document.body.classList.toggle('zoom-constellation', isConstellation);
+      if (wasConstellation !== isConstellation) {
+        renderEdges();
+      }
     }
 
     function screenToWorld(clientX, clientY) {
@@ -1451,26 +1479,43 @@
         const to = state.nodes.find(n => n.id === edge.to);
         if (!from || !to || from.shadowStaged || to.shadowStaged) continue;
 
+        const fromBox = getRenderedNodeRect(from);
+        const toBox = getRenderedNodeRect(to);
+        const gapX = toBox.x > fromBox.x + fromBox.width
+          ? toBox.x - (fromBox.x + fromBox.width)
+          : (fromBox.x > toBox.x + toBox.width ? fromBox.x - (toBox.x + toBox.width) : 0);
+        const gapY = toBox.y > fromBox.y + fromBox.height
+          ? toBox.y - (fromBox.y + fromBox.height)
+          : (fromBox.y > toBox.y + toBox.height ? fromBox.y - (toBox.y + toBox.height) : 0);
+        const fromCx = fromBox.x + fromBox.width / 2;
+        const fromCy = fromBox.y + fromBox.height / 2;
+        const toCx = toBox.x + toBox.width / 2;
+        const toCy = toBox.y + toBox.height / 2;
+        const preferVertical = gapY > gapX || (
+          gapX === 0 && gapY === 0 &&
+          Math.abs(toCy - fromCy) / Math.max(1, fromBox.height) > Math.abs(toCx - fromCx) / Math.max(1, fromBox.width)
+        );
+
         let x1, y1, x2, y2, d;
-        if (to.y >= from.y + from.height - 20) {
-          x1 = from.x + from.width / 2; y1 = from.y + from.height;
-          x2 = to.x + to.width / 2; y2 = to.y;
-          const dy = Math.max(50, Math.abs(y2 - y1) * 0.45);
+        if (preferVertical && toCy >= fromCy) {
+          x1 = fromCx; y1 = fromBox.y + fromBox.height;
+          x2 = toCx; y2 = toBox.y;
+          const dy = Math.max(44, Math.abs(y2 - y1) * 0.45);
           d = `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
-        } else if (to.y + to.height <= from.y + 20) {
-          x1 = from.x + from.width / 2; y1 = from.y;
-          x2 = to.x + to.width / 2; y2 = to.y + to.height;
-          const dy = Math.max(50, Math.abs(y2 - y1) * 0.45);
+        } else if (preferVertical) {
+          x1 = fromCx; y1 = fromBox.y;
+          x2 = toCx; y2 = toBox.y + toBox.height;
+          const dy = Math.max(44, Math.abs(y2 - y1) * 0.45);
           d = `M ${x1} ${y1} C ${x1} ${y1 - dy}, ${x2} ${y2 + dy}, ${x2} ${y2}`;
-        } else if (to.x >= from.x) {
-          x1 = from.x + from.width; y1 = from.y + from.height / 2;
-          x2 = to.x; y2 = to.y + to.height / 2;
-          const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
+        } else if (toCx >= fromCx) {
+          x1 = fromBox.x + fromBox.width; y1 = fromCy;
+          x2 = toBox.x; y2 = toCy;
+          const dx = Math.max(52, Math.abs(x2 - x1) * 0.45);
           d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
         } else {
-          x1 = from.x; y1 = from.y + from.height / 2;
-          x2 = to.x + to.width; y2 = to.y + to.height / 2;
-          const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
+          x1 = fromBox.x; y1 = fromCy;
+          x2 = toBox.x + toBox.width; y2 = toCy;
+          const dx = Math.max(52, Math.abs(x2 - x1) * 0.45);
           d = `M ${x1} ${y1} C ${x1 - dx} ${y1}, ${x2 + dx} ${y2}, ${x2} ${y2}`;
         }
 
@@ -2179,8 +2224,9 @@
           try { header.setPointerCapture?.(e.pointerId); } catch {}
           const tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
           tempLine.setAttribute('class', 'connect-temp-line');
-          const sx = sourceNode.x + sourceNode.width / 2;
-          const sy = sourceNode.y + sourceNode.height / 2;
+          const sourceBox = getRenderedNodeRect(sourceNode);
+          const sx = sourceBox.x + sourceBox.width / 2;
+          const sy = sourceBox.y + sourceBox.height / 2;
           tempLine.setAttribute('x1', String(sx)); tempLine.setAttribute('y1', String(sy));
           tempLine.setAttribute('x2', String(sx)); tempLine.setAttribute('y2', String(sy));
           edgesGroup.appendChild(tempLine);
