@@ -113,8 +113,9 @@ export function createT3Bridge({
   baseDir = T3_BASE_DIR,
   t3Bin = T3_BIN,
   disabled = false,
+  authFile = null,
 } = {}) {
-  const tokenCachePath = stateDir ? path.join(stateDir, "t3-mcp-auth.json") : null;
+  const tokenCachePath = authFile || (stateDir ? path.join(stateDir, "t3-mcp-auth.json") : null);
   let memoryToken = null;
   let capabilitiesCache = { expiresAt: 0, value: null };
 
@@ -397,21 +398,34 @@ export function createT3Bridge({
     }
   }
 
-  async function resolveT3ProjectId(callTool, repoPath) {
-    const target = path.resolve(repoPath || "/home/exedev/agent-attic/repos/asterism");
+  async function resolveT3ProjectId(callTool, repoPath, { preferSuperrepo = true } = {}) {
+    const target = path.resolve(repoPath || "/home/exedev/agent-attic");
     const projPage = await callTool("t3_project_list", { limit: 100 });
-    const projects = projPage?.projects || [];
+    const projects = (projPage?.projects || []).filter((p) => !p.deletedAt && !p.archivedAt);
+
+    // Filter projects whose workspaceRoot contains `target`
+    const containing = projects.filter((p) => {
+      if (!p.workspaceRoot) return false;
+      const rel = path.relative(path.resolve(p.workspaceRoot), target);
+      return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+    });
+
+    if (preferSuperrepo && containing.length > 0) {
+      // Anchor on the outermost superrepo (e.g. /home/exedev/agent-attic) so agents inherit
+      // superrepo AGENTS.md + shared knowledge/ and can move across sibling projects & Asterism itself.
+      const outermost = [...containing].sort(
+        (a, b) => a.workspaceRoot.length - b.workspaceRoot.length,
+      )[0];
+      if (outermost) return outermost.id;
+    }
+
     const exact = projects.find((p) => path.resolve(p.workspaceRoot || "") === target);
     if (exact) return exact.id;
 
-    // Pick deepest containing project root, or create one for `target` if it's a git repo
-    const containing = projects
-      .filter((p) => {
-        if (!p.workspaceRoot) return false;
-        const rel = path.relative(path.resolve(p.workspaceRoot), target);
-        return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
-      })
-      .sort((a, b) => b.workspaceRoot.length - a.workspaceRoot.length)[0];
+    const deepest = [...containing].sort(
+      (a, b) => b.workspaceRoot.length - a.workspaceRoot.length,
+    )[0];
+    if (deepest) return deepest.id;
 
     if (fs.existsSync(path.join(target, ".git"))) {
       try {
@@ -422,10 +436,9 @@ export function createT3Bridge({
         if (created?.project?.id) return created.project.id;
         if (created?.id) return created.id;
       } catch {
-        // Fall back to containing project
+        // Fall back to first project
       }
     }
-    if (containing) return containing.id;
     if (projects[0]) return projects[0].id;
     throw new Error(`No T3 project found for ${target}`);
   }
@@ -454,7 +467,7 @@ export function createT3Bridge({
     providerInstanceId = "antigravity",
     model = "gemini-4-neon",
     options = {},
-    repoPath = "/home/exedev/agent-attic/repos/asterism",
+    repoPath = "/home/exedev/agent-attic",
     title = "Asterism Canvas Task",
     workspaceStrategy,
     timeoutMs = 180_000,
@@ -546,7 +559,7 @@ export function buildPolarisPrompt({
     .slice(0, 18)
     .map(
       (n) =>
-        `- [${n.id}] "${n.title}" (stage=${n.stage || "note"}, role=${n.surfaceRole || "dialogue"}, commitment=${n.commitment || n.status || "ready"})`,
+        `- [${n.id}] "${n.title}" (stage=${n.stage || "note"}, role=${n.surfaceRole || "dialogue"}, commitment=${n.commitment || n.status || "ready"}${n.projectId ? `, project=${n.projectId}` : ""})`,
     )
     .join("\n");
   const pinnedHyps = (canvasState?.userModel?.hypotheses || [])
@@ -556,39 +569,41 @@ export function buildPolarisPrompt({
     .join("\n");
 
   const cliPath = path.join(repoRoot, "bin", "asterism");
+  const superrepoRoot = path.resolve(repoRoot, "../..");
 
   const preamble = isFirstTurn
     ? `<polaris_role>
-You are **Polaris**, the quiet right-rail Workspace Steward inside **Asterism** (${asterismOrigin}), running at ${repoRoot}.
-The operator uses Asterism to develop Asterism itself (guided self-improving software) as well as sibling repos under /home/exedev/agent-attic.
+You are **Polaris**, the quiet right-rail Workspace Steward inside **Asterism** (${asterismOrigin}).
+Your session is anchored in the superrepo \`${superrepoRoot}\` ("superrepo > many projects"), while Asterism itself lives at \`${repoRoot}\`.
 
 Core Principles & Capabilities:
-1. You are empowered to act directly on the operator's behalf—answering questions, manipulating the live Asterism spatial canvas, delegating tasks to Muse / Codex / Gemini subagents via T3 \`delegate_task\` (conserve Claude quota unless the operator asks for Claude), and modifying Asterism's own source code.
-2. Read \`/home/exedev/agent-attic/AGENTS.md\` when working across repos. Everything not prohibited is permitted, including committing and pushing to \`main\`.
+1. You help the operator both **work on real projects across \`${superrepoRoot}\`** (nested repos under \`repos/*\`, experiments like \`dsv41-deepdream\`, shared notes in \`knowledge/\`) AND **continuously improve Asterism itself** whenever dogfooding reveals a better workflow.
+2. Read \`${superrepoRoot}/AGENTS.md\` (and \`${repoRoot}/AGENTS.md\` when editing Asterism). When delegating to Antigravity workers via T3 \`delegate_task\`, explicitly include those file paths in the brief since Antigravity ACP does not auto-load rule files. Conserve Claude quota by preferring Gemini, Muse, and Codex unless Claude is requested.
 3. Keep Asterism's UI calm and zero-chrome: resting canvas cards show only title + interactive HTML surface, never noisy orchestration toolbars.
-4. **Live Canvas CLI (\`${cliPath}\`):**
-   - \`${cliPath} status\` — check live server health, git SHA, & T3 bridge
-   - \`${cliPath} cards\` — list active canvas thoughts
+4. **Live Canvas & Diagnostics CLI (\`${cliPath}\`):**
+   - \`${cliPath} status\` / \`${cliPath} projects\` / \`${cliPath} cards\` — inspect live health, discovered superrepo projects, and active thoughts
+   - \`${cliPath} errors [--clear]\` / \`${cliPath} logs\` — inspect uncaught browser/card-iframe JS errors and server logs
    - \`${cliPath} card-create --title "..." --stage note|brainstorm|refine|design|implement --role dialogue|spec-diagram|ui-prototype|artifact-harness --html "<div...>" [--parent <nodeId>]\`
    - \`${cliPath} card-update <nodeId> [--title "..."] [--html-file <file>]\`
    - \`${cliPath} connect <fromId> <toId> --relation specifies|visualizes-ui|implements|cross-pollinates\`
-   - \`${cliPath} compile "<dilemma or intent>"\` — run the power-set VOI decision compiler on the canvas
-   - \`${cliPath} tidy\` — untangle overlapping canvas cards
+   - \`${cliPath} compile "<dilemma or intent>"\` / \`${cliPath} tidy\`
+   - \`${cliPath} snapshots\` / \`${cliPath} snapshot-save\` / \`${cliPath} snapshot-restore latest\` — instant canvas state time-machine
+   - \`${cliPath} worktree <list|create|remove> [--repo <path>]\` — isolated git worktrees for any nested repo in \`${superrepoRoot}\`
+   - \`${cliPath} preview [--port 3457]\` — boot an ephemeral canary preview seeded from live canvas state
 5. **Safe Self-Modification of Asterism (\`${repoRoot}\`):**
-   - Whenever you edit \`server.mjs\`, \`src/*.mjs\`, \`public/index.html\`, or \`packages/asterism-core\`, ALWAYS run:
-     \`${cliPath} self-check\` (verifies server syntax, inline \`<script>\` syntax in \`public/index.html\`, and full \`node --test\` suite in an isolated temp DB).
-   - To deploy live to port 3456 safely with automatic rollback if healthcheck fails, run:
-     \`${cliPath} self-deploy --message "feat: ..." --push\`
-   - Connected browsers will hot-reconnect (or offer a 1-click UI refresh while preserving viewport & Polaris chat) automatically!
+   - Whenever you edit \`server.mjs\`, \`src/**\`, \`public/**\`, or \`packages/asterism-core\`, ALWAYS run \`${cliPath} self-check\`.
+   - Deploy live to :3456 with automatic healthcheck + git rollback via \`${cliPath} self-deploy --message "feat: ..." --push\`.
 </polaris_role>\n\n`
     : "";
 
   const focusBlock = focusedNode
-    ? `Focused Card: [${focusedNode.id}] "${focusedNode.title}" (stage=${focusedNode.stage}, role=${focusedNode.surfaceRole || "dialogue"}${focusedNode.worktree?.worktreePath ? `, worktree=${focusedNode.worktree.worktreePath}` : ""})`
+    ? `Focused Card: [${focusedNode.id}] "${focusedNode.title}" (stage=${focusedNode.stage}, role=${focusedNode.surfaceRole || "dialogue"}${focusedNode.projectId ? `, cardProject=${focusedNode.projectId}` : ""}${focusedNode.worktree?.worktreePath ? `, worktree=${focusedNode.worktree.worktreePath}` : ""})`
     : "Focused Card: (none)";
 
   const contextBlock = `<asterism_live_context>
-Active Project: ${activeProject?.name || "asterism"} (${activeProject?.repoPath || repoRoot})
+Superrepo Root: ${superrepoRoot}
+Active Workspace Project: ${activeProject?.name || "misc-attic"} (${activeProject?.repoPath || superrepoRoot})
+Asterism Self-Host Root: ${repoRoot}
 ${focusBlock}
 Visible Canvas Thoughts (${visibleNodes.length}):
 ${cardLines || "- (empty canvas)"}
@@ -600,6 +615,7 @@ ${pinnedHyps ? `Operator Preferences:\n${pinnedHyps}` : ""}
 
 export function createPolarisService({
   stateDir,
+  stateFile: customStateFile = null,
   repoRoot,
   t3Bridge,
   getAsterismOrigin,
@@ -607,7 +623,7 @@ export function createPolarisService({
   broadcastSse,
   customRunner = null,
 }) {
-  const stateFile = path.join(stateDir, "polaris-state.json");
+  const stateFile = customStateFile || path.join(stateDir, "polaris-state.json");
 
   function loadPolarisState() {
     const raw = readJsonSafe(stateFile);

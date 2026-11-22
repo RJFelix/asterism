@@ -1,12 +1,20 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import vm from "node:vm";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import * as Effect from "effect/Effect";
+import { createIsolatedWorktree } from "@asterism/core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
+const SUPERREPO_ROOT =
+  process.env.ASTERISM_SUPERREPO_ROOT || path.resolve(REPO_ROOT, "../..");
+const LIVE_SHARED_DATA_DIR = fs.existsSync("/home/exedev/agent-attic/repos/asterism/data")
+  ? "/home/exedev/agent-attic/repos/asterism/data"
+  : path.join(REPO_ROOT, "data");
 const DEFAULT_URL = process.env.ASTERISM_URL || "http://127.0.0.1:3456";
 
 function parseArgs(argv) {
@@ -49,7 +57,9 @@ async function apiRequest(baseUrl, method, route, body) {
     data = { raw: text };
   }
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ${method} ${route}: ${data.error || text.slice(0, 240)}`);
+    throw new Error(
+      `HTTP ${res.status} ${method} ${route}: ${data.error || text.slice(0, 240)}`,
+    );
   }
   return data;
 }
@@ -62,7 +72,7 @@ function collectMjsFiles(dir) {
     if (entry.isDirectory()) out.push(...collectMjsFiles(full));
     else if (entry.isFile() && entry.name.endsWith(".mjs")) out.push(full);
   }
-  return out;
+  return out.sort();
 }
 
 export function runPreflightChecks({ quiet = false, skipTests = false } = {}) {
@@ -70,14 +80,15 @@ export function runPreflightChecks({ quiet = false, skipTests = false } = {}) {
     if (!quiet) console.log(...args);
   };
 
-  // 1. Node syntax checks across server.mjs, bin/asterism, src/*.mjs, test/*.mjs
+  // 1. Node syntax checks across server.mjs, bin/asterism, src/**/*.mjs, public/js/**/*.mjs, test/**/*.mjs
   const filesToCheck = [
     path.join(REPO_ROOT, "server.mjs"),
     path.join(REPO_ROOT, "bin", "asterism"),
     ...collectMjsFiles(path.join(REPO_ROOT, "src")),
+    ...collectMjsFiles(path.join(REPO_ROOT, "public", "js")),
     ...collectMjsFiles(path.join(REPO_ROOT, "test")),
   ];
-  log(`▸ [1/3] Checking syntax of ${filesToCheck.length} JS modules…`);
+  log(`▸ [1/3] Checking syntax of ${filesToCheck.length} backend & frontend JS modules…`);
   for (const file of filesToCheck) {
     execFileSync(process.execPath, ["--check", file], {
       cwd: REPO_ROOT,
@@ -85,24 +96,38 @@ export function runPreflightChecks({ quiet = false, skipTests = false } = {}) {
     });
   }
 
-  // 2. Inline <script> syntax verification on public/index.html
+  // 2. Verify public/index.html shell + static assets + any inline <script> blocks
   const indexHtmlPath = path.join(REPO_ROOT, "public", "index.html");
-  log("▸ [2/3] Parsing inline <script> blocks in public/index.html…");
-  const html = fs.readFileSync(indexHtmlPath, "utf8");
-  const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
-  let scriptCount = 0;
-  let match;
-  while ((match = scriptRegex.exec(html)) !== null) {
-    const code = match[1];
-    if (!code.trim()) continue;
-    scriptCount++;
-    new vm.Script(code, { filename: `public/index.html#script-${scriptCount}` });
+  const cssPath = path.join(REPO_ROOT, "public", "css", "asterism.css");
+  const appJsPath = path.join(REPO_ROOT, "public", "js", "app.mjs");
+  log("▸ [2/3] Verifying public/index.html shell & UI bundle assets…");
+  if (!fs.existsSync(indexHtmlPath)) {
+    throw new Error("Missing public/index.html");
   }
-  if (scriptCount === 0) {
-    throw new Error("No inline <script> found in public/index.html — refusing potentially broken UI.");
+  const html = fs.readFileSync(indexHtmlPath, "utf8");
+  const hasModuleEntry =
+    html.includes('src="/js/app.mjs"') && fs.existsSync(appJsPath);
+  if (html.includes('href="/css/asterism.css"') && !fs.existsSync(cssPath)) {
+    throw new Error("public/index.html references /css/asterism.css, which is missing.");
   }
 
-  // 3. Isolated test suite (`node --test`)
+  const scriptRegex = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  let inlineScriptCount = 0;
+  let match;
+  while ((match = scriptRegex.exec(html)) !== null) {
+    const attrs = match[1] || "";
+    const code = match[2] || "";
+    if (/\bsrc\s*=/.test(attrs) || !code.trim()) continue;
+    inlineScriptCount++;
+    new vm.Script(code, { filename: `public/index.html#script-${inlineScriptCount}` });
+  }
+  if (!hasModuleEntry && inlineScriptCount === 0) {
+    throw new Error(
+      "Neither /js/app.mjs module entry nor inline <script> found in public/index.html — refusing broken UI.",
+    );
+  }
+
+  // 3. Isolated test suite (`node --test test/*.test.mjs`)
   if (!skipTests) {
     log("▸ [3/3] Running isolated unit & integration test suite (node --test)…");
     const testFiles = collectMjsFiles(path.join(REPO_ROOT, "test"));
@@ -113,12 +138,17 @@ export function runPreflightChecks({ quiet = false, skipTests = false } = {}) {
     });
     if (res.status !== 0) {
       const stderr = res.stderr ? res.stderr.toString("utf8") : "";
-      throw new Error(`Test suite failed (exit ${res.status}). ${stderr.slice(0, 400)}`);
+      throw new Error(
+        `Test suite failed (exit ${res.status}). ${stderr.slice(0, 400)}`,
+      );
     }
   }
 
   log("✓ Preflight self-check passed.");
-  return { checkedModules: filesToCheck.length, checkedScripts: scriptCount };
+  return {
+    checkedModules: filesToCheck.length,
+    checkedScripts: inlineScriptCount + (hasModuleEntry ? 1 : 0),
+  };
 }
 
 function snapshotLiveState(tag = "pre-deploy") {
@@ -139,12 +169,11 @@ function snapshotLiveState(tag = "pre-deploy") {
   const snapFile = path.join(snapDir, `${stamp}-${tag}.json`);
   fs.writeFileSync(snapFile, JSON.stringify(bundle, null, 2), { mode: 0o600 });
 
-  // Retain most recent 20 snapshots
   const all = fs
     .readdirSync(snapDir)
     .filter((f) => f.endsWith(".json"))
     .sort();
-  while (all.length > 20) {
+  while (all.length > 30) {
     const oldest = all.shift();
     try {
       fs.unlinkSync(path.join(snapDir, oldest));
@@ -174,11 +203,27 @@ async function waitForHealthyBoot(baseUrl, previousBootId, timeoutMs = 15_000) {
   );
 }
 
+function resolveGitRepoTarget(rawRepo) {
+  if (!rawRepo) return REPO_ROOT;
+  const str = String(rawRepo).trim();
+  if (str === "agent-attic" || str === "superrepo") return SUPERREPO_ROOT;
+  const candidateNested = path.join(SUPERREPO_ROOT, "repos", str);
+  if (fs.existsSync(path.join(candidateNested, ".git"))) return candidateNested;
+  const candidateTop = path.join(SUPERREPO_ROOT, str);
+  if (fs.existsSync(path.join(candidateTop, ".git"))) return candidateTop;
+  const resolved = path.resolve(str);
+  if (fs.existsSync(path.join(resolved, ".git"))) return resolved;
+  throw new Error(
+    `Not a git repository: "${str}" (tried ${candidateNested} and ${resolved}).`,
+  );
+}
+
 function printHelp() {
-  console.log(`Asterism Workspace & Self-Hosting CLI
+  console.log(`Asterism Superrepo Workspace & Self-Hosting CLI
 
 Usage:
   bin/asterism status [--json]
+  bin/asterism projects [--switch <projectId>] [--json]
   bin/asterism cards [--json]
   bin/asterism card-create --title "..." [--stage note|brainstorm|refine|design|implement] [--role dialogue|spec-diagram|ui-prototype|artifact-harness] [--html "..."] [--html-file <path>] [--parent <nodeId>] [--relation advances]
   bin/asterism card-update <nodeId> [--title "..."] [--stage ...] [--role ...] [--html "..."] [--html-file <path>]
@@ -186,6 +231,13 @@ Usage:
   bin/asterism connect <fromId> <toId> [--relation specifies|visualizes-ui|implements|advances]
   bin/asterism compile "<dilemma or intent>" [--probe]
   bin/asterism tidy
+  bin/asterism errors [--clear] [--json]
+  bin/asterism logs [--lines 60]
+  bin/asterism snapshots [--json]
+  bin/asterism snapshot-save [--label "before-refactor"]
+  bin/asterism snapshot-restore [latest|<snapshot-name>]
+  bin/asterism worktree <list|create|remove> [name] [--repo asterism|hydro|intuit|<path>]
+  bin/asterism preview [--port 3457] [--keep]
   bin/asterism self-check [--skip-tests]
   bin/asterism self-deploy [--message "feat: ..."] [--push]
 `);
@@ -207,12 +259,50 @@ async function main() {
       console.log(JSON.stringify(health, null, 2));
       return;
     }
+    const uiHash = health.uiBundleHash || health.indexHtmlHash;
     console.log(`Asterism Live Status (${baseUrl})`);
-    console.log(`  Boot / SHA : ${health.bootId} @ ${health.gitSha} (UI hash ${health.indexHtmlHash})`);
-    console.log(`  Canvas     : ${health.nodeCount} thoughts, ${health.edgeCount} edges (project: ${health.activeProjectId})`);
-    console.log(`  Polaris    : ${health.polaris?.providerInstanceId}/${health.polaris?.model} [${health.polaris?.status}]`);
-    const providers = (health.liveT3?.providers || []).map((p) => `${p.providerInstanceId}(${p.models.length})`).join(", ");
-    console.log(`  T3 Bridge  : ${health.liveT3?.connected ? `connected (${providers})` : `offline (${health.liveT3?.error || health.liveT3?.reason || "unavailable"})`}`);
+    console.log(`  Boot / SHA  : ${health.bootId} @ ${health.gitSha} (UI hash ${uiHash})`);
+    console.log(
+      `  Canvas      : ${health.nodeCount} thoughts, ${health.edgeCount} edges (project: ${health.activeProjectId})`,
+    );
+    console.log(
+      `  Polaris     : ${health.polaris?.providerInstanceId}/${health.polaris?.model} [${health.polaris?.status}]`,
+    );
+    const errCount = health.clientErrors?.count || 0;
+    const latestErr = health.clientErrors?.latest;
+    console.log(
+      `  Client Errs : ${errCount === 0 ? "0 (clean)" : `${errCount} — latest [${latestErr?.source}${latestErr?.nodeId ? `:${latestErr.nodeId}` : ""}]: ${latestErr?.message}`}`,
+    );
+    const providers = (health.liveT3?.providers || [])
+      .map((p) => `${p.providerInstanceId}(${p.models.length})`)
+      .join(", ");
+    console.log(
+      `  T3 Bridge   : ${health.liveT3?.connected ? `connected (${providers})` : `offline (${health.liveT3?.error || health.liveT3?.reason || "unavailable"})`}`,
+    );
+    return;
+  }
+
+  if (cmd === "projects") {
+    if (flags.switch) {
+      const switched = await apiRequest(baseUrl, "POST", "/api/projects", {
+        activeProjectId: String(flags.switch),
+      });
+      console.log(
+        `Switched active project to [${switched.activeProjectId}] "${switched.activeProject?.name}" (${switched.activeProject?.repoPath})`,
+      );
+      return;
+    }
+    const data = await apiRequest(baseUrl, "GET", "/api/projects");
+    if (flags.json) {
+      console.log(JSON.stringify(data, null, 2));
+      return;
+    }
+    console.log(`Superrepo Workspace Projects (active: ${data.activeProjectId}):`);
+    for (const p of data.projects || []) {
+      const marker = p.id === data.activeProjectId ? "★" : "•";
+      const gitTag = p.isGitRepo === false ? "dir" : "git";
+      console.log(`  ${marker} [${p.id}] ${p.name} (${gitTag}) -> ${p.repoPath}`);
+    }
     return;
   }
 
@@ -224,7 +314,9 @@ async function main() {
     }
     for (const n of state.nodes || []) {
       const vis = n.shadowStaged ? " [shadow]" : "";
-      console.log(`• [${n.id}] "${n.title}" (${n.stage || "note"} · ${n.surfaceRole || "dialogue"} · ${n.commitment || n.status || "ready"})${vis}`);
+      console.log(
+        `• [${n.id}] "${n.title}" (${n.stage || "note"} · ${n.surfaceRole || "dialogue"} · ${n.commitment || n.status || "ready"})${vis}`,
+      );
     }
     return;
   }
@@ -242,19 +334,26 @@ async function main() {
         title,
         ...(flags.stage ? { stage: String(flags.stage) } : {}),
         ...(flags.role ? { surfaceRole: String(flags.role) } : {}),
+        ...(flags.project ? { projectId: String(flags.project) } : {}),
         ...(flags.summary ? { summary: String(flags.summary) } : {}),
         ...(html ? { html } : {}),
       },
       ...(flags.parent ? { parentNodeId: String(flags.parent) } : {}),
       ...(flags.relation ? { relation: String(flags.relation) } : {}),
     });
-    console.log(`Created card [${out.node.id}] "${out.node.title}" at (${out.node.x}, ${out.node.y})`);
+    console.log(
+      `Created card [${out.node.id}] "${out.node.title}" at (${out.node.x}, ${out.node.y})`,
+    );
     return;
   }
 
   if (cmd === "card-update") {
     const nodeId = positionals[1] || flags.id;
-    if (!nodeId) throw new Error("Usage: bin/asterism card-update <nodeId> [--title ...] [--html-file ...]");
+    if (!nodeId) {
+      throw new Error(
+        "Usage: bin/asterism card-update <nodeId> [--title ...] [--html-file ...]",
+      );
+    }
     const html = flags["html-file"]
       ? fs.readFileSync(path.resolve(String(flags["html-file"])), "utf8")
       : typeof flags.html === "string"
@@ -275,14 +374,20 @@ async function main() {
   if (cmd === "card-delete") {
     const nodeId = positionals[1] || flags.id;
     if (!nodeId) throw new Error("Usage: bin/asterism card-delete <nodeId>");
-    const out = await apiRequest(baseUrl, "POST", "/api/nodes/delete", { nodeId: String(nodeId) });
+    const out = await apiRequest(baseUrl, "POST", "/api/nodes/delete", {
+      nodeId: String(nodeId),
+    });
     console.log(`Deleted card [${out.deletedId}]`);
     return;
   }
 
   if (cmd === "connect") {
     const [from, to] = [positionals[1], positionals[2]];
-    if (!from || !to) throw new Error("Usage: bin/asterism connect <fromId> <toId> [--relation specifies]");
+    if (!from || !to) {
+      throw new Error(
+        "Usage: bin/asterism connect <fromId> <toId> [--relation specifies]",
+      );
+    }
     const relation = String(flags.relation || "specifies");
     await apiRequest(baseUrl, "POST", "/api/edges", {
       action: "create",
@@ -294,18 +399,222 @@ async function main() {
 
   if (cmd === "compile") {
     const prompt = positionals.slice(1).join(" ") || String(flags.prompt || "");
-    if (!prompt) throw new Error('Usage: bin/asterism compile "<dilemma or intent>" [--probe]');
+    if (!prompt) {
+      throw new Error('Usage: bin/asterism compile "<dilemma or intent>" [--probe]');
+    }
     const out = await apiRequest(baseUrl, "POST", "/api/decisions/compile", {
       prompt,
       forceProbe: Boolean(flags.probe),
     });
-    console.log(`Compiled regime=${out.regime} bestSubset=${out.sealedPrediction?.predictedSubsetKey}`);
+    console.log(
+      `Compiled regime=${out.regime} bestSubset=${out.sealedPrediction?.predictedSubsetKey}`,
+    );
     return;
   }
 
   if (cmd === "tidy") {
     const out = await apiRequest(baseUrl, "POST", "/api/canvas/tidy", {});
     console.log(`Tidied canvas (${out.movedCount} cards repositioned).`);
+    return;
+  }
+
+  if (cmd === "errors") {
+    if (flags.clear) {
+      const out = await apiRequest(
+        baseUrl,
+        "DELETE",
+        "/api/telemetry/client-errors",
+      );
+      console.log(`Cleared ${out.cleared} client runtime error(s).`);
+      return;
+    }
+    const out = await apiRequest(baseUrl, "GET", "/api/telemetry/client-errors");
+    if (flags.json) {
+      console.log(JSON.stringify(out, null, 2));
+      return;
+    }
+    const errs = out.errors || [];
+    if (errs.length === 0) {
+      console.log("No uncaught browser or card-iframe runtime errors recorded.");
+      return;
+    }
+    console.log(`Recorded Client Runtime Errors (${errs.length}):`);
+    for (const e of errs) {
+      const loc = e.nodeId ? `${e.source}:${e.nodeId}` : e.source;
+      const lineInfo = e.lineno ? ` (line ${e.lineno})` : "";
+      console.log(
+        `• [${e.lastSeenAt || e.timestamp}] (${loc}${lineInfo}, x${e.occurrences || 1}) ${e.message}`,
+      );
+    }
+    return;
+  }
+
+  if (cmd === "logs") {
+    const linesCount = Math.max(5, Math.min(500, Number(flags.lines || 60)));
+    const logFile = "/tmp/asterism-server.log";
+    if (fs.existsSync(logFile)) {
+      const content = fs.readFileSync(logFile, "utf8").split("\n");
+      console.log(content.slice(-linesCount).join("\n"));
+      return;
+    }
+    execFileSync(
+      "journalctl",
+      ["--user", "-u", "asterism.service", "-n", String(linesCount), "--no-pager"],
+      { stdio: "inherit" },
+    );
+    return;
+  }
+
+  if (cmd === "snapshots") {
+    const out = await apiRequest(baseUrl, "GET", "/api/snapshots");
+    if (flags.json) {
+      console.log(JSON.stringify(out, null, 2));
+      return;
+    }
+    const snaps = out.snapshots || [];
+    if (snaps.length === 0) {
+      console.log("No canvas snapshots saved yet.");
+      return;
+    }
+    console.log(`Saved Canvas Snapshots (${snaps.length}):`);
+    for (const s of snaps) {
+      console.log(`• ${s.name} (${Math.round(s.sizeBytes / 1024)} KB · ${s.mtime})`);
+    }
+    return;
+  }
+
+  if (cmd === "snapshot-save") {
+    const label = String(flags.label || positionals[1] || "manual");
+    const out = await apiRequest(baseUrl, "POST", "/api/snapshots/save", { label });
+    console.log(
+      `Saved snapshot ${out.snapshot.name} (${out.snapshot.nodeCount} cards, ${out.snapshot.edgeCount} edges)`,
+    );
+    return;
+  }
+
+  if (cmd === "snapshot-restore") {
+    const target = String(positionals[1] || flags.target || "latest");
+    const out = await apiRequest(baseUrl, "POST", "/api/snapshots/restore", {
+      target,
+    });
+    console.log(
+      `Restored snapshot ${out.restoredFrom} (${out.nodeCount} cards, ${out.edgeCount} edges; backup saved as ${out.backupName})`,
+    );
+    return;
+  }
+
+  if (cmd === "worktree") {
+    const sub = positionals[1] || "list";
+    const repoRoot = resolveGitRepoTarget(flags.repo);
+    const repoSlug = path.basename(repoRoot);
+    const worktreesDir = path.join(LIVE_SHARED_DATA_DIR, "worktrees", repoSlug);
+
+    if (sub === "list") {
+      const out = execFileSync("git", ["worktree", "list"], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      console.log(`Git worktrees for ${repoRoot}:\n${out.trim()}`);
+      return;
+    }
+
+    if (sub === "create") {
+      const name = String(
+        positionals[2] || flags.name || `wt-${Date.now().toString(36)}`,
+      );
+      fs.mkdirSync(worktreesDir, { recursive: true });
+      const created = await Effect.runPromise(
+        createIsolatedWorktree({
+          repoRoot,
+          worktreesDir,
+          nodeId: name,
+        }),
+      );
+      if (flags.json) {
+        console.log(JSON.stringify(created, null, 2));
+      } else {
+        console.log(`Created isolated worktree for ${repoSlug}:`);
+        console.log(`  Path   : ${created.worktreePath}`);
+        console.log(`  Branch : ${created.branchName} (base ${created.baseCommit})`);
+      }
+      return;
+    }
+
+    if (sub === "remove") {
+      const target = positionals[2] || flags.name || flags.path;
+      if (!target) {
+        throw new Error(
+          "Usage: bin/asterism worktree remove <name-or-path> [--repo ...]",
+        );
+      }
+      const candidatePath = fs.existsSync(String(target))
+        ? path.resolve(String(target))
+        : path.join(worktreesDir, String(target).replace(/[^a-zA-Z0-9_-]/g, "-"));
+      execFileSync(
+        "git",
+        ["worktree", "remove", "--force", candidatePath],
+        { cwd: repoRoot, stdio: "inherit" },
+      );
+      execFileSync("git", ["worktree", "prune"], {
+        cwd: repoRoot,
+        stdio: "inherit",
+      });
+      console.log(`Removed worktree ${candidatePath}`);
+      return;
+    }
+
+    throw new Error(
+      `Unknown worktree subcommand "${sub}". Expected list, create, or remove.`,
+    );
+  }
+
+  if (cmd === "preview") {
+    const port = Number(flags.port || process.env.PREVIEW_PORT || 3457);
+    const keep = Boolean(flags.keep);
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "asterism-preview-"));
+    const liveCanvasFile = path.join(LIVE_SHARED_DATA_DIR, "canvas-state.json");
+    const previewStateFile = path.join(tmpDir, "canvas-state.json");
+    if (fs.existsSync(liveCanvasFile)) {
+      fs.copyFileSync(liveCanvasFile, previewStateFile);
+    }
+    const liveAuthFile = path.join(LIVE_SHARED_DATA_DIR, "t3-mcp-auth.json");
+
+    const { createAsterismServer } = await import(
+      path.join(REPO_ROOT, "server.mjs")
+    );
+    const server = createAsterismServer({
+      dbPath: path.join(tmpDir, "preview.sqlite"),
+      stateFile: previewStateFile,
+      worktreesDir: path.join(tmpDir, "worktrees"),
+      t3AuthFile: fs.existsSync(liveAuthFile) ? liveAuthFile : null,
+      asterismOrigin: `http://127.0.0.1:${port}`,
+    });
+
+    const cleanup = () => {
+      try {
+        server.close();
+      } catch {}
+      if (!keep) {
+        try {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        } catch {}
+      }
+      process.exit(0);
+    };
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
+
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "0.0.0.0", resolve);
+    });
+
+    console.log(`✦ Asterism Canary Preview Server running from ${REPO_ROOT}`);
+    console.log(`  Local URL  : http://127.0.0.1:${port}/`);
+    console.log(`  Public URL : https://agentbox-101.exe.xyz:${port}/`);
+    console.log(`  Sandbox    : ${tmpDir} (seeded from live canvas, isolated from :3456)`);
+    console.log("  Press Ctrl+C to stop preview.");
+    await new Promise(() => {});
     return;
   }
 
@@ -329,7 +638,7 @@ async function main() {
       const prevHealth = await apiRequest(baseUrl, "GET", "/api/health");
       previousBootId = prevHealth.bootId || null;
     } catch {
-      // Service may not yet expose /api/health before upgrade
+      // Service may be stopped prior to restart
     }
 
     let createdCommit = false;
@@ -356,8 +665,9 @@ async function main() {
 
     try {
       const health = await waitForHealthyBoot(baseUrl, previousBootId, 15_000);
+      const uiHash = health.uiBundleHash || health.indexHtmlHash;
       console.log(
-        `✓ Live deploy healthy: bootId=${health.bootId} sha=${health.gitSha} uiHash=${health.indexHtmlHash} (${health.nodeCount} cards)`,
+        `✓ Live deploy healthy: bootId=${health.bootId} sha=${health.gitSha} uiHash=${uiHash} (${health.nodeCount} cards)`,
       );
       if (flags.push) {
         console.log("▸ Pushing main to origin…");
@@ -369,7 +679,9 @@ async function main() {
     } catch (deployErr) {
       console.error(`✗ Healthcheck failed after restart: ${deployErr.message}`);
       if (createdCommit) {
-        console.error("▸ Reverting commit and restarting asterism.service to restore healthy state…");
+        console.error(
+          "▸ Reverting commit and restarting asterism.service to restore healthy state…",
+        );
         execFileSync("git", ["revert", "--no-edit", "HEAD"], {
           cwd: REPO_ROOT,
           stdio: "inherit",
@@ -387,7 +699,11 @@ async function main() {
   throw new Error(`Unknown command "${cmd}". Run 'bin/asterism help' for usage.`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isMain =
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMain) {
   main().catch((err) => {
     console.error(`asterism cli error: ${err.message}`);
     process.exit(1);

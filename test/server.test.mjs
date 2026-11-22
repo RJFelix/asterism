@@ -649,3 +649,140 @@ test('Self-hosting infra: /api/health, /api/nodes/update, SSE server_hello + pol
   }
 });
 
+test('Superrepo project discovery, client/iframe error telemetry, snapshot time-machine, and modular UI bundle', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'asterism-superrepo-test-'));
+  const mockSuperrepo = path.join(tmpDir, 'mock-agent-attic');
+  fs.mkdirSync(path.join(mockSuperrepo, 'repos', 'novel-lab', '.git'), { recursive: true });
+  fs.mkdirSync(path.join(mockSuperrepo, 'repos', 'intuit', '.git'), { recursive: true });
+  fs.mkdirSync(path.join(mockSuperrepo, 'dsv41-deepdream'), { recursive: true });
+  fs.mkdirSync(path.join(mockSuperrepo, 'knowledge'), { recursive: true }); // ignored dir
+
+  const server = createAsterismServer({
+    dbPath: path.join(tmpDir, 'test.sqlite'),
+    worktreesDir: path.join(tmpDir, 'worktrees'),
+    superrepoRoot: mockSuperrepo,
+  });
+
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    // 1. Modular static UI bundle serving
+    const [htmlRes, cssRes, appJsRes, srcdocJsRes] = await Promise.all([
+      fetch(`${baseUrl}/`),
+      fetch(`${baseUrl}/css/asterism.css`),
+      fetch(`${baseUrl}/js/app.mjs`),
+      fetch(`${baseUrl}/js/card-srcdoc.mjs`),
+    ]);
+    assert.equal(htmlRes.status, 200);
+    assert.equal(cssRes.status, 200);
+    assert.equal(appJsRes.status, 200);
+    assert.equal(srcdocJsRes.status, 200);
+    assert.match(cssRes.headers.get('content-type') || '', /text\/css/);
+    assert.match(appJsRes.headers.get('content-type') || '', /application\/javascript/);
+    const htmlText = await htmlRes.text();
+    assert.ok(htmlText.includes('/css/asterism.css'), 'index.html links modular stylesheet');
+    assert.ok(htmlText.includes('/js/app.mjs'), 'index.html loads modular app entrypoint');
+    const srcdocText = await srcdocJsRes.text();
+    assert.ok(srcdocText.includes('asterism:card-error'), 'card-srcdoc wires card-iframe error postMessage');
+
+    // 2. Superrepo project auto-discovery on GET /api/projects
+    const projRes = await fetch(`${baseUrl}/api/projects`);
+    assert.equal(projRes.status, 200);
+    const projData = await projRes.json();
+    const names = projData.projects.map((p) => p.name);
+    assert.ok(names.includes('novel-lab'), 'Discovers unseeded nested repo novel-lab');
+    assert.ok(names.includes('intuit'), 'Discovers nested repo intuit');
+    assert.ok(names.includes('dsv41-deepdream'), 'Discovers top-level superrepo project dir dsv41-deepdream');
+    assert.ok(!names.includes('knowledge'), 'Skips superrepo knowledge dir');
+    const novelProj = projData.projects.find((p) => p.name === 'novel-lab');
+    assert.equal(novelProj.isGitRepo, true);
+    const deepdreamProj = projData.projects.find((p) => p.name === 'dsv41-deepdream');
+    assert.equal(deepdreamProj.isGitRepo, false);
+
+    // 3. Browser & card-iframe runtime error telemetry + deduplication
+    const errPost1 = await fetch(`${baseUrl}/api/telemetry/client-error`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: 'card-iframe',
+        kind: 'error',
+        nodeId: 'node-ergodic-algebra',
+        message: 'ReferenceError: fooWidget is not defined',
+        lineno: 42,
+      }),
+    });
+    assert.equal(errPost1.status, 200);
+
+    // Duplicate identical error increments occurrences rather than flooding buffer
+    await fetch(`${baseUrl}/api/telemetry/client-error`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: 'card-iframe',
+        kind: 'error',
+        nodeId: 'node-ergodic-algebra',
+        message: 'ReferenceError: fooWidget is not defined',
+        lineno: 42,
+      }),
+    });
+
+    const healthRes = await fetch(`${baseUrl}/api/health`);
+    const health = await healthRes.json();
+    assert.equal(health.clientErrors.count, 1);
+    assert.equal(health.clientErrors.latest.occurrences, 2);
+    assert.equal(health.clientErrors.latest.nodeId, 'node-ergodic-algebra');
+    assert.ok(health.uiBundleHash && health.uiBundleHash.length === 12);
+
+    const listErrRes = await fetch(`${baseUrl}/api/telemetry/client-errors`);
+    const listErr = await listErrRes.json();
+    assert.equal(listErr.errors.length, 1);
+    assert.equal(listErr.errors[0].occurrences, 2);
+
+    const clearErrRes = await fetch(`${baseUrl}/api/telemetry/client-errors`, { method: 'DELETE' });
+    const clearErr = await clearErrRes.json();
+    assert.equal(clearErr.cleared, 1);
+
+    // 4. Canvas state snapshot save & restore time-machine
+    const beforeState = await (await fetch(`${baseUrl}/api/state`)).json();
+    const initialCount = beforeState.nodes.length;
+
+    const saveSnapRes = await fetch(`${baseUrl}/api/snapshots/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: 'checkpoint-alpha' }),
+    });
+    assert.equal(saveSnapRes.status, 200);
+    const savedSnap = await saveSnapRes.json();
+    assert.match(savedSnap.snapshot.name, /checkpoint-alpha\.json$/);
+
+    // Add a temporary card after the snapshot
+    await fetch(`${baseUrl}/api/nodes/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ node: { id: 'node-ephemeral-after-snap', title: 'Ephemeral Card' } }),
+    });
+    const mutatedState = await (await fetch(`${baseUrl}/api/state`)).json();
+    assert.equal(mutatedState.nodes.length, initialCount + 1);
+
+    // Restore checkpoint-alpha and verify the temporary card is gone and a pre-restore backup exists
+    const restoreRes = await fetch(`${baseUrl}/api/snapshots/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: 'checkpoint-alpha' }),
+    });
+    assert.equal(restoreRes.status, 200);
+    const restored = await restoreRes.json();
+    assert.equal(restored.nodeCount, initialCount);
+    assert.match(restored.backupName, /pre-restore\.json$/);
+
+    const snapsList = await (await fetch(`${baseUrl}/api/snapshots`)).json();
+    assert.ok(snapsList.snapshots.length >= 2);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+
