@@ -28,11 +28,11 @@ test("Asterism server supports keeping multiple speculative branches in parallel
     const keepARes = await fetch(`${baseUrl}/api/nodes/commit-branch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeId: "node-spec-a" }),
+      body: JSON.stringify({ nodeId: "node-fork-polaris-ux" }),
     });
     assert.equal(keepARes.status, 200);
     const keepAData = await keepARes.json();
-    assert.equal(keepAData.winner.id, "node-spec-a");
+    assert.equal(keepAData.winner.id, "node-fork-polaris-ux");
     assert.equal(keepAData.winner.status, "committed");
     assert.equal(keepAData.state.nodes.length, 6);
 
@@ -40,11 +40,11 @@ test("Asterism server supports keeping multiple speculative branches in parallel
     const keepBRes = await fetch(`${baseUrl}/api/nodes/commit-branch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeId: "node-spec-b" }),
+      body: JSON.stringify({ nodeId: "node-fork-feature-tenders" }),
     });
     assert.equal(keepBRes.status, 200);
     const keepBData = await keepBRes.json();
-    assert.equal(keepBData.winner.id, "node-spec-b");
+    assert.equal(keepBData.winner.id, "node-fork-feature-tenders");
     assert.equal(keepBData.winner.status, "committed");
     assert.equal(keepBData.state.nodes.length, 6);
 
@@ -52,11 +52,11 @@ test("Asterism server supports keeping multiple speculative branches in parallel
     const pruneRes = await fetch(`${baseUrl}/api/nodes/prune-unkept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ parentId: "node-hydro" }),
+      body: JSON.stringify({ parentId: "node-ergodic-algebra" }),
     });
     assert.equal(pruneRes.status, 200);
     const pruneData = await pruneRes.json();
-    assert.deepEqual(pruneData.discarded, ["node-spec-c"]);
+    assert.deepEqual(pruneData.discarded, ["node-fork-ui-critique"]);
     assert.equal(pruneData.state.nodes.length, 5);
 
     await fetch(`${baseUrl}/api/reset`, { method: "POST" });
@@ -93,24 +93,24 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        nodeId: "node-spec-a",
-        patch: { cornerRadiusPx: 22, customInteractiveToggle: "enabled" },
-        model: "openai/gpt-6-luna",
+        nodeId: "node-fork-polaris-ux",
+        patch: { railWidthPx: 410, customInteractiveToggle: "enabled" },
+        model: "antigravity/gemini-4-neon",
       }),
     });
     assert.equal(stateRes.status, 200);
     const stateData = await stateRes.json();
-    assert.equal(stateData.node.state.cornerRadiusPx, 22);
+    assert.equal(stateData.node.state.railWidthPx, 410);
     assert.equal(stateData.node.state.customInteractiveToggle, "enabled");
 
-    // Feature 2: Multi-Parent Convergence (Synthesize node-spec-a + node-spec-b)
+    // Feature 2: Multi-Parent Convergence (Synthesize node-fork-polaris-ux + node-fork-feature-tenders)
     // Use an unavailable model name to exercise fast deterministic synthesis fallback without waiting on external LLM latency
     const synthRes = await fetch(`${baseUrl}/api/nodes/synthesize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        parentIds: ["node-spec-a", "node-spec-b"],
-        instruction: "Combine spatial inspector handles with state timeline scrubbing",
+        parentIds: ["node-fork-polaris-ux", "node-fork-feature-tenders"],
+        instruction: "Combine peripheral Polaris rail with worktree feature tender promotion",
         targetStage: "design",
         model: "offline-fast-synth",
       }),
@@ -119,10 +119,10 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     const synthData = await synthRes.json();
     const synthNode = synthData.synthNode;
     assert.ok(synthNode.id.startsWith("node-synth-"));
-    assert.deepEqual(synthNode.parentIds, ["node-spec-a", "node-spec-b"]);
+    assert.deepEqual(synthNode.parentIds, ["node-fork-polaris-ux", "node-fork-feature-tenders"]);
     // Merged state from both parents!
-    assert.equal(synthNode.state.cornerRadiusPx, 22);
-    assert.equal(synthNode.state.timelineFps, 60);
+    assert.equal(synthNode.state.railWidthPx, 410);
+    assert.equal(synthNode.state.verifyBudgetSec, 45);
     const synthEdges = synthData.state.edges.filter((e) => e.to === synthNode.id);
     assert.equal(synthEdges.length, 2);
     assert.equal(synthEdges[0].kind, "synthesis");
@@ -168,12 +168,12 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.equal(commitData.commit.committed, true);
     assert.ok(commitData.commit.commitSha.length >= 6);
 
-    // Multi-Panel Typed Relations: Spawn a companion UI Prototype panel (`visualizes-ui`) from a Dialogue proposal panel (`node-brief`)
+    // Multi-Panel Typed Relations: Spawn a companion UI Prototype panel (`visualizes-ui`) from a Dialogue proposal panel (`node-asterism-thesis`)
     const spawnUiRes = await fetch(`${baseUrl}/api/nodes/spawn-related`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sourceNodeId: "node-brief",
+        sourceNodeId: "node-asterism-thesis",
         relation: "visualizes-ui",
         surfaceRole: "ui-prototype",
         prompt: "Build an interactive sample UI for the feature proposal",
@@ -185,18 +185,18 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.equal(spawnUiData.childNode.surfaceRole, "ui-prototype");
     assert.equal(spawnUiData.childNode.relationFromParent, "visualizes-ui");
     const relEdge = spawnUiData.state.edges.find(
-      (e) => e.from === "node-brief" && e.to === spawnUiData.childNode.id,
+      (e) => e.from === "node-asterism-thesis" && e.to === spawnUiData.childNode.id,
     );
     assert.ok(relEdge);
     assert.equal(relEdge.relation, "visualizes-ui");
 
-    // Multi-Panel Agent Collaboration via /api/nodes/mutate: asking a Dialogue panel (`node-brief`, which already has downstream children!)
+    // Multi-Panel Agent Collaboration via /api/nodes/mutate: asking a Dialogue panel (`node-asterism-thesis`, which already has downstream children!)
     // defaults to Regret-Minimizing Branching (`branchedNewFuture: true`) so existing downstream futures stay intact, AND spawns the requested companion `spec-diagram` panel!
     const multiCollabRes = await fetch(`${baseUrl}/api/nodes/mutate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        nodeId: "node-brief",
+        nodeId: "node-asterism-thesis",
         instruction: "Spawn a separate spec panel for our multi-panel collaboration protocol",
         model: "offline-fast-spec",
       }),
@@ -204,7 +204,7 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.equal(multiCollabRes.status, 200);
     const multiCollabData = await multiCollabRes.json();
     assert.equal(multiCollabData.branchedNewFuture, true, "Acting on an upstream node with downstream edges must branch a new future by default to minimize regret");
-    assert.ok(multiCollabData.branchedRevisionNode.id.startsWith("node-brief-rev"));
+    assert.ok(multiCollabData.branchedRevisionNode.id.startsWith("node-asterism-thesis-rev"));
     assert.equal(multiCollabData.spawnedPanels.length, 1);
     assert.equal(multiCollabData.spawnedPanels[0].surfaceRole, "spec-diagram");
     assert.equal(multiCollabData.spawnedPanels[0].relationFromParent, "specifies");
@@ -214,7 +214,7 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        nodeId: "node-brief",
+        nodeId: "node-asterism-thesis",
         facetRole: "spec-diagram",
         tearOff: true,
         prompt: "Crystallize architecture contract lens",
@@ -224,7 +224,7 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.equal(facetRes.status, 200);
     const facetData = await facetRes.json();
     assert.ok(facetData.tornOffLens.id.startsWith("lens-spec-diagram-"));
-    assert.equal(facetData.tornOffLens.lensOfNodeId, "node-brief");
+    assert.equal(facetData.tornOffLens.lensOfNodeId, "node-asterism-thesis");
     assert.ok(facetData.node.facets["spec-diagram"]);
 
     // Basal Free-Energy Floor Allocator (`/api/energy/basal-tick`)
@@ -323,7 +323,7 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        focusNodeId: "node-hydro",
+        focusNodeId: "node-ergodic-algebra",
         viewProjection: "plex",
         applyLayout: true,
       }),
@@ -331,10 +331,10 @@ test("Features 1-4: Bidirectional Surface State, Arena Models, Multi-Parent Synt
     assert.equal(plexRes.status, 200);
     const plexData = await plexRes.json();
     assert.equal(plexData.viewProjection, "plex");
-    assert.equal(plexData.focusNodeId, "node-hydro");
-    assert.ok(plexData.parents.some((p) => p.id === "node-brief"), "Plex must identify node-brief as parent of node-hydro");
-    assert.ok(plexData.children.some((c) => c.id === "node-spec-a"), "Plex must identify node-spec-a as child of node-hydro");
-    assert.ok(plexData.lateral.some((l) => l.id === "node-robotics"), "Plex must identify node-robotics as lateral peer of node-hydro");
+    assert.equal(plexData.focusNodeId, "node-ergodic-algebra");
+    assert.ok(plexData.parents.some((p) => p.id === "node-asterism-thesis"), "Plex must identify node-asterism-thesis as parent of node-ergodic-algebra");
+    assert.ok(plexData.children.some((c) => c.id === "node-fork-polaris-ux"), "Plex must identify node-fork-polaris-ux as child of node-ergodic-algebra");
+    assert.ok(plexData.lateral.some((l) => l.id === "node-t3-self-host"), "Plex must identify node-t3-self-host as lateral peer of node-ergodic-algebra");
 
     // Reset back to clean default state
     await fetch(`${baseUrl}/api/reset`, { method: "POST" });
@@ -434,7 +434,7 @@ test("Sovereign Compute: Power-Set Policy (Co-Fork, Neither, Ask/Probe) & Testab
 
     const coforkHyp = resolveData.userModel.hypotheses.find((h) => h.id === "hyp-cofork-basal");
     assert.equal(coforkHyp.usesSinceLastProbe, 0, "Resolving a probe resets staleness counter on tested hypotheses");
-    assert.ok(coforkHyp.empiricalTrials >= 7);
+    assert.equal(coforkHyp.empiricalTrials, 1, "Default hypotheses start at 0 empirical trials and increment honestly on probe resolution");
 
     await fetch(`${baseUrl}/api/reset`, { method: "POST" });
   } finally {
@@ -522,3 +522,130 @@ test('Open canvas placement respects dimensions, exclusions and shadow staging',
   assert.deepEqual(resolveOpenCanvasPosition(nodes, 25, 25, 395, 260, 28, new Set(['occupied'])), { x: 25, y: 25 });
   assert.deepEqual(resolveOpenCanvasPosition([{ ...nodes[0], shadowStaged: true }], 25, 25), { x: 25, y: 25 });
 });
+
+test('Self-hosting infra: /api/health, /api/nodes/update, SSE server_hello + polaris_update, and Polaris Workspace Steward', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'asterism-polaris-'));
+  let capturedTurn = null;
+  const server = createAsterismServer({
+    dbPath: path.join(tmpDir, 'polaris.sqlite'),
+    stateFile: path.join(tmpDir, 'state.json'),
+    worktreesDir: path.join(tmpDir, 'worktrees'),
+    polarisStateFile: path.join(tmpDir, 'polaris.json'),
+    polarisRunner: async (turn) => {
+      capturedTurn = turn;
+      return {
+        threadId: 'thread-polaris-test-1',
+        threadLink: 'http://127.0.0.1:3773/threads/thread-polaris-test-1',
+        text: `Polaris inspected "${turn.focusedNode?.title || 'none'}" via ${turn.polaris.providerInstanceId}/${turn.polaris.model}.`,
+      };
+    },
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const sseAbort = new AbortController();
+
+  try {
+    // 1. Verify /api/health exposes bootId, gitSha, indexHtmlHash, and Polaris default model
+    const healthRes = await fetch(`${baseUrl}/api/health?deep=1`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.equal(health.ok, true);
+    assert.ok(typeof health.bootId === 'string' && health.bootId.length >= 8);
+    assert.ok(typeof health.indexHtmlHash === 'string' && health.indexHtmlHash.length >= 8);
+    assert.equal(health.polaris.providerInstanceId, 'antigravity');
+    assert.equal(health.polaris.model, 'gemini-4-neon');
+
+    // 2. Open SSE stream and confirm initial server_hello, state, and polaris_update frames
+    const sseRes = await fetch(`${baseUrl}/api/events`, { signal: sseAbort.signal });
+    assert.equal(sseRes.status, 200);
+    const reader = sseRes.body.getReader();
+    const decoder = new TextDecoder();
+    let sseBuffer = '';
+    while (
+      (!sseBuffer.includes('event: server_hello') ||
+        !sseBuffer.includes('event: state') ||
+        !sseBuffer.includes('event: polaris_update')) &&
+      sseBuffer.length < 500_000
+    ) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      sseBuffer += decoder.decode(value, { stream: true });
+    }
+    assert.match(sseBuffer, /event: server_hello/);
+    assert.match(sseBuffer, /event: polaris_update/);
+    sseAbort.abort();
+
+    // 3. Create a linked child card and update it via /api/nodes/update (CLI / Polaris manipulation contract)
+    const createRes = await fetch(`${baseUrl}/api/nodes/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        node: { id: 'node-polaris-probe', title: 'Polaris Probe Card', stage: 'spec', summary: 'Initial summary' },
+        parentNodeId: 'node-ergodic-algebra',
+        relation: 'advances',
+      }),
+    });
+    assert.equal(createRes.status, 200);
+    const created = await createRes.json();
+    assert.equal(created.node.parentId, 'node-ergodic-algebra');
+    assert.ok(created.state.edges.some((e) => e.from === 'node-ergodic-algebra' && e.to === 'node-polaris-probe'));
+
+    const updateRes = await fetch(`${baseUrl}/api/nodes/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nodeId: 'node-polaris-probe',
+        title: 'Polaris Updated Card',
+        state: { stewardVerified: true },
+      }),
+    });
+    assert.equal(updateRes.status, 200);
+    const updated = await updateRes.json();
+    assert.equal(updated.node.title, 'Polaris Updated Card');
+    assert.equal(updated.node.state.stewardVerified, true);
+
+    // 4. Send a message to Polaris with focusedNodeId and verify prompt injection + turn completion
+    const msgRes = await fetch(`${baseUrl}/api/polaris/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: 'Review the focused card and summarize next steps.',
+        focusedNodeId: 'node-polaris-probe',
+        wait: true,
+      }),
+    });
+    assert.equal(msgRes.status, 200);
+    const msgData = await msgRes.json();
+    assert.equal(msgData.ok, true);
+    assert.equal(msgData.polaris.status, 'idle');
+    assert.equal(msgData.polaris.threadId, 'thread-polaris-test-1');
+    assert.equal(msgData.polaris.messages.length, 2);
+    assert.match(msgData.polaris.messages[1].text, /Polaris Updated Card/);
+    assert.ok(capturedTurn.fullPrompt.includes('<polaris_role>'), 'First turn must inject Polaris role system prompt');
+    assert.ok(capturedTurn.fullPrompt.includes('bin/asterism self-check'), 'Prompt must document self-check / self-deploy CLI');
+    assert.ok(capturedTurn.fullPrompt.includes('Polaris Updated Card'), 'Prompt must inject focused card context');
+
+    // 5. Configure model & reset thread cleanly
+    const cfgRes = await fetch(`${baseUrl}/api/polaris/configure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providerInstanceId: 'muse', model: 'muse-wonder-full-1.0' }),
+    });
+    assert.equal(cfgRes.status, 200);
+    const cfgData = await cfgRes.json();
+    assert.equal(cfgData.polaris.providerInstanceId, 'muse');
+    assert.equal(cfgData.polaris.model, 'muse-wonder-full-1.0');
+    assert.equal(cfgData.polaris.threadId, 'thread-polaris-test-1', 'Configuring model preserves thread continuity when supported');
+
+    const rstRes = await fetch(`${baseUrl}/api/polaris/reset`, { method: 'POST' });
+    assert.equal(rstRes.status, 200);
+    const rstData = await rstRes.json();
+    assert.equal(rstData.polaris.threadId, null);
+    assert.equal(rstData.polaris.messages.length, 0);
+  } finally {
+    sseAbort.abort();
+    await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+

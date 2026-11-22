@@ -126,56 +126,61 @@ export function defaultStageForRole(role = "dialogue", fallbackStage = "note") {
 
 export const ARENA_MODELS = [
   {
-    id: "openai/gpt-6-luna",
-    shortLabel: "gpt-6-luna",
-    provider: "chatgpt-gateway",
-    harness: "@t3tools/provider-codex",
-    specialty: "Direct Manipulation & Fast Spatial UI",
+    id: "antigravity/gemini-4-neon",
+    shortLabel: "gemini-4-neon",
+    provider: "antigravity",
+    harness: "@t3tools/provider-antigravity",
+    specialty: "Workspace Steward, Spatial UI & Fast Reasoning",
     badgeColor: "#38bdf8",
     bgTint: "rgba(56,189,248,0.18)",
     btnColor: "#0284c7",
   },
   {
-    id: "openai/gpt-6.1-terra",
-    shortLabel: "gpt-6.1-terra",
-    provider: "chatgpt-gateway",
-    harness: "@t3tools/provider-claude",
-    specialty: "State Machines, Systems & Deep Spec",
-    badgeColor: "#c084fc",
-    bgTint: "rgba(168,85,247,0.18)",
-    btnColor: "#7e22ce",
-  },
-  {
-    id: "openai/gpt-6.1-sol",
-    shortLabel: "gpt-6.1-sol",
-    provider: "chatgpt-gateway",
-    harness: "@t3tools/provider-antigravity",
-    specialty: "High-Density Telemetry & Verification",
+    id: "codex/gpt-6.2-sol",
+    shortLabel: "gpt-6.2-sol",
+    provider: "codex",
+    harness: "@t3tools/provider-codex",
+    specialty: "Systems Architecture, State Machines & Worktrees",
     badgeColor: "#34d399",
     bgTint: "rgba(16,185,129,0.18)",
     btnColor: "#059669",
   },
   {
-    id: "openai/gpt-6-astra",
-    shortLabel: "gpt-6-astra",
-    provider: "chatgpt-gateway",
-    harness: "@t3tools/provider-opencode",
-    specialty: "Multimodal & Creative Synthesis",
+    id: "muse/muse-wonder-full-1.0",
+    shortLabel: "muse-wonder-full",
+    provider: "muse",
+    harness: "@t3tools/provider-muse",
+    specialty: "Creative Ideonomy Expansion & Design Synthesis",
     badgeColor: "#fbbf24",
     bgTint: "rgba(251,191,36,0.18)",
     btnColor: "#d97706",
   },
   {
-    id: "openai/gpt-5.3-codex",
-    shortLabel: "gpt-5.3-codex",
-    provider: "codex",
-    harness: "@t3tools/provider-codex",
-    specialty: "Worktree Code Synthesis & Test Harnesses",
+    id: "antigravity/gemini-4-argon",
+    shortLabel: "gemini-4-argon",
+    provider: "antigravity",
+    harness: "@t3tools/provider-antigravity",
+    specialty: "Exploratory QA, Edge-Case Probing & Telemetry",
+    badgeColor: "#c084fc",
+    bgTint: "rgba(168,85,247,0.18)",
+    btnColor: "#7e22ce",
+  },
+  {
+    id: "claudeAgent/claude-opus-5-5",
+    shortLabel: "claude-opus-5-5",
+    provider: "claudeAgent",
+    harness: "@t3tools/provider-claude",
+    specialty: "Deep Formal Critique (Quota-Conserved)",
     badgeColor: "#f472b6",
     bgTint: "rgba(244,114,182,0.18)",
     btnColor: "#db2777",
   },
 ];
+
+let registeredT3Bridge = null;
+export function registerT3BridgeForLlm(bridge) {
+  registeredT3Bridge = bridge || null;
+}
 
 export function nextStageFor(currentStage = "note") {
   const idx = STAGE_ORDER.indexOf(currentStage);
@@ -193,15 +198,36 @@ export function highestStageOf(stages = []) {
 }
 
 /**
- * Streams a completion from exe.dev's keyless LLM integration (/v1/responses)
- * and extracts the final text output.
+ * Routes completions either through the live T3 Code provider harness (`antigravity`, `codex`, `muse`, `claudeAgent`)
+ * when a T3 provider model is selected, or through exe.dev's keyless LLM gateway (`/v1/responses`).
  */
 export async function callLlmResponses({ instructions, prompt, model = DEFAULT_MODEL }) {
+  const rawModel = String(model || DEFAULT_MODEL).trim();
+  if (rawModel.startsWith("offline-")) {
+    throw new Error(`Offline deterministic model requested: ${rawModel}`);
+  }
+
+  const normalized = rawModel.startsWith("t3:") ? rawModel.slice(3) : rawModel;
+  const t3Match = normalized.match(/^(antigravity|codex|muse|claudeAgent)\/(.+)$/);
+  if (t3Match && registeredT3Bridge && process.env.ASTERISM_DISABLE_T3_SURFACES !== "1") {
+    const [, providerInstanceId, modelSlug] = t3Match;
+    const out = await registeredT3Bridge.runOneShotPrompt({
+      providerInstanceId,
+      model: modelSlug,
+      instructions,
+      prompt,
+      title: `Asterism Surface · ${modelSlug}`,
+      timeoutMs: 90_000,
+    });
+    if (out?.text) return out.text;
+  }
+
+  const gatewayModel = t3Match ? DEFAULT_MODEL : normalized;
   const res = await fetch(`${LLM_BASE_URL}/v1/responses`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model,
+      model: gatewayModel,
       instructions,
       input: [{ role: "user", content: prompt }],
       store: false,

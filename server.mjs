@@ -2,16 +2,23 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { getDefaultCanvasState } from "./src/default-state.mjs";
+import {
+  createT3Bridge,
+  createPolarisService,
+  DEFAULT_POLARIS_MODEL,
+} from "./src/t3-bridge.mjs";
 import {
   ARENA_MODELS,
   DEFAULT_MODEL,
   SURFACE_ROLES,
   PANEL_RELATIONS,
   defaultRoleForStage,
+  registerT3BridgeForLlm,
   mutateHtmlSurface,
   collaborateAcrossPanels,
   spawnRelatedPanel,
@@ -329,10 +336,33 @@ function sendJson(res, status, data, extraHeaders = {}) {
 export function createAsterismServer(options = {}) {
   const dbPath = options.dbPath || SQLITE_FILE;
   const stateFile = options.stateFile || (options.dbPath ? path.join(path.dirname(options.dbPath), "canvas-state.json") : STATE_FILE);
+  const stateDir = path.dirname(stateFile);
   const worktreesDir = options.worktreesDir || WORKTREES_DIR;
   const eventSink = Effect.runSync(makeSqliteEventSink(dbPath));
   const peerFederation = Effect.runSync(makePeerFederation());
   Effect.runSync(eventSink.reconcileAfterProcessLoss);
+
+  const bootId = `boot-${crypto.randomUUID().slice(0, 8)}`;
+  const startedAt = new Date().toISOString();
+  let gitSha = "unknown";
+  try {
+    gitSha = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+      cwd: __dirname,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    // Non-git fallback
+  }
+
+  function getIndexHtmlHash() {
+    try {
+      const buf = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"));
+      return crypto.createHash("sha256").update(buf).digest("hex").slice(0, 12);
+    } catch {
+      return "missing";
+    }
+  }
 
   let canvasState = loadState(stateFile);
   const sseClients = new Set();
@@ -340,8 +370,8 @@ export function createAsterismServer(options = {}) {
   const workerId = `asterism-outbox-worker-${crypto.randomUUID().slice(0, 8)}`;
   let drainingOutbox = false;
 
-  function broadcastState(eventType = "state") {
-    const payload = `event: ${eventType}\ndata: ${JSON.stringify(canvasState)}\n\n`;
+  function broadcastSse(eventType, dataObj) {
+    const payload = `event: ${eventType}\ndata: ${JSON.stringify(dataObj)}\n\n`;
     for (const res of sseClients) {
       try {
         res.write(payload);
@@ -350,6 +380,27 @@ export function createAsterismServer(options = {}) {
       }
     }
   }
+
+  function broadcastState(eventType = "state") {
+    broadcastSse(eventType, canvasState);
+  }
+
+  const isTestInstance = Boolean(options.dbPath && path.resolve(options.dbPath) !== path.resolve(SQLITE_FILE));
+  const disableT3Bridge = options.disableT3Bridge ?? (isTestInstance && !options.enableT3Bridge);
+  const t3Bridge = createT3Bridge({ stateDir, disabled: disableT3Bridge });
+  if (!disableT3Bridge) {
+    registerT3BridgeForLlm(t3Bridge);
+  }
+
+  const polarisService = createPolarisService({
+    stateDir,
+    repoRoot: __dirname,
+    t3Bridge,
+    getAsterismOrigin: () => process.env.ASTERISM_PUBLIC_URL || "http://127.0.0.1:3456",
+    getCanvasState: () => canvasState,
+    broadcastSse,
+    customRunner: options.polarisRunner || null,
+  });
 
   async function recordDomainCommand(
     commandType,
@@ -462,12 +513,46 @@ export function createAsterismServer(options = {}) {
     try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
+    // 0. Healthcheck & Self-Deploy Identity Probe
+    if (req.method === "GET" && url.pathname === "/api/health") {
+      const deep = url.searchParams.get("deep") === "1";
+      const t3Desc = t3Bridge.readT3RuntimeDescriptor();
+      const liveT3 = deep ? await t3Bridge.getLiveStatus({ forceRefresh: false }) : undefined;
+      const pState = polarisService.getState();
+      return sendJson(res, 200, {
+        ok: true,
+        bootId,
+        startedAt,
+        gitSha,
+        indexHtmlHash: getIndexHtmlHash(),
+        nodeCount: canvasState.nodes.length,
+        edgeCount: canvasState.edges.length,
+        activeProjectId: canvasState.activeProjectId,
+        polaris: {
+          agentName: pState.agentName,
+          providerInstanceId: pState.providerInstanceId,
+          model: pState.model,
+          status: pState.status,
+          threadId: pState.threadId,
+        },
+        t3Runtime: {
+          running: t3Desc.running,
+          origin: t3Desc.origin,
+          serverVersion: t3Desc.serverVersion || null,
+          bridgeEnabled: !disableT3Bridge,
+        },
+        ...(liveT3 ? { liveT3 } : {}),
+      });
+    }
+
     // 1. Environment Descriptor
     if (req.method === "GET" && url.pathname === "/api/environment/descriptor") {
       return sendJson(res, 200, {
         environmentId: ENVIRONMENT_ID,
         name: "asterism-agentbox-101",
         protocolVersion: MCP_PROTOCOL_VERSION,
+        bootId,
+        gitSha,
         providers: EXTRACTED_PROVIDER_CATALOG.map((p) => p.id),
         arenaModels: ARENA_MODELS.map((m) => m.id),
         surfaceRoles: Object.keys(SURFACE_ROLES),
@@ -475,23 +560,30 @@ export function createAsterismServer(options = {}) {
       });
     }
 
-    // 2. Extracted Provider Harness Catalog + Arena Models + Surface Roles + Relations
+    // 2. Extracted Provider Harness Catalog + Live T3 Code Providers + Arena Models + Surface Roles + Relations
     if (req.method === "GET" && url.pathname === "/api/providers") {
-      const cliProbes = await Effect.runPromise(
-        probeAvailableHarnesses(
-          EXTRACTED_PROVIDER_CATALOG.map((p) => ({
-            id: p.id,
-            binary: p.binary,
-          })),
+      const [cliProbes, liveT3] = await Promise.all([
+        Effect.runPromise(
+          probeAvailableHarnesses(
+            EXTRACTED_PROVIDER_CATALOG.map((p) => ({
+              id: p.id,
+              binary: p.binary,
+            })),
+          ),
         ),
-      );
+        t3Bridge.getLiveStatus({ forceRefresh: url.searchParams.get("refresh") === "1" }),
+      ]);
       const probeById = new Map(cliProbes.map((p) => [p.id, p]));
+      const liveIds = new Set((liveT3.providers || []).map((p) => p.providerInstanceId));
       return sendJson(res, 200, {
         providers: EXTRACTED_PROVIDER_CATALOG.map((p) => ({
           ...p,
-          cliInstalled: probeById.get(p.id)?.installed ?? false,
+          cliInstalled: (probeById.get(p.id)?.installed ?? false) || liveIds.has(p.id),
           binaryPath: probeById.get(p.id)?.binaryPath ?? null,
+          liveInT3: liveIds.has(p.id),
         })),
+        liveT3,
+        polarisDefault: DEFAULT_POLARIS_MODEL,
         arenaModels: ARENA_MODELS,
         surfaceRoles: SURFACE_ROLES,
         panelRelations: PANEL_RELATIONS,
@@ -655,10 +747,61 @@ export function createAsterismServer(options = {}) {
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
       });
+      res.write(
+        `event: server_hello\ndata: ${JSON.stringify({
+          bootId,
+          startedAt,
+          gitSha,
+          indexHtmlHash: getIndexHtmlHash(),
+        })}\n\n`,
+      );
       res.write(`event: state\ndata: ${JSON.stringify(canvasState)}\n\n`);
+      res.write(`event: polaris_update\ndata: ${JSON.stringify(polarisService.getState())}\n\n`);
       sseClients.add(res);
       req.on("close", () => sseClients.delete(res));
       return;
+    }
+
+    // Polaris Workspace Steward Endpoints (`/api/polaris/*`)
+    if (req.method === "GET" && url.pathname === "/api/polaris/state") {
+      return sendJson(res, 200, { polaris: polarisService.getState() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/polaris/message") {
+      const body = await readJsonBody(req);
+      const accepted = await polarisService.sendMessage({
+        message: body.message,
+        focusedNodeId: body.focusedNodeId || null,
+      });
+      if (body.wait === true) {
+        await accepted.completion;
+        return sendJson(res, 200, {
+          ok: true,
+          userMessage: accepted.userMessage,
+          polaris: polarisService.getState(),
+        });
+      }
+      return sendJson(res, 202, {
+        accepted: true,
+        userMessage: accepted.userMessage,
+        polaris: accepted.polaris,
+      });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/polaris/configure") {
+      const body = await readJsonBody(req);
+      const polaris = await polarisService.configure(body);
+      return sendJson(res, 200, { polaris });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/polaris/reset") {
+      const polaris = await polarisService.resetThread();
+      return sendJson(res, 200, { polaris });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/polaris/interrupt") {
+      const polaris = await polarisService.interrupt();
+      return sendJson(res, 200, { polaris });
     }
 
     if (req.method === "GET" && url.pathname === "/api/state") {
@@ -681,16 +824,67 @@ export function createAsterismServer(options = {}) {
         : (a, b) => String(a.title || "").localeCompare(String(b.title || "")) || a.id.localeCompare(b.id));
       return sendJson(res, 200, { nodes, edges: canvasState.edges });
     }
-    if (req.method === "POST" && ["/api/nodes/move", "/api/nodes/create", "/api/nodes/delete", "/api/edges"].includes(url.pathname)) {
+    if (req.method === "POST" && ["/api/nodes/move", "/api/nodes/create", "/api/nodes/update", "/api/nodes/delete", "/api/edges"].includes(url.pathname)) {
       const body = await readJsonBody(req);
       let result = {};
       if (url.pathname === "/api/nodes/create") {
         if (!body.node || typeof body.node !== "object" || Array.isArray(body.node)) return sendJson(res, 400, { error: "node must be an object" });
-        const node = { width: 400, height: 260, ...body.node, id: body.node.id || "node-" + crypto.randomUUID() };
+        const stage = body.node.stage || "note";
+        const surfaceRole = body.node.surfaceRole || defaultRoleForStage(stage);
+        const node = {
+          width: 400,
+          height: 260,
+          kind: "surface",
+          stage,
+          surfaceRole,
+          commitment: body.node.commitment || "committed",
+          status: body.node.status || "ready",
+          model: body.node.model || "antigravity/gemini-4-neon",
+          provider: body.node.provider || "antigravity",
+          state: {},
+          ...body.node,
+          id: body.node.id || "node-" + crypto.randomUUID(),
+        };
         if (typeof node.id !== "string" || canvasState.nodes.some(n => n.id === node.id)) return sendJson(res, 400, { error: "Invalid or duplicate node id" });
         for (const key of ["width", "height"]) if (!Number.isFinite(node[key]) || node[key] <= 0) node[key] = key === "width" ? 400 : 260;
+        if (!node.html) {
+          node.html = `<div style="font-family:'Inter',system-ui,sans-serif;padding:14px 16px;color:#e2e8f0;font-size:12px;line-height:1.5;">${escapeHtml(node.summary || node.title || "New thought")}</div>`;
+        }
+        node.facets = { ...(node.facets || {}), [node.surfaceRole]: node.html };
         Object.assign(node, resolveOpenCanvasPosition(canvasState.nodes, node.x, node.y, node.width, node.height));
         canvasState.nodes.push(node);
+        if (body.parentNodeId && canvasState.nodes.some(n => n.id === body.parentNodeId)) {
+          const relation = body.relation || node.relationFromParent || "advances";
+          const relMeta = PANEL_RELATIONS[relation] || PANEL_RELATIONS.advances;
+          node.parentId = body.parentNodeId;
+          node.parentIds = [body.parentNodeId];
+          canvasState.edges.push({
+            id: `edge-${crypto.randomUUID().slice(0, 8)}`,
+            from: body.parentNodeId,
+            to: node.id,
+            relation,
+            kind: relation,
+            label: relMeta.label,
+          });
+        }
+        result = { node };
+      } else if (url.pathname === "/api/nodes/update") {
+        const node = canvasState.nodes.find(n => n.id === body.nodeId);
+        if (!node) return sendJson(res, 404, { error: "Node not found" });
+        for (const key of ["title", "html", "stage", "surfaceRole", "commitment", "status", "model", "provider", "summary"]) {
+          if (typeof body[key] === "string") node[key] = body[key];
+        }
+        for (const key of ["width", "height"]) {
+          if (Number.isFinite(body[key]) && body[key] > 0) node[key] = body[key];
+        }
+        if (body.state && typeof body.state === "object" && !Array.isArray(body.state)) {
+          node.state = { ...(node.state || {}), ...body.state };
+        }
+        if (typeof body.html === "string") {
+          const role = node.surfaceRole || defaultRoleForStage(node.stage);
+          node.facets = { ...(node.facets || {}), [role]: body.html };
+        }
+        node.updatedAt = new Date().toISOString();
         result = { node };
       } else if (url.pathname === "/api/edges") {
         if (body.action === "delete") {

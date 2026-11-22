@@ -829,6 +829,203 @@
       border-color: rgba(56, 189, 248, 0.32);
     }
     .spotlight-empty { color: #64748b; font-size: 12px; padding: 12px; }
+
+    /* Polaris Workspace Steward (Calm Peripheral Right Rail) */
+    .polaris-pill-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .polaris-pill-btn.active {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: rgba(56, 189, 248, 0.42);
+      color: #e0f2fe;
+    }
+    .polaris-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #38bdf8;
+      opacity: 0.75;
+      transition: all 0.2s ease;
+    }
+    .polaris-pill-btn.working .polaris-dot {
+      opacity: 1;
+      background: #34d399;
+      box-shadow: 0 0 8px rgba(52, 211, 153, 0.85);
+      animation: polarisPulse 1.3s infinite ease-in-out;
+    }
+    @keyframes polarisPulse {
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.35); opacity: 0.55; }
+    }
+
+    #polaris-drawer {
+      display: none;
+      position: fixed;
+      top: 58px;
+      right: 12px;
+      bottom: 12px;
+      width: min(388px, calc(100vw - 24px));
+      z-index: 165;
+      background: rgba(10, 15, 28, 0.94);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 14px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(18px);
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #polaris-drawer.open { display: flex; }
+
+    .polaris-header {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.88);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    }
+    .polaris-title-wrap {
+      display: flex; flex-direction: column; gap: 1px; min-width: 0;
+    }
+    .polaris-title-row {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12.5px; font-weight: 600; color: #f8fafc;
+    }
+    .polaris-sub {
+      font-size: 10px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .polaris-model-select {
+      background: rgba(15, 23, 42, 0.9);
+      color: #cbd5e1;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 6px;
+      padding: 3px 6px;
+      font-size: 10.5px;
+      max-width: 150px;
+      outline: none;
+      cursor: pointer;
+    }
+    .polaris-model-select:focus { border-color: rgba(56, 189, 248, 0.5); }
+
+    #polaris-activity-bar {
+      display: none;
+      align-items: center; justify-content: space-between; gap: 8px;
+      padding: 6px 12px;
+      background: rgba(56, 189, 248, 0.09);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+      font-size: 10.5px; color: #bae6fd;
+    }
+    #polaris-activity-bar.active { display: flex; }
+
+    #polaris-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .polaris-msg {
+      border-radius: 10px;
+      padding: 9px 11px;
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .polaris-msg.role-user {
+      align-self: flex-end;
+      max-width: 88%;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      color: #f1f5f9;
+    }
+    .polaris-msg.role-assistant {
+      align-self: stretch;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      color: #e2e8f0;
+    }
+    .polaris-msg.is-error {
+      border-color: rgba(248, 113, 113, 0.38);
+      background: rgba(127, 29, 29, 0.22);
+    }
+    .polaris-msg-meta {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      margin-bottom: 4px; font-size: 9.5px; color: #64748b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .polaris-md p { margin: 0 0 7px; }
+    .polaris-md p:last-child { margin-bottom: 0; }
+    .polaris-md pre {
+      margin: 6px 0; padding: 8px 9px; border-radius: 7px;
+      background: rgba(2, 6, 23, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      overflow-x: auto; font-size: 10.5px; line-height: 1.42;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; color: #cbd5e1;
+    }
+    .polaris-md code {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 10.5px; background: rgba(30, 41, 59, 0.75);
+      padding: 1px 4px; border-radius: 4px; color: #bae6fd;
+    }
+    .polaris-md pre code { background: transparent; padding: 0; color: inherit; }
+    .polaris-md ul { margin: 4px 0 7px 16px; padding: 0; }
+    .polaris-md li { margin-bottom: 3px; }
+    .polaris-md a { color: #38bdf8; text-decoration: none; }
+    .polaris-md a:hover { text-decoration: underline; }
+
+    .polaris-starter-btn {
+      text-align: left; width: 100%;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 8px; padding: 7px 9px;
+      color: #cbd5e1; font-size: 11px; line-height: 1.4;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .polaris-starter-btn:hover {
+      border-color: rgba(56, 189, 248, 0.38);
+      background: rgba(30, 41, 59, 0.75);
+      color: #f8fafc;
+    }
+
+    .polaris-composer {
+      padding: 9px 11px 11px;
+      background: rgba(15, 23, 42, 0.92);
+      border-top: 1px solid rgba(148, 163, 184, 0.14);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .polaris-context-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      font-size: 10px; color: #94a3b8;
+    }
+    .polaris-focus-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(30, 41, 59, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 99px; padding: 2px 8px;
+      max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .polaris-input-row {
+      display: flex; gap: 6px; align-items: flex-end;
+    }
+    #polaris-input {
+      flex: 1; resize: none; min-height: 36px; max-height: 120px;
+      background: rgba(9, 13, 24, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 8px; padding: 7px 9px;
+      color: #f8fafc; font-size: 12px; line-height: 1.42;
+      font-family: inherit; outline: none;
+    }
+    #polaris-input:focus { border-color: rgba(56, 189, 248, 0.5); }
+
+    #self-update-banner {
+      display: none;
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 260;
+      background: rgba(12, 19, 34, 0.96);
+      border: 1px solid rgba(56, 189, 248, 0.42);
+      border-radius: 99px; padding: 6px 8px 6px 14px;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
+      align-items: center; gap: 10px;
+      font-size: 11.5px; color: #e0f2fe;
+    }
+    #self-update-banner.visible { display: inline-flex; }
   </style>
 </head>
 <body>
@@ -841,7 +1038,7 @@
 
     <button class="project-pill-btn" id="btn-project-pill" onclick="cycleOrPromptProject()" title="Global Workspace Project & Economic Context">
       <span style="opacity:0.75;">📁</span>
-      <span id="project-pill-label">agent-attic (misc)</span>
+      <span id="project-pill-label">asterism</span>
     </button>
 
     <div class="ideabox-wrap" title="State an intent or dilemma: Sovereign Compute compiles a power-set decision tree on-the-fly, auto-acts (Co-Fork / Single / Neither) under basal energy, or surfaces a Choice/Probe only when warranted">
@@ -876,12 +1073,17 @@
         <span class="attn-dot"></span>
         <span id="attn-pill-label">Queue</span>
       </button>
+      <button class="attn-pill-btn polaris-pill-btn" id="btn-polaris-steward" onclick="togglePolarisDrawer()" title="Toggle Polaris Workspace Steward (⌘J / Ctrl+J)">
+        <span class="polaris-dot" id="polaris-pill-dot"></span>
+        <span id="polaris-pill-label">✦ Polaris</span>
+      </button>
 
       <span class="zoom-readout" id="zoom-label" onclick="resetViewportZoom()" title="Zoom altitude (zoom in >=112% for deep spec/code lenses)">88%</span>
 
       <div class="workspace-menu-wrap">
         <button class="icon-btn" id="btn-workspace-menu" onclick="toggleWorkspaceMenu(event)" title="Workspace Actions">⋯</button>
         <div class="workspace-dropdown" id="workspace-dropdown" hidden>
+          <button onclick="togglePolarisDrawer(true); closeWorkspaceMenu();">✦ Open Polaris Workspace Steward (⌘J)</button>
           <button onclick="compileAutonomousIntent(undefined, true); closeWorkspaceMenu();">🎯 Run Calibration Spot-Check Probe</button>
           <button onclick="submitIdeaBoxSeed(); closeWorkspaceMenu();">🌱 Seed 4 Shadow-Graph Branches</button>
           <button onclick="createNewSurface(); closeWorkspaceMenu();">＋ New Blank Card</button>
@@ -902,7 +1104,7 @@
   </header>
 
   <div id="plex-hud-banner">
-    <span>🕸 <strong>Plex Focus:</strong> <span id="plex-focus-title">Diamond Stratum &amp; Energy Spec</span></span>
+    <span>🕸 <strong>Plex Focus:</strong> <span id="plex-focus-title">Power-Set VOI &amp; Ergodic Reachability Spec</span></span>
     <span style="color:#64748b;">·</span>
     <span style="color:#94a3b8;font-size:10.5px;">Click any connected card to pivot the Plex around it</span>
     <button class="mini-btn" onclick="setViewProjection('canvas')">Exit Plex</button>
@@ -1025,6 +1227,51 @@
     <div id="attention-list" style="padding:10px 12px;overflow-y:auto;flex:1;"></div>
   </div>
 
+  <aside id="polaris-drawer" aria-label="Polaris Workspace Steward">
+    <div class="polaris-header">
+      <div class="polaris-title-wrap">
+        <div class="polaris-title-row">
+          <span style="color:#38bdf8;">✦</span>
+          <span>Polaris</span>
+          <a id="polaris-thread-link" href="#" target="_blank" rel="noopener" hidden style="font-size:10px;color:#64748b;font-weight:400;text-decoration:none;" title="Open backing thread in T3 Code">↗ T3</a>
+        </div>
+        <div class="polaris-sub" id="polaris-subtitle">Workspace Steward · T3 Live Harness</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;">
+        <select id="polaris-model-select" class="polaris-model-select" onchange="onPolarisModelChange(this.value)" title="Select T3 Provider & Model (defaults to Gemini Neon)">
+          <option value="antigravity::gemini-4-neon">gemini-4-neon ★</option>
+          <option value="antigravity::gemini-4-carbon">gemini-4-carbon</option>
+          <option value="antigravity::gemini-4-argon">gemini-4-argon</option>
+          <option value="codex::gpt-6.2-sol">gpt-6.2-sol</option>
+          <option value="muse::muse-wonder-full-1.0">muse-wonder-full</option>
+          <option value="claudeAgent::claude-opus-5-5">claude-opus-5-5</option>
+        </select>
+        <button class="mini-btn" onclick="resetPolarisChat()" title="Start fresh Polaris thread">＋</button>
+        <button class="mini-btn" onclick="togglePolarisDrawer(false)" title="Collapse Polaris (⌘J)">✕</button>
+      </div>
+    </div>
+    <div id="polaris-activity-bar">
+      <span id="polaris-activity-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Thinking…</span>
+      <button class="mini-btn" onclick="interruptPolaris()" style="color:#fca5a5;border-color:rgba(248,113,113,0.35);">■ Stop</button>
+    </div>
+    <div id="polaris-messages"></div>
+    <div class="polaris-composer">
+      <div class="polaris-context-row">
+        <span class="polaris-focus-pill" id="polaris-focus-pill" title="Focused canvas card automatically passed to Polaris">⌖ Canvas-wide context</span>
+        <span style="color:#475569;">⌘J</span>
+      </div>
+      <div class="polaris-input-row">
+        <textarea id="polaris-input" rows="2" placeholder="Steer canvas, dispatch T3 subagents, or edit Asterism…"></textarea>
+        <button class="ideabox-btn" id="polaris-send-btn" onclick="sendPolarisMessage()" style="padding:7px 11px;">Send</button>
+      </div>
+    </div>
+  </aside>
+
+  <div id="self-update-banner" role="status">
+    <span id="self-update-text">✦ New Asterism UI deployed</span>
+    <button class="ideabox-btn" onclick="applySeamlessSelfReload()">Reload Seamless</button>
+  </div>
+
   <div id="compare-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(15,23,42,0.95);border-bottom:1px solid rgba(148,163,184,0.16);">
       <div>
@@ -1068,7 +1315,7 @@
 
   <div id="spotlight-modal" role="dialog" aria-modal="true" aria-label="Spatial Spotlight">
     <div class="spotlight-panel">
-      <input id="spotlight-input" type="text" placeholder="Jump to card, switch lens (1-6), tidy canvas, or type an intent to compile..." autocomplete="off" />
+      <input id="spotlight-input" type="text" placeholder="Jump to card, ask Polaris (⌘J), switch lens (1-6), or compile intent..." autocomplete="off" />
       <div id="spotlight-list" role="listbox"></div>
     </div>
   </div>
@@ -1083,11 +1330,11 @@
       return escHtml(s);
     }
     const AVAILABLE_MODELS = [
-      { id: 'openai/gpt-6-luna', label: 'gpt-6-luna' },
-      { id: 'openai/gpt-6.1-terra', label: 'gpt-6.1-terra' },
-      { id: 'openai/gpt-6.1-sol', label: 'gpt-6.1-sol' },
-      { id: 'openai/gpt-6-astra', label: 'gpt-6-astra' },
-      { id: 'openai/gpt-5.3-codex', label: 'gpt-5.3-codex' },
+      { id: 'antigravity/gemini-4-neon', label: 'gemini-4-neon' },
+      { id: 'codex/gpt-6.2-sol', label: 'gpt-6.2-sol' },
+      { id: 'muse/muse-wonder-full-1.0', label: 'muse-wonder-full' },
+      { id: 'antigravity/gemini-4-argon', label: 'gemini-4-argon' },
+      { id: 'claudeAgent/claude-opus-5-5', label: 'claude-opus-5-5' },
     ];
 
     let state = {
@@ -1189,6 +1436,7 @@
         g.classList.toggle('is-focused', Boolean(active));
       });
       if (!document.querySelector('.edge-item')) renderEdges();
+      if (typeof updatePolarisFocusPill === 'function') updatePolarisFocusPill();
     }
 
     function focusDecisionNode(nodeId) {
@@ -1221,7 +1469,7 @@
         const res = await fetch('/api/edges', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(edge)
+          body: JSON.stringify({ action: 'create', edge })
         });
         if (!res.ok) await persistState();
       } catch {
@@ -1311,7 +1559,7 @@
       if (btn) btn.classList.add('active');
 
       if (nextView === 'plex') {
-        const focusId = targetFocusNodeId || focusedNodeId || state.plexFocusNodeId || 'node-hydro';
+        const focusId = targetFocusNodeId || focusedNodeId || state.plexFocusNodeId || 'node-ergodic-algebra';
         await focusPlexNode(focusId);
       } else {
         renderAll();
@@ -1961,7 +2209,7 @@
 
         let plexClass = '';
         if (state.viewProjection === 'plex') {
-          const plexId = state.plexFocusNodeId || focusedNodeId || 'node-hydro';
+          const plexId = state.plexFocusNodeId || focusedNodeId || 'node-ergodic-algebra';
           const plexNode = state.nodes.find(n => n.id === plexId);
           const isDirectEdge = state.edges.some(
             e => (e.from === plexId && e.to === node.id) || (e.to === plexId && e.from === node.id)
@@ -2113,6 +2361,7 @@
           focusedNodeId = nodeId;
           renderNodes();
           renderEdges();
+          if (typeof updatePolarisFocusPill === 'function') updatePolarisFocusPill();
         }
       });
 
@@ -2691,6 +2940,14 @@
         resolveSurfacedDecision(verifiedNodeId, msg.predictionId, msg.chosenOptionIds || []);
       } else if (msg.type === 'asterism:counterfactual') {
         triggerCounterfactualAction(verifiedNodeId || msg.nodeId, msg.predictionId, msg.action, msg.targetOptionIds);
+      } else if (msg.type === 'asterism:open-polaris') {
+        focusedNodeId = msg.focusNodeId || verifiedNodeId;
+        updateFocusClasses();
+        togglePolarisDrawer(true);
+        if (msg.prefill) {
+          const inp = document.getElementById('polaris-input');
+          if (inp) { inp.value = String(msg.prefill); inp.focus(); }
+        }
       }
     });
 
@@ -3313,7 +3570,7 @@
 
       const plexTitleEl = document.getElementById('plex-focus-title');
       if (plexTitleEl) {
-        const pFocus = state.nodes.find(n => n.id === (state.plexFocusNodeId || focusedNodeId || 'node-hydro'));
+        const pFocus = state.nodes.find(n => n.id === (state.plexFocusNodeId || focusedNodeId || 'node-ergodic-algebra'));
         if (pFocus) plexTitleEl.textContent = pFocus.title;
       }
 
@@ -3506,6 +3763,321 @@
       renderStrokes();
       updateAttentionAndWeatherUI();
       renderProjectionViews();
+      updatePolarisFocusPill();
+    }
+
+    // ── Polaris Workspace Steward & Self-Hosting Hot-Reload Client ───────────
+    let polarisState = {
+      agentName: 'Polaris',
+      subtitle: 'Workspace Steward',
+      providerInstanceId: 'antigravity',
+      model: 'gemini-4-neon',
+      status: 'idle',
+      activeActivity: null,
+      threadId: null,
+      threadLink: null,
+      messages: []
+    };
+    let liveT3Providers = [];
+    let knownServerHello = null;
+    let pendingServerHello = null;
+    let restoredSessionOnce = false;
+
+    function renderPolarisMarkdown(text) {
+      const raw = String(text || '');
+      const blocks = [];
+      const withPlaceholders = raw.replace(/```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g, (_, _lang, code) => {
+        const idx = blocks.length;
+        blocks.push(`<pre><code>${escHtml(code.replace(/\n$/, ''))}</code></pre>`);
+        return `\u0000CODEBLOCK_${idx}\u0000`;
+      });
+
+      const lines = withPlaceholders.split('\n');
+      const htmlParts = [];
+      let inList = false;
+
+      const formatInline = (line) => {
+        let out = escHtml(line);
+        out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+        out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|file:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        return out;
+      };
+
+      for (const line of lines) {
+        const phMatch = line.trim().match(/^\u0000CODEBLOCK_(\d+)\u0000$/);
+        if (phMatch) {
+          if (inList) { htmlParts.push('</ul>'); inList = false; }
+          htmlParts.push(blocks[Number(phMatch[1])] || '');
+          continue;
+        }
+        const bullet = line.match(/^\s*[-*•]\s+(.+)$/);
+        if (bullet) {
+          if (!inList) { htmlParts.push('<ul>'); inList = true; }
+          htmlParts.push(`<li>${formatInline(bullet[1])}</li>`);
+          continue;
+        }
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        if (!line.trim()) continue;
+        htmlParts.push(`<p>${formatInline(line).replace(/\u0000CODEBLOCK_(\d+)\u0000/g, (_, i) => blocks[Number(i)] || '')}</p>`);
+      }
+      if (inList) htmlParts.push('</ul>');
+      return `<div class="polaris-md">${htmlParts.join('')}</div>`;
+    }
+
+    function updatePolarisFocusPill() {
+      const pill = document.getElementById('polaris-focus-pill');
+      if (!pill) return;
+      const node = focusedNodeId ? state.nodes.find(n => n.id === focusedNodeId) : null;
+      if (node) {
+        pill.innerHTML = `<span>⌖ ${escHtml(node.title.length > 30 ? node.title.slice(0, 29) + '…' : node.title)}</span>`;
+        pill.style.color = '#bae6fd';
+        pill.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+      } else {
+        pill.textContent = '⌖ Canvas-wide context';
+        pill.style.color = '#94a3b8';
+        pill.style.borderColor = 'rgba(148, 163, 184, 0.18)';
+      }
+    }
+
+    function togglePolarisDrawer(forceOpen) {
+      const drawer = document.getElementById('polaris-drawer');
+      const btn = document.getElementById('btn-polaris-steward');
+      if (!drawer) return;
+      const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !drawer.classList.contains('open');
+      drawer.classList.toggle('open', shouldOpen);
+      if (btn) btn.classList.toggle('active', shouldOpen);
+      try { sessionStorage.setItem('asterism:polarisOpen', shouldOpen ? '1' : '0'); } catch {}
+      if (shouldOpen) {
+        updatePolarisFocusPill();
+        renderPolarisUI(true);
+        requestAnimationFrame(() => document.getElementById('polaris-input')?.focus());
+      }
+    }
+
+    function renderPolarisUI(forceScrollBottom = false) {
+      const btn = document.getElementById('btn-polaris-steward');
+      const actBar = document.getElementById('polaris-activity-bar');
+      const actText = document.getElementById('polaris-activity-text');
+      const subEl = document.getElementById('polaris-subtitle');
+      const linkEl = document.getElementById('polaris-thread-link');
+      const selEl = document.getElementById('polaris-model-select');
+      const msgBox = document.getElementById('polaris-messages');
+      const isWorking = polarisState.status === 'working';
+
+      if (btn) btn.classList.toggle('working', isWorking);
+      if (actBar) actBar.classList.toggle('active', isWorking);
+      if (actText && polarisState.activeActivity) actText.textContent = polarisState.activeActivity;
+      if (subEl) {
+        subEl.textContent = `Workspace Steward · ${polarisState.providerInstanceId}/${polarisState.model}`;
+      }
+      if (linkEl) {
+        if (polarisState.threadLink && polarisState.threadLink.startsWith('http')) {
+          linkEl.href = polarisState.threadLink;
+          linkEl.hidden = false;
+        } else {
+          linkEl.hidden = true;
+        }
+      }
+      if (selEl) {
+        const key = `${polarisState.providerInstanceId}::${polarisState.model}`;
+        if (!Array.from(selEl.options).some(o => o.value === key)) {
+          const opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = polarisState.model;
+          selEl.appendChild(opt);
+        }
+        selEl.value = key;
+      }
+
+      if (!msgBox) return;
+      const nearBottom = forceScrollBottom || (msgBox.scrollHeight - msgBox.scrollTop - msgBox.clientHeight < 90);
+      const msgs = Array.isArray(polarisState.messages) ? polarisState.messages : [];
+
+      if (msgs.length === 0) {
+        msgBox.innerHTML = `
+          <div style="padding:10px 11px;border-radius:10px;background:rgba(15,23,42,0.55);border:1px solid rgba(148,163,184,0.12);color:#94a3b8;font-size:11.5px;line-height:1.5;">
+            <div style="color:#e2e8f0;font-weight:600;margin-bottom:4px;">✦ Polaris · Workspace Steward</div>
+            <div>Connected to your live T3 Code providers (defaulting to <code>gemini-4-neon</code>). I can manipulate canvas cards, dispatch Gemini/Muse/Codex subagents, or edit &amp; safely redeploy Asterism itself via <code>bin/asterism self-deploy</code>.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px;">
+            <button class="polaris-starter-btn" onclick="sendPolarisStarter('Review our 3 active roadmap branches on the canvas and recommend the highest-VOI next step.')">↗ Review active roadmap branches &amp; highest-VOI next step</button>
+            <button class="polaris-starter-btn" onclick="sendPolarisStarter('Inspect the currently focused card and propose a concrete improvement or companion surface.')">⌖ Critique or extend the currently focused card</button>
+            <button class="polaris-starter-btn" onclick="sendPolarisStarter('Run bin/asterism status and summarize live T3 provider readiness and recent commits.')">⚙ Check live self-hosting &amp; T3 harness status</button>
+          </div>
+        `;
+        return;
+      }
+
+      msgBox.innerHTML = msgs.map(m => {
+        const isUser = m.role === 'user';
+        const focusTag = m.focusedNodeTitle
+          ? `<span>⌖ ${escHtml(m.focusedNodeTitle.slice(0, 24))}</span>`
+          : '';
+        const modelTag = !isUser && m.model ? `<span>${escHtml(m.model)}${m.streaming ? ' · streaming…' : ''}</span>` : '';
+        return `
+          <div class="polaris-msg role-${isUser ? 'user' : 'assistant'}${m.isError ? ' is-error' : ''}">
+            ${(focusTag || modelTag) ? `<div class="polaris-msg-meta">${modelTag || '<span>you</span>'}${focusTag}</div>` : ''}
+            ${isUser ? `<div>${escHtml(m.text)}</div>` : renderPolarisMarkdown(m.text)}
+          </div>
+        `;
+      }).join('');
+
+      if (nearBottom) {
+        msgBox.scrollTop = msgBox.scrollHeight;
+      }
+    }
+
+    function sendPolarisStarter(promptText) {
+      const inp = document.getElementById('polaris-input');
+      if (inp) inp.value = promptText;
+      sendPolarisMessage();
+    }
+
+    async function sendPolarisMessage(customText) {
+      const inp = document.getElementById('polaris-input');
+      const text = (customText !== undefined ? String(customText) : (inp?.value || '')).trim();
+      if (!text) return;
+      if (inp && customText === undefined) inp.value = '';
+      togglePolarisDrawer(true);
+      try {
+        const res = await fetch('/api/polaris/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            focusedNodeId: focusedNodeId || null
+          })
+        });
+        const data = await res.json();
+        if (data.polaris) {
+          polarisState = data.polaris;
+          renderPolarisUI(true);
+        }
+      } catch (err) {
+        showToast('Polaris request failed: ' + (err?.message || 'network error'));
+      }
+    }
+
+    async function onPolarisModelChange(val) {
+      const [providerInstanceId, model] = String(val || '').split('::');
+      if (!providerInstanceId || !model) return;
+      const options = model.includes('gemini-4') ? { thinking_level: 'high' } : {};
+      const res = await fetch('/api/polaris/configure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerInstanceId, model, options })
+      });
+      const data = await res.json();
+      if (data.polaris) {
+        polarisState = data.polaris;
+        renderPolarisUI(false);
+        showToast(`Polaris switched to ${providerInstanceId}/${model}`);
+      }
+    }
+
+    async function resetPolarisChat() {
+      const res = await fetch('/api/polaris/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (data.polaris) {
+        polarisState = data.polaris;
+        renderPolarisUI(true);
+        showToast('Started fresh Polaris Steward thread.');
+      }
+    }
+
+    async function interruptPolaris() {
+      const res = await fetch('/api/polaris/interrupt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (data.polaris) {
+        polarisState = data.polaris;
+        renderPolarisUI(false);
+      }
+    }
+
+    async function hydrateLiveT3Providers() {
+      try {
+        const res = await fetch('/api/providers');
+        if (!res.ok) return;
+        const data = await res.json();
+        const providers = data?.liveT3?.providers || [];
+        if (!Array.isArray(providers) || providers.length === 0) return;
+        liveT3Providers = providers;
+
+        // Populate Polaris grouped model selector with live T3 models
+        const selEl = document.getElementById('polaris-model-select');
+        if (selEl) {
+          const currentVal = `${polarisState.providerInstanceId}::${polarisState.model}`;
+          selEl.innerHTML = '';
+          for (const p of providers) {
+            const group = document.createElement('optgroup');
+            group.label = p.displayName || p.providerInstanceId;
+            for (const m of (p.models || [])) {
+              const opt = document.createElement('option');
+              opt.value = `${p.providerInstanceId}::${m.id}`;
+              opt.textContent = `${m.id}${m.favorite ? ' ★' : ''}`;
+              group.appendChild(opt);
+            }
+            selEl.appendChild(group);
+          }
+          if (Array.from(selEl.options).some(o => o.value === currentVal)) {
+            selEl.value = currentVal;
+          }
+        }
+      } catch {
+        // Offline or T3 bridge disabled
+      }
+    }
+
+    function applySeamlessSelfReload() {
+      try {
+        sessionStorage.setItem('asterism:reloadState', JSON.stringify({
+          viewport: state.viewport,
+          viewProjection: state.viewProjection,
+          focusedNodeId,
+          polarisOpen: document.getElementById('polaris-drawer')?.classList.contains('open') || false
+        }));
+      } catch {}
+      window.location.reload();
+    }
+
+    function restoreSeamlessReloadIfPresent() {
+      if (restoredSessionOnce) return;
+      restoredSessionOnce = true;
+      try {
+        const raw = sessionStorage.getItem('asterism:reloadState');
+        if (raw) {
+          sessionStorage.removeItem('asterism:reloadState');
+          const saved = JSON.parse(raw);
+          if (saved.viewport) state.viewport = saved.viewport;
+          if (saved.viewProjection) state.viewProjection = saved.viewProjection;
+          if (saved.focusedNodeId) focusedNodeId = saved.focusedNodeId;
+          if (saved.polarisOpen) togglePolarisDrawer(true);
+          return;
+        }
+        if (sessionStorage.getItem('asterism:polarisOpen') === '1') {
+          togglePolarisDrawer(true);
+        }
+      } catch {}
+    }
+
+    const polarisInputEl = document.getElementById('polaris-input');
+    if (polarisInputEl) {
+      polarisInputEl.addEventListener('keydown', (e) => {
+        if (e.isComposing) return;
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendPolarisMessage();
+        }
+      });
     }
 
     document.addEventListener('click', (e) => {
@@ -3534,16 +4106,28 @@
         toggleSpatialSpotlight();
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'j') {
+        e.preventDefault();
+        togglePolarisDrawer();
+        return;
+      }
       if (e.key === 'Escape') {
         const spotlight = document.getElementById('spotlight-modal');
         if (spotlight && spotlight.classList.contains('open')) { closeSpatialSpotlight(); return; }
         const dd = document.getElementById('workspace-dropdown');
         if (dd && !dd.hidden) { closeWorkspaceMenu(); return; }
+        if (target && target.id === 'polaris-input' && !target.value) {
+          togglePolarisDrawer(false);
+          target.blur();
+          return;
+        }
         if (inField) return;
         const compare = document.getElementById('compare-modal');
         if (compare && compare.classList.contains('open')) { closeComparisonMatrix(); return; }
         const drawer = document.getElementById('attention-drawer');
         if (drawer && drawer.classList.contains('open')) { drawer.classList.remove('open'); return; }
+        const polarisDrawer = document.getElementById('polaris-drawer');
+        if (polarisDrawer && polarisDrawer.classList.contains('open')) { togglePolarisDrawer(false); return; }
         const editing = document.querySelectorAll('.canvas-node.editing-html, .canvas-node.viewing-diff');
         if (editing.length) { editing.forEach(c => c.classList.remove('editing-html', 'viewing-diff')); return; }
         if (state.viewProjection && state.viewProjection !== 'canvas') { setViewProjection('canvas'); return; }
@@ -3569,6 +4153,7 @@
       const q = String(query || '').trim().toLowerCase();
       const match = (text) => !q || String(text).toLowerCase().includes(q);
       const actions = [
+        { label: '✦ Toggle Polaris Workspace Steward', hint: 'Steward · ⌘J', run: () => togglePolarisDrawer() },
         { label: '✨ Tidy Overlapping Cards', hint: 'Action', run: () => tidyCanvasLayout() },
         { label: '☀ Open Morning Coffee Brief', hint: 'Lens · 6', run: () => setViewProjection('brief') },
         { label: '🎯 Run Calibration Spot-Check Probe', hint: 'Action', run: () => compileAutonomousIntent(undefined, true) },
@@ -3593,6 +4178,11 @@
       const items = [...actions, ...cards];
       const trimmed = String(query || '').trim();
       if (trimmed) {
+        items.push({
+          label: `✦ Ask Polaris: ${trimmed}`,
+          hint: 'Polaris Steward',
+          run: () => sendPolarisMessage(trimmed)
+        });
         items.push({
           label: `⚡ Act on intent: ${trimmed}`,
           hint: 'Compile intent',
@@ -3698,6 +4288,32 @@
       const dot = document.getElementById('brand-health-dot');
       if (dot) { dot.style.background = '#fbbf24'; dot.style.boxShadow = '0 0 6px rgba(251, 191, 36, 0.6)'; }
     };
+    evtSource.addEventListener('server_hello', (e) => {
+      let hello;
+      try { hello = JSON.parse(e.data); } catch { return; }
+      if (!hello || typeof hello !== 'object') return;
+      if (!knownServerHello) {
+        knownServerHello = hello;
+        return;
+      }
+      if (hello.indexHtmlHash && hello.indexHtmlHash !== knownServerHello.indexHtmlHash) {
+        pendingServerHello = hello;
+        const banner = document.getElementById('self-update-banner');
+        const txt = document.getElementById('self-update-text');
+        if (txt) txt.textContent = `✦ New Asterism UI ready (${hello.gitSha || 'updated'})`;
+        if (banner) banner.classList.add('visible');
+      } else if (hello.bootId && hello.bootId !== knownServerHello.bootId) {
+        knownServerHello = hello;
+        showToast(`✦ Live backend hot-reloaded (${hello.gitSha || 'updated'}) — workspace preserved.`);
+      }
+    });
+    evtSource.addEventListener('polaris_update', (e) => {
+      let incoming;
+      try { incoming = JSON.parse(e.data); } catch { return; }
+      if (!incoming || typeof incoming !== 'object') return;
+      polarisState = incoming;
+      renderPolarisUI(false);
+    });
     evtSource.addEventListener('state', (e) => {
       let incoming;
       try { incoming = JSON.parse(e.data); } catch { return; }
@@ -3730,6 +4346,7 @@
         state.viewport = { ...prevViewport, scale: Math.min(3.0, Math.max(0.15, prevViewport.scale || 0.88)) };
       }
       if (prevViewProjection) state.viewProjection = prevViewProjection;
+      restoreSeamlessReloadIfPresent();
       const validIds = new Set(state.nodes.map(n => n.id));
       for (const id of [...selectedForSynth]) { if (!validIds.has(id)) selectedForSynth.delete(id); }
       if (focusedNodeId && !validIds.has(focusedNodeId)) focusedNodeId = null;
@@ -3738,6 +4355,8 @@
       updateSynthButtonLabel();
       renderAll();
     });
+
+    hydrateLiveT3Providers();
   </script>
 </body>
 </html>

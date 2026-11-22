@@ -1,0 +1,395 @@
+#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+import { execFileSync, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, "..");
+const DEFAULT_URL = process.env.ASTERISM_URL || "http://127.0.0.1:3456";
+
+function parseArgs(argv) {
+  const positionals = [];
+  const flags = {};
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (token.startsWith("--")) {
+      const eqIdx = token.indexOf("=");
+      if (eqIdx !== -1) {
+        flags[token.slice(2, eqIdx)] = token.slice(eqIdx + 1);
+      } else {
+        const key = token.slice(2);
+        const next = argv[i + 1];
+        if (next !== undefined && !next.startsWith("--")) {
+          flags[key] = next;
+          i++;
+        } else {
+          flags[key] = true;
+        }
+      }
+    } else {
+      positionals.push(token);
+    }
+  }
+  return { positionals, flags };
+}
+
+async function apiRequest(baseUrl, method, route, body) {
+  const res = await fetch(`${baseUrl.replace(/\/+$/, "")}${route}`, {
+    method,
+    headers: body ? { "content-type": "application/json" } : {},
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ${method} ${route}: ${data.error || text.slice(0, 240)}`);
+  }
+  return data;
+}
+
+function collectMjsFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...collectMjsFiles(full));
+    else if (entry.isFile() && entry.name.endsWith(".mjs")) out.push(full);
+  }
+  return out;
+}
+
+export function runPreflightChecks({ quiet = false, skipTests = false } = {}) {
+  const log = (...args) => {
+    if (!quiet) console.log(...args);
+  };
+
+  // 1. Node syntax checks across server.mjs, bin/asterism, src/*.mjs, test/*.mjs
+  const filesToCheck = [
+    path.join(REPO_ROOT, "server.mjs"),
+    path.join(REPO_ROOT, "bin", "asterism"),
+    ...collectMjsFiles(path.join(REPO_ROOT, "src")),
+    ...collectMjsFiles(path.join(REPO_ROOT, "test")),
+  ];
+  log(`▸ [1/3] Checking syntax of ${filesToCheck.length} JS modules…`);
+  for (const file of filesToCheck) {
+    execFileSync(process.execPath, ["--check", file], {
+      cwd: REPO_ROOT,
+      stdio: quiet ? "pipe" : "inherit",
+    });
+  }
+
+  // 2. Inline <script> syntax verification on public/index.html
+  const indexHtmlPath = path.join(REPO_ROOT, "public", "index.html");
+  log("▸ [2/3] Parsing inline <script> blocks in public/index.html…");
+  const html = fs.readFileSync(indexHtmlPath, "utf8");
+  const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+  let scriptCount = 0;
+  let match;
+  while ((match = scriptRegex.exec(html)) !== null) {
+    const code = match[1];
+    if (!code.trim()) continue;
+    scriptCount++;
+    new vm.Script(code, { filename: `public/index.html#script-${scriptCount}` });
+  }
+  if (scriptCount === 0) {
+    throw new Error("No inline <script> found in public/index.html — refusing potentially broken UI.");
+  }
+
+  // 3. Isolated test suite (`node --test`)
+  if (!skipTests) {
+    log("▸ [3/3] Running isolated unit & integration test suite (node --test)…");
+    const testFiles = collectMjsFiles(path.join(REPO_ROOT, "test"));
+    const res = spawnSync(process.execPath, ["--test", ...testFiles], {
+      cwd: REPO_ROOT,
+      stdio: quiet ? "pipe" : "inherit",
+      env: { ...process.env, ASTERISM_DISABLE_T3_SURFACES: "1" },
+    });
+    if (res.status !== 0) {
+      const stderr = res.stderr ? res.stderr.toString("utf8") : "";
+      throw new Error(`Test suite failed (exit ${res.status}). ${stderr.slice(0, 400)}`);
+    }
+  }
+
+  log("✓ Preflight self-check passed.");
+  return { checkedModules: filesToCheck.length, checkedScripts: scriptCount };
+}
+
+function snapshotLiveState(tag = "pre-deploy") {
+  const dataDir = path.join(REPO_ROOT, "data");
+  const snapDir = path.join(dataDir, "snapshots");
+  fs.mkdirSync(snapDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const bundle = {
+    createdAt: new Date().toISOString(),
+    tag,
+    canvasState: fs.existsSync(path.join(dataDir, "canvas-state.json"))
+      ? JSON.parse(fs.readFileSync(path.join(dataDir, "canvas-state.json"), "utf8"))
+      : null,
+    polarisState: fs.existsSync(path.join(dataDir, "polaris-state.json"))
+      ? JSON.parse(fs.readFileSync(path.join(dataDir, "polaris-state.json"), "utf8"))
+      : null,
+  };
+  const snapFile = path.join(snapDir, `${stamp}-${tag}.json`);
+  fs.writeFileSync(snapFile, JSON.stringify(bundle, null, 2), { mode: 0o600 });
+
+  // Retain most recent 20 snapshots
+  const all = fs
+    .readdirSync(snapDir)
+    .filter((f) => f.endsWith(".json"))
+    .sort();
+  while (all.length > 20) {
+    const oldest = all.shift();
+    try {
+      fs.unlinkSync(path.join(snapDir, oldest));
+    } catch {
+      // ignore
+    }
+  }
+  return snapFile;
+}
+
+async function waitForHealthyBoot(baseUrl, previousBootId, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastErr = null;
+  while (Date.now() < deadline) {
+    try {
+      const health = await apiRequest(baseUrl, "GET", "/api/health");
+      if (health.ok && (!previousBootId || health.bootId !== previousBootId)) {
+        return health;
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+    await new Promise((r) => setTimeout(r, 350));
+  }
+  throw new Error(
+    `Server at ${baseUrl} did not report a healthy new bootId within ${timeoutMs}ms${lastErr ? ` (${lastErr.message})` : ""}.`,
+  );
+}
+
+function printHelp() {
+  console.log(`Asterism Workspace & Self-Hosting CLI
+
+Usage:
+  bin/asterism status [--json]
+  bin/asterism cards [--json]
+  bin/asterism card-create --title "..." [--stage note|brainstorm|refine|design|implement] [--role dialogue|spec-diagram|ui-prototype|artifact-harness] [--html "..."] [--html-file <path>] [--parent <nodeId>] [--relation advances]
+  bin/asterism card-update <nodeId> [--title "..."] [--stage ...] [--role ...] [--html "..."] [--html-file <path>]
+  bin/asterism card-delete <nodeId>
+  bin/asterism connect <fromId> <toId> [--relation specifies|visualizes-ui|implements|advances]
+  bin/asterism compile "<dilemma or intent>" [--probe]
+  bin/asterism tidy
+  bin/asterism self-check [--skip-tests]
+  bin/asterism self-deploy [--message "feat: ..."] [--push]
+`);
+}
+
+async function main() {
+  const { positionals, flags } = parseArgs(process.argv.slice(2));
+  const cmd = positionals[0] || "help";
+  const baseUrl = String(flags.url || DEFAULT_URL);
+
+  if (cmd === "help" || flags.help) {
+    printHelp();
+    return;
+  }
+
+  if (cmd === "status") {
+    const health = await apiRequest(baseUrl, "GET", "/api/health?deep=1");
+    if (flags.json) {
+      console.log(JSON.stringify(health, null, 2));
+      return;
+    }
+    console.log(`Asterism Live Status (${baseUrl})`);
+    console.log(`  Boot / SHA : ${health.bootId} @ ${health.gitSha} (UI hash ${health.indexHtmlHash})`);
+    console.log(`  Canvas     : ${health.nodeCount} thoughts, ${health.edgeCount} edges (project: ${health.activeProjectId})`);
+    console.log(`  Polaris    : ${health.polaris?.providerInstanceId}/${health.polaris?.model} [${health.polaris?.status}]`);
+    const providers = (health.liveT3?.providers || []).map((p) => `${p.providerInstanceId}(${p.models.length})`).join(", ");
+    console.log(`  T3 Bridge  : ${health.liveT3?.connected ? `connected (${providers})` : `offline (${health.liveT3?.error || health.liveT3?.reason || "unavailable"})`}`);
+    return;
+  }
+
+  if (cmd === "cards") {
+    const state = await apiRequest(baseUrl, "GET", "/api/state");
+    if (flags.json) {
+      console.log(JSON.stringify(state.nodes, null, 2));
+      return;
+    }
+    for (const n of state.nodes || []) {
+      const vis = n.shadowStaged ? " [shadow]" : "";
+      console.log(`• [${n.id}] "${n.title}" (${n.stage || "note"} · ${n.surfaceRole || "dialogue"} · ${n.commitment || n.status || "ready"})${vis}`);
+    }
+    return;
+  }
+
+  if (cmd === "card-create") {
+    const title = String(flags.title || positionals[1] || "New Canvas Thought");
+    const html = flags["html-file"]
+      ? fs.readFileSync(path.resolve(String(flags["html-file"])), "utf8")
+      : typeof flags.html === "string"
+        ? flags.html
+        : undefined;
+    const out = await apiRequest(baseUrl, "POST", "/api/nodes/create", {
+      node: {
+        ...(flags.id ? { id: String(flags.id) } : {}),
+        title,
+        ...(flags.stage ? { stage: String(flags.stage) } : {}),
+        ...(flags.role ? { surfaceRole: String(flags.role) } : {}),
+        ...(flags.summary ? { summary: String(flags.summary) } : {}),
+        ...(html ? { html } : {}),
+      },
+      ...(flags.parent ? { parentNodeId: String(flags.parent) } : {}),
+      ...(flags.relation ? { relation: String(flags.relation) } : {}),
+    });
+    console.log(`Created card [${out.node.id}] "${out.node.title}" at (${out.node.x}, ${out.node.y})`);
+    return;
+  }
+
+  if (cmd === "card-update") {
+    const nodeId = positionals[1] || flags.id;
+    if (!nodeId) throw new Error("Usage: bin/asterism card-update <nodeId> [--title ...] [--html-file ...]");
+    const html = flags["html-file"]
+      ? fs.readFileSync(path.resolve(String(flags["html-file"])), "utf8")
+      : typeof flags.html === "string"
+        ? flags.html
+        : undefined;
+    const out = await apiRequest(baseUrl, "POST", "/api/nodes/update", {
+      nodeId: String(nodeId),
+      ...(typeof flags.title === "string" ? { title: flags.title } : {}),
+      ...(typeof flags.stage === "string" ? { stage: flags.stage } : {}),
+      ...(typeof flags.role === "string" ? { surfaceRole: flags.role } : {}),
+      ...(typeof flags.summary === "string" ? { summary: flags.summary } : {}),
+      ...(html !== undefined ? { html } : {}),
+    });
+    console.log(`Updated card [${out.node.id}] "${out.node.title}"`);
+    return;
+  }
+
+  if (cmd === "card-delete") {
+    const nodeId = positionals[1] || flags.id;
+    if (!nodeId) throw new Error("Usage: bin/asterism card-delete <nodeId>");
+    const out = await apiRequest(baseUrl, "POST", "/api/nodes/delete", { nodeId: String(nodeId) });
+    console.log(`Deleted card [${out.deletedId}]`);
+    return;
+  }
+
+  if (cmd === "connect") {
+    const [from, to] = [positionals[1], positionals[2]];
+    if (!from || !to) throw new Error("Usage: bin/asterism connect <fromId> <toId> [--relation specifies]");
+    const relation = String(flags.relation || "specifies");
+    await apiRequest(baseUrl, "POST", "/api/edges", {
+      action: "create",
+      edge: { from, to, relation, kind: relation, label: relation },
+    });
+    console.log(`Connected [${from}] --(${relation})--> [${to}]`);
+    return;
+  }
+
+  if (cmd === "compile") {
+    const prompt = positionals.slice(1).join(" ") || String(flags.prompt || "");
+    if (!prompt) throw new Error('Usage: bin/asterism compile "<dilemma or intent>" [--probe]');
+    const out = await apiRequest(baseUrl, "POST", "/api/decisions/compile", {
+      prompt,
+      forceProbe: Boolean(flags.probe),
+    });
+    console.log(`Compiled regime=${out.regime} bestSubset=${out.sealedPrediction?.predictedSubsetKey}`);
+    return;
+  }
+
+  if (cmd === "tidy") {
+    const out = await apiRequest(baseUrl, "POST", "/api/canvas/tidy", {});
+    console.log(`Tidied canvas (${out.movedCount} cards repositioned).`);
+    return;
+  }
+
+  if (cmd === "self-check") {
+    runPreflightChecks({ skipTests: Boolean(flags["skip-tests"]) });
+    return;
+  }
+
+  if (cmd === "self-deploy") {
+    runPreflightChecks({ skipTests: Boolean(flags["skip-tests"]) });
+
+    const prevSha = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    }).trim();
+    const snapFile = snapshotLiveState(prevSha);
+    console.log(`▸ Saved state snapshot: ${path.relative(REPO_ROOT, snapFile)}`);
+
+    let previousBootId = null;
+    try {
+      const prevHealth = await apiRequest(baseUrl, "GET", "/api/health");
+      previousBootId = prevHealth.bootId || null;
+    } catch {
+      // Service may not yet expose /api/health before upgrade
+    }
+
+    let createdCommit = false;
+    if (typeof flags.message === "string" && flags.message.trim()) {
+      const statusOut = execFileSync("git", ["status", "--porcelain"], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+      }).trim();
+      if (statusOut) {
+        execFileSync("git", ["add", "-A"], { cwd: REPO_ROOT, stdio: "inherit" });
+        execFileSync("git", ["commit", "-m", flags.message.trim()], {
+          cwd: REPO_ROOT,
+          stdio: "inherit",
+        });
+        createdCommit = true;
+      }
+    }
+
+    console.log("▸ Restarting systemd unit asterism.service…");
+    execFileSync("systemctl", ["--user", "restart", "asterism.service"], {
+      cwd: REPO_ROOT,
+      stdio: "inherit",
+    });
+
+    try {
+      const health = await waitForHealthyBoot(baseUrl, previousBootId, 15_000);
+      console.log(
+        `✓ Live deploy healthy: bootId=${health.bootId} sha=${health.gitSha} uiHash=${health.indexHtmlHash} (${health.nodeCount} cards)`,
+      );
+      if (flags.push) {
+        console.log("▸ Pushing main to origin…");
+        execFileSync("git", ["push", "origin", "main"], {
+          cwd: REPO_ROOT,
+          stdio: "inherit",
+        });
+      }
+    } catch (deployErr) {
+      console.error(`✗ Healthcheck failed after restart: ${deployErr.message}`);
+      if (createdCommit) {
+        console.error("▸ Reverting commit and restarting asterism.service to restore healthy state…");
+        execFileSync("git", ["revert", "--no-edit", "HEAD"], {
+          cwd: REPO_ROOT,
+          stdio: "inherit",
+        });
+        execFileSync("systemctl", ["--user", "restart", "asterism.service"], {
+          cwd: REPO_ROOT,
+          stdio: "inherit",
+        });
+      }
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  throw new Error(`Unknown command "${cmd}". Run 'bin/asterism help' for usage.`);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error(`asterism cli error: ${err.message}`);
+    process.exit(1);
+  });
+}
